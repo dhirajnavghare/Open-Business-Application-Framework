@@ -42,6 +42,8 @@ When contributing to OBAF, keep these non-negotiables in mind:
 
 ## 🛠️ Setting Up Your Development Environment
 
+For complete details on environment prerequisites, editors, and quickstart commands, see the [Developer Setup Guide](docs/DEVELOPER_SETUP.md). You can also run `make setup` to automatically initialize your environment.
+
 ### Prerequisites
 - [Rust](https://rustup.rs/) (1.80 or higher) with `rustfmt` and `clippy` (`rustup component add rustfmt clippy`)
 - Git

@@ -271,9 +271,9 @@ Open-Business-Application-Framework/
 
 ---
 
-## 🤝 Contributing
+## 🤝 Contributing & Developer Setup
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+Contributions are welcome! Please read our [Developer Setup Guide](docs/DEVELOPER_SETUP.md) and [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## 📄 License
 

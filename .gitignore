@@ -20,7 +20,9 @@ rustc-ice-*.txt
 *.db
 *.db-shm
 *.db-wal
-data/
+data/*.db*
+data/backups/
+!data/.gitkeep
 .env
 .env.*
 !.env.example
