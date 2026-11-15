@@ -227,3 +227,19 @@ fn test_cli_new_preset() {
 
     let _ = fs::remove_file(&preset_file);
 }
+
+#[test]
+fn test_cli_status() {
+    let bin = env!("CARGO_BIN_EXE_obaf-cli");
+    let output = Command::new(bin)
+        .current_dir(get_workspace_root())
+        .args(["status"])
+        .output()
+        .expect("Failed to execute obaf-cli status");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Open Business Application Framework (OBAF) System Status"));
+    assert!(stdout.contains("Local Domain Engine:"));
+    assert!(stdout.contains("Domain Presets:"));
+}

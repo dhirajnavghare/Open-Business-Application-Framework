@@ -1,10 +1,12 @@
 use axum::{
-    http::{header, HeaderName, HeaderValue},
-    middleware::{from_fn, Next},
-    response::Response,
+    extract::State,
+    http::{header, HeaderName, HeaderValue, StatusCode},
+    middleware::{from_fn, from_fn_with_state, Next},
+    response::{IntoResponse, Response},
     routing::get,
-    Router,
+    Json, Router,
 };
+use obaf_core::RateLimitResult;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -76,9 +78,81 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/admin", admin_routes())
         // Global Middlewares
         .layer(from_fn(request_id_and_security_middleware))
+        .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+async fn rate_limit_middleware(
+    State(state): State<SharedState>,
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path();
+    // Exclude health, metrics, documentation, and metadata endpoints from rate limiting
+    if path == "/health"
+        || path == "/metrics"
+        || path == "/llms.txt"
+        || path.starts_with("/swagger-ui")
+        || path == "/api/v1/openapi.json"
+    {
+        return next.run(request).await;
+    }
+
+    // Determine client rate limiting key (Token Bucket per client/tenant)
+    let client_key = if let Some(auth) = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    {
+        format!("auth:{}", &auth[..auth.len().min(32)])
+    } else if let Some(ip) = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+    {
+        format!("ip:{}", ip.split(',').next().unwrap_or("unknown").trim())
+    } else if let Some(ip) = request
+        .headers()
+        .get("cf-connecting-ip")
+        .and_then(|v| v.to_str().ok())
+    {
+        format!("ip:{}", ip.trim())
+    } else {
+        "client:default".to_string()
+    };
+
+    match state.rate_limiter.check_and_consume(&client_key, 1.0) {
+        RateLimitResult::Allowed { remaining } => {
+            let mut response = next.run(request).await;
+            if let Ok(rem_val) = HeaderValue::from_str(&format!("{:.0}", remaining)) {
+                response
+                    .headers_mut()
+                    .insert(HeaderName::from_static("x-ratelimit-remaining"), rem_val);
+            }
+            response
+        }
+        RateLimitResult::Rejected { retry_after_secs } => {
+            let retry_secs = (retry_after_secs.ceil() as u64).max(1);
+            let body = serde_json::json!({
+                "error": "Too Many Requests",
+                "message": "Rate limit exceeded. Please retry after the cooling window.",
+                "retry_after_secs": retry_secs
+            });
+            let mut response = Json(body).into_response();
+            *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+            let headers = response.headers_mut();
+            if let Ok(retry_val) = HeaderValue::from_str(&retry_secs.to_string()) {
+                headers.insert(header::RETRY_AFTER, retry_val);
+            }
+            headers.insert(
+                HeaderName::from_static("x-ratelimit-remaining"),
+                HeaderValue::from_static("0"),
+            );
+            response
+        }
+    }
 }
 
 async fn request_id_and_security_middleware(

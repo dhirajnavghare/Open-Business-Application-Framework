@@ -55,6 +55,59 @@ async fn test_security_headers_middleware() {
 }
 
 #[tokio::test]
+async fn test_token_bucket_rate_limiter_middleware() {
+    let db = establish_connection("sqlite::memory:").await.unwrap();
+    run_migrations(&db).await.unwrap();
+
+    let state = Arc::new(AppState::new(db, "test_secret_32_characters_minimum_len"));
+    let app = create_router(state.clone());
+
+    // 1. Health check should bypass rate limiting
+    let health_req = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .body(Body::empty())
+        .unwrap();
+    let health_res = app.clone().oneshot(health_req).await.unwrap();
+    assert_eq!(health_res.status(), StatusCode::OK);
+
+    // 2. An API request with a client key should include x-ratelimit-remaining header
+    let api_req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/customers")
+        .header("x-forwarded-for", "203.0.113.195")
+        .header("Authorization", "Bearer dummy-token")
+        .body(Body::empty())
+        .unwrap();
+    let api_res = app.clone().oneshot(api_req).await.unwrap();
+    assert!(api_res.headers().get("x-ratelimit-remaining").is_some());
+
+    // 3. Exhaust tokens for a specific client key directly via state.rate_limiter
+    let client_key = "ip:198.51.100.42";
+    state.rate_limiter.check_and_consume(client_key, 100.0);
+
+    // Next request from that client IP should trigger HTTP 429 Too Many Requests
+    let limited_req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/customers")
+        .header("x-forwarded-for", "198.51.100.42")
+        .body(Body::empty())
+        .unwrap();
+    let limited_res = app.oneshot(limited_req).await.unwrap();
+    assert_eq!(limited_res.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(limited_res.headers().get("retry-after").is_some());
+    assert_eq!(
+        limited_res
+            .headers()
+            .get("x-ratelimit-remaining")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "0"
+    );
+}
+
+#[tokio::test]
 async fn test_saas_tenant_provisioning_and_usage() {
     let db = establish_connection("sqlite::memory:").await.unwrap();
     run_migrations(&db).await.unwrap();

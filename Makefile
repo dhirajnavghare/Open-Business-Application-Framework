@@ -1,4 +1,4 @@
-.PHONY: help setup dev run worker doctor presets check fmt test test-e2e test-all tour sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
+.PHONY: help setup dev run status worker doctor presets check fmt test test-e2e test-all tour sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
 
 # Default shell
 SHELL := /bin/bash
@@ -11,6 +11,7 @@ help:
 	@echo "  make setup         - Initialize .env, create data/ dir, and check tools"
 	@echo "  make build         - Run all checks and tests, then build release binaries"
 	@echo "  make dev           - Run obaf-server in local development mode"
+	@echo "  make status        - Check live server health, metrics, and database stats"
 	@echo "  make tour          - Run 60-second interactive guided terminal demo"
 	@echo "  make worker        - Run background worker daemon"
 	@echo "  make doctor        - Verify database, migrations, and presets"
@@ -60,6 +61,9 @@ dev:
 	cargo run -p obaf-server
 
 run: dev
+
+status:
+	cargo run -p obaf-cli -- status
 
 worker:
 	cargo run -p obaf-worker -- --interval-secs 30
