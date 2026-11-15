@@ -18,7 +18,7 @@ use crate::catalog::catalog_routes;
 use crate::customers::customer_routes;
 use crate::docs::ApiDoc;
 use crate::events::event_routes;
-use crate::health::{health_check, metrics_check};
+use crate::health::{health_check, llms_txt, metrics_check};
 use crate::inventory::inventory_routes;
 use crate::meta::{engine_info, schema_discovery};
 use crate::orders::order_routes;
@@ -47,9 +47,10 @@ pub fn create_router(state: SharedState) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        // Health & Metrics checks
+        // Health, Metrics & AI Agent discovery endpoints
         .route("/health", get(health_check))
         .route("/metrics", get(metrics_check))
+        .route("/llms.txt", get(llms_txt))
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api/v1/openapi.json", openapi))
         // API v1 routes

@@ -1,0 +1,43 @@
+# Open Business Application Framework (OBAF)
+
+> The ultra-fast, single-binary, headless business operations, billing, and workflow engine built in Rust. Single binary. Multi-tenant. Multi-database. 100% API-driven.
+
+OBAF delivers a high-performance alternative to legacy monolithic ERPs (Odoo, ERPNext, MedusaJS) with sub-3ms request latencies, ~20MB memory footprint, 128-bit decimal arithmetic for financial precision, and 22 out-of-the-box industry domain presets.
+
+## Core Capabilities & Primitives
+- [Architecture](docs/SYSTEM_ARCHITECTURE.md): The 6 Universal Primitives (Resource/Unit, Catalog Item, Customer/Party, Order/Ticket, Status Workflow, Ledger & Bill).
+- [API Standards](docs/API_STANDARDS.md): RESTful JSON conventions, standard error codes, pagination, and OpenAPI 3.1 specification.
+- [Database Architecture](docs/DATABASE_ARCHITECTURE.md): SeaORM abstraction supporting zero-config SQLite and clustered PostgreSQL with TenantPoolRouter.
+- [Multi-Tenancy](docs/MULTI_TENANCY_AND_AUTHORIZATION.md): Multi-tenant row-level isolation and dedicated enterprise database pool routing.
+- [System Design Primer](docs/SYSTEM_DESIGN.md): Token bucket rate limiters, cache-aside TTL caches, and circuit breaker resilience patterns.
+
+## Domain Presets & Quickstarts
+- [Preset Specifications](docs/PRESET_SPECIFICATION.md): Specifications for 22 domain presets across Hospitality, Healthcare, Retail, Services, Logistics, and Manufacturing.
+- [Developer Setup](docs/DEVELOPER_SETUP.md): Local development workflow with Cargo, Make, SQLite, and Docker.
+- [Deployment Runbook](docs/DEPLOYMENT_RUNBOOK.md): Production clustering, Kubernetes manifests, horizontal pod autoscaling, and backup/restore.
+
+## Client SDKs
+- [TypeScript SDK](sdk/typescript/README.md): Official zero-dependency `@obaf/sdk` client for Node.js, Bun, Deno, and Next.js.
+- [Python SDK](sdk/python/README.md): Official zero-dependency `obaf-sdk` client for Python 3.8+ automations, data pipelines, and AI agents.
+
+## Quick CLI Reference
+- `obaf init <project> --preset <preset>`: Scaffold a turnkey project with Docker Compose, TypeScript, and Python clients.
+- `obaf doctor`: Verify database connectivity, migrations, and domain presets.
+- `obaf presets`: List all 22 domain preset templates.
+- `obaf token --role admin`: Generate signed JWT admin token for API debugging.
+- `obaf backup`: Atomic SQLite database snapshot.
+- `obaf restore --source <file>`: Restore database from backup.
+
+## Core API Endpoints
+- `GET /health`: System health and database status.
+- `GET /swagger-ui`: Interactive Swagger UI documentation.
+- `GET /api/v1/openapi.json`: OpenAPI 3.1 JSON specification.
+- `GET /api/v1/meta/schema`: Dynamic JSON schema discovery for headless UI auto-generation.
+- `POST /api/v1/admin/setup/preset`: 1-call tenant onboarding with domain preset.
+- `POST /api/v1/auth/login`: User login returning Bearer JWT token.
+- `POST /api/v1/catalog`: Create products with dynamic custom schema validation.
+- `POST /api/v1/orders`: Create orders with state machine transitions and Idempotency-Key support.
+- `POST /api/v1/billing/split`: Split bill calculation with penny-perfect reconciliation.
+- `POST /api/v1/procurement/orders`: Purchase order lifecycle and automatic stock inward movements.
+- `POST /api/v1/billing/convert-currency`: High-precision 128-bit decimal currency conversion.
+- `POST /api/v1/sync`: Monotonic offline-first POS batch synchronization.

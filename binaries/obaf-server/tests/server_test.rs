@@ -89,4 +89,12 @@ async fn test_server_binary_startup_and_endpoints() {
     // 3. Check /swagger-ui/
     let swagger_res = client.get(&swagger_url).send().await.unwrap();
     assert_eq!(swagger_res.status(), reqwest::StatusCode::OK);
+
+    // 4. Check /llms.txt AI Discovery endpoint
+    let llms_url = format!("http://127.0.0.1:{}/llms.txt", test_port);
+    let llms_res = client.get(&llms_url).send().await.unwrap();
+    assert_eq!(llms_res.status(), reqwest::StatusCode::OK);
+    let llms_text = llms_res.text().await.unwrap();
+    assert!(llms_text.contains("Open Business Application Framework (OBAF)"));
+    assert!(llms_text.contains("Core Capabilities"));
 }

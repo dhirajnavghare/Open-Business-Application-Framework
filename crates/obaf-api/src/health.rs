@@ -70,3 +70,12 @@ pub async fn metrics_check(State(state): State<SharedState>) -> Response {
     )
         .into_response()
 }
+
+pub async fn llms_txt() -> Response {
+    let content = include_str!("../../../llms.txt");
+    (
+        [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+        content,
+    )
+        .into_response()
+}

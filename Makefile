@@ -1,4 +1,4 @@
-.PHONY: help setup dev run worker doctor presets check fmt test test-e2e test-all sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
+.PHONY: help setup dev run worker doctor presets check fmt test test-e2e test-all tour sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
 
 # Default shell
 SHELL := /bin/bash
@@ -11,6 +11,7 @@ help:
 	@echo "  make setup         - Initialize .env, create data/ dir, and check tools"
 	@echo "  make build         - Run all checks and tests, then build release binaries"
 	@echo "  make dev           - Run obaf-server in local development mode"
+	@echo "  make tour          - Run 60-second interactive guided terminal demo"
 	@echo "  make worker        - Run background worker daemon"
 	@echo "  make doctor        - Verify database, migrations, and presets"
 	@echo "  make presets       - List all 22 domain preset templates"
@@ -89,6 +90,10 @@ test-all: test test-e2e sdk-ts sdk-py
 benchmark:
 	@chmod +x scripts/benchmark.sh
 	./scripts/benchmark.sh
+
+tour:
+	@chmod +x scripts/tour.sh
+	./scripts/tour.sh
 
 sdk-ts:
 	@echo "Building and testing TypeScript SDK..."
