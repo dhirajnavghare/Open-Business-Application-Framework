@@ -13,6 +13,7 @@ pub mod orders;
 pub mod payments;
 pub mod reports;
 pub mod router;
+pub mod search;
 pub mod state;
 pub mod subscriptions;
 pub mod suppliers;

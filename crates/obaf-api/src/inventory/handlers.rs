@@ -159,3 +159,52 @@ pub async fn list_movements(
     let resp = movements.into_iter().map(Into::into).collect();
     Ok(Json(resp))
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct ProductStockBalance {
+    pub product_id: Uuid,
+    pub on_hand_quantity: Decimal,
+    pub movements_count: usize,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/balance/{product_id}",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    params(
+        ("product_id" = Uuid, Path, description = "Product ID to calculate ledger balance for")
+    ),
+    responses(
+        (status = 200, description = "Current net on-hand stock balance calculated from ledger", body = ProductStockBalance),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_stock_balance(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    axum::extract::Path(product_id): axum::extract::Path<Uuid>,
+) -> Result<Json<ProductStockBalance>, (StatusCode, Json<AuthErrorResponse>)> {
+    let movements = stock_movement::Entity::find()
+        .filter(stock_movement::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .filter(stock_movement::Column::ProductId.eq(product_id))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    let on_hand_quantity = movements.iter().map(|m| m.quantity).sum();
+    let movements_count = movements.len();
+
+    Ok(Json(ProductStockBalance {
+        product_id,
+        on_hand_quantity,
+        movements_count,
+    }))
+}

@@ -1,0 +1,43 @@
+{
+  "preset_id": "courier_fleet",
+  "name": "Courier, Logistics & Fleet Dispatch Manager",
+  "version": "1.0.0",
+  "description": "Waybill booking, parcel barcode tracking, hub sortation, driver route assignment, cash-on-delivery (COD) reconciliation, and proof of delivery",
+  "active_modules": [
+    "orders",
+    "customers",
+    "billing",
+    "payments",
+    "webhooks",
+    "reports"
+  ],
+  "default_tax_slabs": [
+    { "name": "Courier Freight GST 18%", "rate": 0.18 },
+    { "name": "Exempt Non-Taxable Delivery", "rate": 0.00 }
+  ],
+  "workflow_states": [
+    "booked",
+    "picked_up",
+    "in_transit_hub",
+    "out_for_delivery",
+    "delivered",
+    "failed_attempt",
+    "returned_to_origin"
+  ],
+  "custom_fields": {
+    "order": {
+      "type": "object",
+      "properties": {
+        "waybill_number": { "type": "string" },
+        "package_weight_kg": { "type": "number", "minimum": 0.01 },
+        "declared_value": { "type": "number" },
+        "origin_pincode": { "type": "string" },
+        "destination_pincode": { "type": "string" },
+        "assigned_driver": { "type": "string" },
+        "is_cash_on_delivery": { "type": "boolean" },
+        "proof_of_delivery_signature": { "type": "string" }
+      },
+      "required": ["waybill_number", "package_weight_kg", "destination_pincode"]
+    }
+  }
+}

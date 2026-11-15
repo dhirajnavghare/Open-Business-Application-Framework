@@ -87,6 +87,22 @@ enum Commands {
         )]
         database_url: String,
     },
+    /// Export tenant data (products, customers, orders, suppliers) as JSON
+    Export {
+        #[arg(help = "Entity to export: products, customers, orders, suppliers")]
+        entity: String,
+        #[arg(
+            short,
+            long,
+            default_value = "sqlite://data/obaf.db?mode=rwc",
+            env = "DATABASE_URL"
+        )]
+        database_url: String,
+        #[arg(short, long, help = "Optional Tenant ID filter")]
+        tenant_id: Option<Uuid>,
+        #[arg(short, long, help = "Output file path (prints to stdout if omitted)")]
+        output: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -378,6 +394,66 @@ async fn main() -> anyhow::Result<()> {
             println!("👤 Admin Email:    {}", admin_email);
             println!("🔑 Admin Password: DemoPassword123!");
             println!("\nBearer Token (24h valid):\n{}", token);
+        }
+
+        Commands::Export {
+            entity,
+            database_url,
+            tenant_id,
+            output,
+        } => {
+            use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+            let db = establish_connection(&database_url).await?;
+
+            let json_value = match entity.to_lowercase().as_str() {
+                "products" | "product" | "catalog" => {
+                    let mut q = obaf_database::entities::product::Entity::find();
+                    if let Some(tid) = tenant_id {
+                        q = q.filter(obaf_database::entities::product::Column::TenantId.eq(tid));
+                    }
+                    let items = q.all(&db).await?;
+                    serde_json::to_value(items)?
+                }
+                "customers" | "customer" => {
+                    let mut q = obaf_database::entities::customer::Entity::find();
+                    if let Some(tid) = tenant_id {
+                        q = q.filter(obaf_database::entities::customer::Column::TenantId.eq(tid));
+                    }
+                    let items = q.all(&db).await?;
+                    serde_json::to_value(items)?
+                }
+                "orders" | "order" => {
+                    let mut q = obaf_database::entities::order::Entity::find();
+                    if let Some(tid) = tenant_id {
+                        q = q.filter(obaf_database::entities::order::Column::TenantId.eq(tid));
+                    }
+                    let items = q.all(&db).await?;
+                    serde_json::to_value(items)?
+                }
+                "suppliers" | "supplier" => {
+                    let mut q = obaf_database::entities::supplier::Entity::find();
+                    if let Some(tid) = tenant_id {
+                        q = q.filter(obaf_database::entities::supplier::Column::TenantId.eq(tid));
+                    }
+                    let items = q.all(&db).await?;
+                    serde_json::to_value(items)?
+                }
+                other => {
+                    anyhow::bail!(
+                        "Unknown export entity '{}'. Choose from: products, customers, orders, suppliers",
+                        other
+                    );
+                }
+            };
+
+            let formatted = serde_json::to_string_pretty(&json_value)?;
+
+            if let Some(out_path) = output {
+                fs::write(&out_path, formatted)?;
+                println!("📁 Data exported successfully to: {}", out_path);
+            } else {
+                println!("{}", formatted);
+            }
         }
     }
 

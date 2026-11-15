@@ -1,0 +1,41 @@
+{
+  "preset_id": "manufacturing_jobwork",
+  "name": "Manufacturing & Job Work Production Manager",
+  "version": "1.0.0",
+  "description": "Production job cards, bill of materials (BOM), raw material consumption vs finished goods yield, labor costing, and batch dispatch",
+  "active_modules": [
+    "catalog",
+    "inventory",
+    "orders",
+    "billing",
+    "suppliers",
+    "reports"
+  ],
+  "default_tax_slabs": [
+    { "name": "Standard Industrial GST 18%", "rate": 0.18 },
+    { "name": "Capital Goods & Machinery GST 12%", "rate": 0.12 }
+  ],
+  "workflow_states": [
+    "job_created",
+    "raw_materials_issued",
+    "machining_in_progress",
+    "quality_inspection",
+    "finished_goods_stocked",
+    "dispatched",
+    "cancelled"
+  ],
+  "custom_fields": {
+    "order": {
+      "type": "object",
+      "properties": {
+        "job_card_number": { "type": "string" },
+        "drawing_reference": { "type": "string" },
+        "raw_material_grade": { "type": "string" },
+        "target_quantity": { "type": "integer", "minimum": 1 },
+        "machine_id": { "type": "string" },
+        "operator_name": { "type": "string" }
+      },
+      "required": ["job_card_number", "target_quantity"]
+    }
+  }
+}

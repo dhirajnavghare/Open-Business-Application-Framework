@@ -40,6 +40,7 @@ use utoipa::{
         // Inventory
         crate::inventory::handlers::record_movement,
         crate::inventory::handlers::list_movements,
+        crate::inventory::handlers::get_stock_balance,
         // Orders
         crate::orders::handlers::create_order,
         crate::orders::handlers::list_orders,
@@ -79,6 +80,8 @@ use utoipa::{
         // Sync
         crate::sync::handlers::sync_push,
         crate::sync::handlers::sync_pull,
+        // Search
+        crate::search::handlers::global_search,
     ),
     components(
         schemas(
@@ -148,6 +151,12 @@ use utoipa::{
             crate::sync::handlers::SyncPushRequest,
             crate::sync::handlers::SyncPushResponse,
             crate::sync::handlers::SyncPullResponse,
+            crate::inventory::handlers::ProductStockBalance,
+            crate::search::handlers::ProductSearchResult,
+            crate::search::handlers::CustomerSearchResult,
+            crate::search::handlers::OrderSearchResult,
+            crate::search::handlers::SupplierSearchResult,
+            crate::search::handlers::GlobalSearchResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -166,6 +175,7 @@ use utoipa::{
         (name = "Billing", description = "GST/VAT tax calculations, bill splitting, and invoice/receipt generation"),
         (name = "Reports", description = "Operational dashboards, kitchen prep sheets, and sales metrics"),
         (name = "Sync", description = "Edge and offline synchronization with batch idempotency"),
+        (name = "Search", description = "Global omni-search across products, customers, orders, and suppliers"),
         (name = "Meta", description = "Dynamic introspection and schema discovery for headless admin panels"),
         (name = "Admin", description = "Platform management and domain preset bootstrapping")
     ),

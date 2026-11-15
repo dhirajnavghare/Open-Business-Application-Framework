@@ -1,0 +1,40 @@
+{
+  "preset_id": "dairy_milk_delivery",
+  "name": "Dairy Farm & Daily Milk Delivery Subscription",
+  "version": "1.0.0",
+  "description": "Daily route milk delivery schedules, morning/evening doorstep drop tracking, vacation pause dates, bottle deposit returns, and monthly billing cycles",
+  "active_modules": [
+    "subscriptions",
+    "customers",
+    "catalog",
+    "orders",
+    "billing",
+    "payments",
+    "reports"
+  ],
+  "default_tax_slabs": [
+    { "name": "Exempt Fresh Milk", "rate": 0.00 },
+    { "name": "Processed Paneer & Ghee GST 5%", "rate": 0.05 },
+    { "name": "Dairy Sweets GST 5%", "rate": 0.05 }
+  ],
+  "workflow_states": [
+    "active",
+    "dispatched_for_route",
+    "delivered",
+    "paused_by_customer",
+    "cancelled"
+  ],
+  "custom_fields": {
+    "subscription": {
+      "type": "object",
+      "properties": {
+        "delivery_slot": { "type": "string", "enum": ["Morning 6 AM", "Evening 5 PM", "Both"] },
+        "milk_variant": { "type": "string", "enum": ["Cow Milk", "Buffalo Milk", "A2 Gir Cow", "Organic Toned"] },
+        "daily_liters": { "type": "number", "minimum": 0.5 },
+        "route_runner_name": { "type": "string" },
+        "empty_bottles_deposit_count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["delivery_slot", "milk_variant", "daily_liters"]
+    }
+  }
+}
