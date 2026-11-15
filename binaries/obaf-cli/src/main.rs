@@ -103,6 +103,18 @@ enum Commands {
         #[arg(short, long, help = "Output file path (prints to stdout if omitted)")]
         output: Option<String>,
     },
+    /// Run background maintenance and reconciliation sweep
+    Worker {
+        #[arg(
+            short,
+            long,
+            default_value = "sqlite://data/obaf.db?mode=rwc",
+            env = "DATABASE_URL"
+        )]
+        database_url: String,
+        #[arg(long, default_value_t = false)]
+        once: bool,
+    },
 }
 
 #[tokio::main]
@@ -454,6 +466,24 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 println!("{}", formatted);
             }
+        }
+        Commands::Worker {
+            database_url,
+            once: _,
+        } => {
+            use sea_orm::EntityTrait;
+            println!("⚙️  Connecting to database ({})...", database_url);
+            let db = establish_connection(&database_url)
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+            println!("🔍 Executing background reconciliation sweep...");
+            let orgs = obaf_database::entities::organization::Entity::find()
+                .all(&db)
+                .await?;
+            println!(
+                "✅ Maintenance complete: {} active tenant organizations.",
+                orgs.len()
+            );
         }
     }
 

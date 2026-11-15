@@ -59,10 +59,10 @@ pub async fn get_dashboard_metrics(
 ) -> Result<Json<DashboardMetrics>, (StatusCode, Json<AuthErrorResponse>)> {
     let tenant_uuid = auth.tenant_id.as_uuid();
 
-    // 1. Total revenue from completed payments
+    // 1. Total revenue from successful/completed payments
     let payments = payment::Entity::find()
         .filter(payment::Column::TenantId.eq(tenant_uuid))
-        .filter(payment::Column::Status.eq("COMPLETED"))
+        .filter(payment::Column::Status.is_in(["SUCCESS", "COMPLETED"]))
         .all(&state.db)
         .await
         .map_err(|e| internal_err(format!("DB Error: {}", e)))?;
@@ -222,7 +222,7 @@ pub async fn get_sales_by_payment_method(
 
     let payments = payment::Entity::find()
         .filter(payment::Column::TenantId.eq(tenant_uuid))
-        .filter(payment::Column::Status.eq("COMPLETED"))
+        .filter(payment::Column::Status.is_in(["SUCCESS", "COMPLETED"]))
         .all(&state.db)
         .await
         .map_err(|e| internal_err(format!("DB Error: {}", e)))?;

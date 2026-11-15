@@ -162,4 +162,40 @@ async fn test_reports_and_attendance_checkin() {
     assert_eq!(dash_json["total_customers"], 1);
     assert_eq!(dash_json["total_bookings"], 1);
     assert_eq!(dash_json["active_subscriptions"], 1);
+
+    // 6. Record a payment and verify dashboard revenue
+    let payment_req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/payments")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::json!({
+                "amount": "1200.00",
+                "payment_method": "UPI",
+                "customer_id": customer_id
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(payment_req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let dash_req2 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/reports/dashboard")
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(dash_req2).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let dash_bytes2 = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let dash_json2: serde_json::Value = serde_json::from_slice(&dash_bytes2).unwrap();
+    let rev_str = dash_json2["total_revenue"].as_str().unwrap();
+    let rev_decimal: rust_decimal::Decimal = rev_str.parse().unwrap();
+    assert_eq!(rev_decimal, rust_decimal::Decimal::from(1200));
 }
