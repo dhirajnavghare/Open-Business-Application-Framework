@@ -21,15 +21,21 @@ When contributing to OBAF, keep these non-negotiables in mind:
 ```
 .
 ├── crates/
-│   ├── obaf-core/        # Domain primitives: Tenant, Money, Security, Errors, Schema Validation
-│   ├── obaf-database/    # SeaORM entities, multi-database pool, automated migration runner
-│   └── obaf-api/         # Axum web server, REST handlers, WebSockets, background webhook dispatch
+│   ├── obaf-core/        # Domain primitives: Tenant, Money, Security, Errors, Schema Validation, Cache, RateLimiter
+│   ├── obaf-database/    # SeaORM entities (21 tables), multi-database pool, TenantPoolRouter, migrations
+│   └── obaf-api/         # Axum web server, REST handlers, OpenAPI docs, WebSockets, background webhook dispatch
 ├── binaries/
-│   ├── obaf-server/      # Standalone API server executable
-│   └── obaf-cli/         # Developer CLI (`doctor`, `presets`, `token`)
+│   ├── obaf-server/      # Standalone API server executable with graceful SIGINT/SIGTERM drain
+│   ├── obaf-cli/         # Developer CLI (`doctor`, `presets`, `token`, `backup`, `restore`, `seed`, `worker`)
+│   └── obaf-worker/      # Dedicated background worker and scheduler daemon
 ├── config/
-│   └── presets/          # 11 industry presets (Restaurant, Pharmacy, Gym, Laundry, etc.)
-└── tests/                # End-to-end multi-domain test suites (Python & Rust)
+│   └── presets/          # 22 industry presets (Restaurant, Pharmacy, Gym, Hotel, Retail, etc.)
+├── sdk/
+│   ├── python/           # Official zero-dependency Python Client SDK (`obaf-sdk`)
+│   └── typescript/       # Official zero-dependency TypeScript Client SDK (`@obaf/sdk`)
+├── examples/
+│   └── community_extension/ # Reference compiled Rust extension module (`ObafExtension`)
+└── tests/                # End-to-end multi-domain test suites & benchmarks (Python & Rust)
 ```
 
 ---
@@ -37,16 +43,17 @@ When contributing to OBAF, keep these non-negotiables in mind:
 ## 🛠️ Setting Up Your Development Environment
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.80 or higher)
+- [Rust](https://rustup.rs/) (1.80 or higher) with `rustfmt` and `clippy` (`rustup component add rustfmt clippy`)
 - Git
-- Python 3.10+ (for running end-to-end integration test suites)
+- Python 3.9+ (for running end-to-end integration test suites)
+- Node.js 18+ (optional, for building or contributing to the TypeScript SDK)
 
 ### 1. Clone & Build
 ```bash
 git clone https://github.com/dhirajnavghare/Open-Business-Application-Framework.git
 cd Open-Business-Application-Framework
 
-# Compile workspace
+# Compile entire workspace
 cargo build --workspace
 ```
 
@@ -54,12 +61,23 @@ cargo build --workspace
 ```bash
 cargo run -p obaf-cli -- doctor
 ```
+This verifies:
+- Local database connection (`sqlite://data/obaf.db?mode=rwc`)
+- Table migration integrity (21 foundational entities)
+- Configuration preset templates (22 industry presets)
 
 ### 3. Run the Development Server
 ```bash
 cargo run -p obaf-server
 ```
-Interactive Swagger UI documentation is available at [http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui).
+Interactive Swagger UI documentation is immediately available at [http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui), and OpenAPI 3.1 JSON specification at [http://127.0.0.1:8080/api/v1/openapi.json](http://127.0.0.1:8080/api/v1/openapi.json).
+
+### 4. Run the Background Worker (Optional)
+```bash
+cargo run -p obaf-worker -- --interval-secs 60
+# Or run a single sweep:
+cargo run -p obaf-worker -- --once
+```
 
 ---
 
@@ -69,7 +87,7 @@ Before opening a pull request, all automated checks and tests must pass:
 
 ### 1. Formatting
 ```bash
-cargo fmt --all -- --check
+cargo fmt --all --check
 ```
 
 ### 2. Clippy (Zero Warnings Allowed)
@@ -77,35 +95,61 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-### 3. Rust Unit and Integration Tests
+### 3. Rust Unit, Contract, and Integration Tests
 ```bash
-cargo test --workspace
+cargo test --workspace --all-targets
 ```
 
-### 4. End-to-End Workflow Suites
-In a separate terminal while `obaf-server` is running:
+### 4. End-to-End Workflow Test Suites
+In a separate terminal while `obaf-server` is running on port 8080:
 ```bash
+# Core Restaurant POS & Bill Splitting Flow
 python3 tests/test_flow.py
+
+# Pharmacy Expiry & FEFO Batch Dispensing
 python3 tests/test_pharmacy.py
+
+# Gym Memberships, Payments & Slot Bookings
 python3 tests/test_services_gym_bookings.py
+
+# Retail Barcode Checkout & Hotel Room Folios
+python3 tests/test_retail_and_hotel.py
+
+# Webhooks & HTML Printable Invoices
 python3 tests/test_webhooks_and_invoices.py
+
+# Procurement POs, Coupons & Multi-Currency Exchange
+python3 tests/test_procurement_and_promotions_e2e.py
+
+# Official Python SDK Client Tests
+python3 tests/test_python_sdk.py
+
+# Concurrency & Load Benchmark
+python3 tests/benchmark_concurrency.py
+```
+
+### 5. TypeScript SDK Build & Typecheck (Optional)
+```bash
+cd sdk/typescript
+npx -p typescript tsc
 ```
 
 ---
 
 ## 📦 Adding a New Domain Preset
 
-Presets allow new industries to bootstrap within seconds. To add a preset:
-1. Create a new JSON file in `config/presets/<preset_name>.json`.
-2. Ensure it defines:
-   - `name`: Human-readable name.
-   - `domain`: Industry identifier (e.g., `hotel_hospitality`, `retail`, `field_service`).
-   - `default_currency`: 3-letter ISO code (e.g., `USD`, `INR`, `EUR`).
-   - `tax_rates`: Default tax configurations (e.g. CGST, SGST, VAT).
-   - `catalog_schema`: JSON Schema defining custom product/service metadata attributes.
-   - `order_schema`: JSON Schema defining custom ticket/order metadata attributes.
-   - `seed_products`: Initial catalog items to populate upon bootstrapping.
-3. Test the preset using:
+Presets allow new industries to bootstrap within seconds without writing backend database schemas. To add a preset:
+
+1. Scaffold using the CLI:
+   ```bash
+   cargo run -p obaf-cli -- new-preset boutique_jewelry --title "Boutique Jewelry Studio"
+   ```
+2. Customize the generated `config/presets/boutique_jewelry.json`:
+   - `active_modules`: Array of enabled modules (`catalog`, `inventory`, `orders`, `billing`, etc.)
+   - `workflow_states`: Ordered lifecycle states for tickets/orders.
+   - `default_tax_slabs`: Standard regional GST/VAT categories.
+   - `custom_fields`: JSON Schema defining domain-specific custom attributes.
+3. Verify your new preset:
    ```bash
    cargo run -p obaf-cli -- presets
    ```
@@ -120,7 +164,10 @@ Presets allow new industries to bootstrap within seconds. To add a preset:
    ```
 2. Keep commits concise and meaningful (following Conventional Commits e.g. `feat:`, `fix:`, `docs:`, `perf:`).
 3. Update OpenAPI schemas in `crates/obaf-api/src/docs.rs` whenever adding new endpoints or request/response structs.
-4. Ensure CI passes on all targets.
+4. Ensure CI passes on all targets:
+   ```bash
+   cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+   ```
 5. Submit the pull request with a clear description of the problem solved and testing steps verified.
 
 Thank you for building the future of open-source business software! 🚀
