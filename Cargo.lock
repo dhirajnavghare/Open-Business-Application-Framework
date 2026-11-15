@@ -1922,6 +1922,7 @@ dependencies = [
  "obaf-api",
  "obaf-core",
  "obaf-database",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
