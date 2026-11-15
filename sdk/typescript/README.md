@@ -32,7 +32,7 @@ await client.login("admin@example.com", "SecurePassword123!");
 // 4. Create an item
 const product = await client.createProduct({
   sku: "BURGER-01",
-  name="Classic Cheeseburger",
+  name: "Classic Cheeseburger",
   price: "9.99",
   tax_rate: "0.08"
 });
