@@ -2,7 +2,9 @@
 name = "obaf-core"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 serde.workspace = true
@@ -13,7 +15,7 @@ chrono.workspace = true
 rust_decimal.workspace = true
 thiserror.workspace = true
 utoipa.workspace = true
-argon2 = { version = "0.5", features = ["std", "password-hash"] }
+argon2.workspace = true
 password-hash = { version = "0.5", features = ["rand_core"] }
 jsonwebtoken.workspace = true
 tracing.workspace = true

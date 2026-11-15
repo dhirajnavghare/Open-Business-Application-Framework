@@ -199,7 +199,7 @@ pub async fn create_purchase_order(
     let po_num = format!(
         "PO-{}-{}",
         now.format("%Y%m%d"),
-        &Uuid::new_v4().to_string()[..6].to_uppercase()
+        Uuid::new_v4().to_string()[..6].to_uppercase()
     );
 
     let po_model = purchase_order::ActiveModel {

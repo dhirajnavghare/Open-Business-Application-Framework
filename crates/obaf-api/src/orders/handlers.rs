@@ -123,7 +123,7 @@ pub async fn create_order(
 
     let order_id = Uuid::new_v4();
     let now = Utc::now();
-    let order_num = format!("ORD-{}", &order_id.to_string()[..8].to_uppercase());
+    let order_num = format!("ORD-{}", order_id.to_string()[..8].to_uppercase());
 
     let mut subtotal = Decimal::ZERO;
     let mut tax_total = Decimal::ZERO;

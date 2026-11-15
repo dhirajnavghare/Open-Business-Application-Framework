@@ -507,7 +507,7 @@ pub async fn issue_credit_note(
 
     let cn_id = Uuid::new_v4();
     let now = chrono::Utc::now();
-    let cn_number = format!("CN-{}", &cn_id.to_string()[..8].to_uppercase());
+    let cn_number = format!("CN-{}", cn_id.to_string()[..8].to_uppercase());
 
     let new_cn = credit_note::ActiveModel {
         id: Set(cn_id),
