@@ -2,8 +2,28 @@ use clap::{Parser, Subcommand};
 use obaf_core::{generate_token, TenantId};
 use obaf_database::{establish_connection, run_migrations};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
+
+fn find_presets_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("OBAF_PRESETS_DIR") {
+        let p = PathBuf::from(dir);
+        if p.exists() {
+            return p;
+        }
+    }
+    for candidate in &[
+        "config/presets",
+        "../../config/presets",
+        "../config/presets",
+    ] {
+        let p = Path::new(candidate);
+        if p.exists() && p.is_dir() {
+            return p.to_path_buf();
+        }
+    }
+    PathBuf::from("config/presets")
+}
 
 #[derive(Parser)]
 #[command(name = "obaf")]
@@ -143,9 +163,9 @@ async fn main() -> anyhow::Result<()> {
 
             // 3. Presets Directory Check
             print!("• Verifying config/presets/ templates ... ");
-            let presets_dir = Path::new("config/presets");
+            let presets_dir = find_presets_dir();
             if presets_dir.exists() && presets_dir.is_dir() {
-                let count = fs::read_dir(presets_dir)?
+                let count = fs::read_dir(&presets_dir)?
                     .filter_map(|e| e.ok())
                     .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
                     .count();
@@ -159,9 +179,9 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Presets => {
             println!("📦 Available Business Domain Presets:\n");
-            let presets_dir = Path::new("config/presets");
+            let presets_dir = find_presets_dir();
             if presets_dir.exists() && presets_dir.is_dir() {
-                let mut entries = fs::read_dir(presets_dir)?
+                let mut entries = fs::read_dir(&presets_dir)?
                     .filter_map(|e| e.ok())
                     .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
                     .collect::<Vec<_>>();
@@ -293,9 +313,9 @@ async fn main() -> anyhow::Result<()> {
         } => {
             use sea_orm::ActiveModelTrait;
             let preset_id = preset.to_lowercase().replace('-', "_");
-            let preset_file = format!("config/presets/{}.json", preset_id);
-            if !Path::new(&preset_file).exists() {
-                anyhow::bail!("Preset file {} does not exist!", preset_file);
+            let preset_file = find_presets_dir().join(format!("{}.json", preset_id));
+            if !preset_file.exists() {
+                anyhow::bail!("Preset file {} does not exist!", preset_file.display());
             }
 
             let db = establish_connection(&database_url).await?;

@@ -47,6 +47,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e sdk/python
+          python -m unittest discover -s sdk/python/tests
           python tests/test_python_sdk.py
 
       - name: Set up Node.js for SDK Verification

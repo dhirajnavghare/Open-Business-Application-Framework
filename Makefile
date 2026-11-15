@@ -44,6 +44,7 @@ build: check test sdk-ts sdk-py
 	@echo "🧪 Running post-build release binary smoke tests..."
 	./target/release/obaf-cli doctor --database-url "sqlite:///tmp/build_smoke.db?mode=rwc"
 	./target/release/obaf-cli presets > /dev/null
+	./target/release/obaf-worker --database-url "sqlite:///tmp/build_smoke.db?mode=rwc" --once
 	@rm -f /tmp/build_smoke.db*
 	@echo "✅ Build completed and all automated build-time tests passed!"
 
@@ -78,13 +79,8 @@ test:
 	cargo test --workspace
 
 test-e2e:
-	@echo "Running Python End-to-End Test Suites..."
-	python3 tests/test_flow.py
-	python3 tests/test_pharmacy.py
-	python3 tests/test_retail_and_hotel.py
-	python3 tests/test_services_gym_bookings.py
-	python3 tests/test_webhooks_and_invoices.py
-	python3 tests/test_procurement_and_promotions_e2e.py
+	@chmod +x scripts/run_e2e_tests.sh
+	./scripts/run_e2e_tests.sh
 
 test-all: test test-e2e sdk-ts sdk-py
 	@echo "🎉 All workspace tests, SDK checks, and e2e suites passed!"
@@ -96,6 +92,7 @@ sdk-ts:
 
 sdk-py:
 	@echo "Testing Python SDK..."
+	PYTHONPATH=sdk/python python3 -m unittest discover -s sdk/python/tests
 	python3 tests/test_python_sdk.py
 
 docker-up:

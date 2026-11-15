@@ -1938,6 +1938,7 @@ dependencies = [
  "obaf-core",
  "obaf-database",
  "sea-orm",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

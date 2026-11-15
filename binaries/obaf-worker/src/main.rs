@@ -1,5 +1,5 @@
 use clap::Parser;
-use obaf_database::{entities::organization, establish_connection};
+use obaf_database::{entities::organization, establish_connection, run_migrations};
 use sea_orm::EntityTrait;
 use std::time::Duration;
 use tracing::{error, info};
@@ -50,6 +50,11 @@ async fn main() -> anyhow::Result<()> {
             error!("Database connection failed: {}", e);
             anyhow::anyhow!(e)
         })?;
+
+    run_migrations(&db).await.map_err(|e| {
+        error!("Database migration failure: {}", e);
+        anyhow::anyhow!(e)
+    })?;
 
     if args.once {
         info!("Running single background maintenance sweep...");
