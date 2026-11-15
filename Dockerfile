@@ -26,6 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# Create unprivileged application user
+RUN groupadd -r obaf && useradd -r -g obaf -d /app -s /sbin/nologin obaf
+
 # Copy binaries from builder
 COPY --from=builder /app/target/release/obaf-server /app/obaf-server
 COPY --from=builder /app/target/release/obaf-cli /app/obaf-cli
@@ -34,8 +37,10 @@ COPY --from=builder /app/target/release/obaf-worker /app/obaf-worker
 # Copy default config and presets
 COPY config /app/config
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Create data directory for SQLite and ensure ownership
+RUN mkdir -p /app/data && chown -R obaf:obaf /app
+
+USER obaf
 
 ENV PORT=8080
 ENV HOST=0.0.0.0

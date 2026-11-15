@@ -46,19 +46,33 @@ impl AppConfig {
             builder = builder.add_source(config::File::with_name(&config_path));
         }
 
-        // Allow direct DATABASE_URL environment variable override
-        if let Ok(db_url) = env::var("DATABASE_URL") {
+        // Allow direct DATABASE_URL / OBAF_DATABASE_URL environment variable override
+        if let Ok(db_url) = env::var("DATABASE_URL").or_else(|_| env::var("OBAF_DATABASE_URL")) {
             builder = builder.set_override("database.url", db_url)?;
         }
 
-        // Allow PORT environment variable override
-        if let Ok(port_str) = env::var("PORT") {
+        // Allow PORT / HOST environment variable overrides
+        if let Ok(port_str) = env::var("PORT").or_else(|_| env::var("OBAF_SERVER_PORT")) {
             if let Ok(port) = port_str.parse::<u16>() {
                 builder = builder.set_override("server.port", port)?;
             }
         }
+        if let Ok(host) = env::var("HOST").or_else(|_| env::var("OBAF_SERVER_HOST")) {
+            builder = builder.set_override("server.host", host)?;
+        }
 
-        // Allow OBAF_ prefix environment overrides
+        // Allow JWT secret overrides
+        if let Ok(secret) = env::var("JWT_SECRET").or_else(|_| env::var("OBAF_SECURITY_JWT_SECRET"))
+        {
+            builder = builder.set_override("security.jwt_secret", secret)?;
+        }
+        if let Ok(exp_str) = env::var("OBAF_SECURITY_TOKEN_EXPIRY_HOURS") {
+            if let Ok(exp) = exp_str.parse::<u64>() {
+                builder = builder.set_override("security.token_expiry_hours", exp)?;
+            }
+        }
+
+        // Allow OBAF_ prefix environment overrides (e.g. OBAF_SERVER__PORT)
         builder = builder.add_source(
             config::Environment::with_prefix("OBAF")
                 .separator("__")
@@ -67,5 +81,18 @@ impl AppConfig {
 
         let config = builder.build()?.try_deserialize::<AppConfig>()?;
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config_loading() {
+        let cfg = AppConfig::load().expect("Default config should load successfully");
+        assert!(!cfg.server.host.is_empty());
+        assert!(cfg.server.port > 0);
+        assert!(!cfg.database.url.is_empty());
     }
 }
