@@ -363,6 +363,34 @@ class ObafClient:
         """List active stock locations."""
         return self._request("GET", "/api/v1/inventory/locations")
 
+    def get_stock_location(self, location_id: str) -> Dict[str, Any]:
+        """Get stock location details by ID."""
+        return self._request("GET", f"/api/v1/inventory/locations/{location_id}")
+
+    def update_stock_location(
+        self,
+        location_id: str,
+        name: Optional[str] = None,
+        code: Optional[str] = None,
+        address: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update stock location details."""
+        payload = {}
+        if name is not None:
+            payload["name"] = name
+        if code is not None:
+            payload["code"] = code
+        if address is not None:
+            payload["address"] = address
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request("PATCH", f"/api/v1/inventory/locations/{location_id}", payload=payload)
+
+    def delete_stock_location(self, location_id: str) -> Dict[str, Any]:
+        """Delete stock location by ID."""
+        return self._request("DELETE", f"/api/v1/inventory/locations/{location_id}")
+
     def record_stock_movement(
         self,
         product_id: str,
@@ -535,6 +563,46 @@ class ObafClient:
         query_str = "?active_only=true" if active_only else ""
         return self._request("GET", f"/api/v1/promotions/coupons{query_str}")
 
+    def get_coupon(self, code: str) -> Dict[str, Any]:
+        """Get coupon details by code."""
+        return self._request("GET", f"/api/v1/promotions/coupons/{code}")
+
+    def update_coupon(
+        self,
+        code: str,
+        discount_type: Optional[str] = None,
+        discount_value: Optional[str] = None,
+        min_order_amount: Optional[str] = None,
+        max_discount_amount: Optional[str] = None,
+        usage_limit: Optional[int] = None,
+        valid_from: Optional[str] = None,
+        valid_until: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update coupon configuration or active status."""
+        payload = {}
+        if discount_type is not None:
+            payload["discount_type"] = discount_type
+        if discount_value is not None:
+            payload["discount_value"] = discount_value
+        if min_order_amount is not None:
+            payload["min_order_amount"] = min_order_amount
+        if max_discount_amount is not None:
+            payload["max_discount_amount"] = max_discount_amount
+        if usage_limit is not None:
+            payload["usage_limit"] = usage_limit
+        if valid_from is not None:
+            payload["valid_from"] = valid_from
+        if valid_until is not None:
+            payload["valid_until"] = valid_until
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request("PATCH", f"/api/v1/promotions/coupons/{code}", payload=payload)
+
+    def delete_coupon(self, code: str) -> Dict[str, Any]:
+        """Delete coupon by code."""
+        return self._request("DELETE", f"/api/v1/promotions/coupons/{code}")
+
     def validate_coupon(self, code: str, subtotal: str) -> Dict[str, Any]:
         """Validate coupon applicability and compute discount amounts."""
         payload = {"code": code, "subtotal": subtotal}
@@ -654,6 +722,10 @@ class ObafClient:
         payload = {"status": status}
         return self._request("PATCH", f"/api/v1/bookings/{booking_id}/status", payload=payload)
 
+    def delete_booking(self, booking_id: str) -> Dict[str, Any]:
+        """Cancel and delete reservation by ID."""
+        return self._request("DELETE", f"/api/v1/bookings/{booking_id}")
+
     # --- Subscriptions & Memberships ---
     def create_subscription(
         self,
@@ -688,6 +760,10 @@ class ObafClient:
         """Update subscription status (e.g. ACTIVE, PAUSED, CANCELLED)."""
         payload = {"status": status}
         return self._request("PATCH", f"/api/v1/subscriptions/{subscription_id}/status", payload=payload)
+
+    def delete_subscription(self, subscription_id: str) -> Dict[str, Any]:
+        """Delete subscription by ID."""
+        return self._request("DELETE", f"/api/v1/subscriptions/{subscription_id}")
 
     def check_in_member(self, subscription_id: str, notes: Optional[str] = None) -> Dict[str, Any]:
         """Record member physical attendance check-in against active subscription."""

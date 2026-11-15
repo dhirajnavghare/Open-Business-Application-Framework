@@ -277,6 +277,26 @@ export class ObafClient {
     return this.request("GET", "/api/v1/inventory/locations");
   }
 
+  async getStockLocation(locationId: string): Promise<any> {
+    return this.request("GET", `/api/v1/inventory/locations/${locationId}`);
+  }
+
+  async updateStockLocation(
+    locationId: string,
+    payload: {
+      name?: string;
+      code?: string;
+      address?: string;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/inventory/locations/${locationId}`, payload);
+  }
+
+  async deleteStockLocation(locationId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/inventory/locations/${locationId}`);
+  }
+
   // --- POS Cash Drawer & Shift Management ---
   async openShift(payload: {
     register_name: string;
@@ -396,6 +416,30 @@ export class ObafClient {
     return this.request("GET", `/api/v1/promotions/coupons${qs}`);
   }
 
+  async getCoupon(code: string): Promise<any> {
+    return this.request("GET", `/api/v1/promotions/coupons/${code}`);
+  }
+
+  async updateCoupon(
+    code: string,
+    payload: {
+      discount_type?: string;
+      discount_value?: string;
+      min_order_amount?: string;
+      max_discount_amount?: string;
+      usage_limit?: number;
+      valid_from?: string;
+      valid_until?: string;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/promotions/coupons/${code}`, payload);
+  }
+
+  async deleteCoupon(code: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/promotions/coupons/${code}`);
+  }
+
   async validateCoupon(code: string, subtotal: string): Promise<any> {
     return this.request("POST", "/api/v1/promotions/coupons/validate", {
       code,
@@ -492,6 +536,10 @@ export class ObafClient {
     return this.request("PATCH", `/api/v1/bookings/${bookingId}/status`, { status });
   }
 
+  async deleteBooking(bookingId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/bookings/${bookingId}`);
+  }
+
   // --- Subscriptions & Memberships ---
   async createSubscription(payload: {
     customer_id: string;
@@ -515,6 +563,10 @@ export class ObafClient {
 
   async updateSubscriptionStatus(subscriptionId: string, status: string): Promise<any> {
     return this.request("PATCH", `/api/v1/subscriptions/${subscriptionId}/status`, { status });
+  }
+
+  async deleteSubscription(subscriptionId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/subscriptions/${subscriptionId}`);
   }
 
   async checkInMember(subscriptionId: string, notes?: string): Promise<any> {

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -216,6 +216,14 @@ pub struct CreateStockLocationRequest {
     pub address: Option<String>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateStockLocationRequest {
+    pub name: Option<String>,
+    pub code: Option<String>,
+    pub address: Option<String>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct StockLocationResponse {
     pub id: Uuid,
@@ -314,4 +322,179 @@ pub async fn list_stock_locations(
         })?;
 
     Ok(Json(locations.into_iter().map(Into::into).collect()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/locations/{id}",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Location ID")
+    ),
+    responses(
+        (status = 200, description = "Location details", body = StockLocationResponse),
+        (status = 404, description = "Location not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_stock_location(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<StockLocationResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::stock_location;
+
+    let loc = stock_location::Entity::find()
+        .filter(stock_location::Column::Id.eq(id))
+        .filter(stock_location::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Stock location not found".to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(loc.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/inventory/locations/{id}",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Location ID")
+    ),
+    request_body = UpdateStockLocationRequest,
+    responses(
+        (status = 200, description = "Location updated successfully", body = StockLocationResponse),
+        (status = 404, description = "Location not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_stock_location(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateStockLocationRequest>,
+) -> Result<Json<StockLocationResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::stock_location;
+    auth.require_role(&["admin", "manager"])?;
+
+    let loc = stock_location::Entity::find()
+        .filter(stock_location::Column::Id.eq(id))
+        .filter(stock_location::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Stock location not found".to_string(),
+                }),
+            )
+        })?;
+
+    let mut active: stock_location::ActiveModel = loc.into();
+    if let Some(name) = payload.name {
+        active.name = Set(name);
+    }
+    if let Some(code) = payload.code {
+        active.code = Set(code);
+    }
+    if let Some(address) = payload.address {
+        active.address = Set(Some(address));
+    }
+    if let Some(is_active) = payload.is_active {
+        active.is_active = Set(is_active);
+    }
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Update failed: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/inventory/locations/{id}",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Location ID")
+    ),
+    responses(
+        (status = 200, description = "Location deleted"),
+        (status = 404, description = "Location not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_stock_location(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::stock_location;
+    auth.require_role(&["admin", "manager"])?;
+
+    let loc = stock_location::Entity::find()
+        .filter(stock_location::Column::Id.eq(id))
+        .filter(stock_location::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Stock location not found".to_string(),
+                }),
+            )
+        })?;
+
+    let active: stock_location::ActiveModel = loc.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Delete failed: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "location_id": id
+    })))
 }

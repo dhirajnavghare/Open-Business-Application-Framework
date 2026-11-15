@@ -27,6 +27,18 @@ pub struct CreateCouponRequest {
     pub is_active: Option<bool>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateCouponRequest {
+    pub discount_type: Option<String>,
+    pub discount_value: Option<Decimal>,
+    pub min_order_amount: Option<Decimal>,
+    pub max_discount_amount: Option<Decimal>,
+    pub usage_limit: Option<i32>,
+    pub valid_from: Option<DateTime<Utc>>,
+    pub valid_until: Option<DateTime<Utc>>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct CouponResponse {
     pub id: Uuid,
@@ -422,4 +434,191 @@ pub async fn redeem_coupon(
         used_count: updated_count,
         remaining_usage: remaining,
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/promotions/coupons/{code}",
+    tag = "Promotions",
+    security(("bearer_auth" = [])),
+    params(
+        ("code" = String, Path, description = "Coupon Code")
+    ),
+    responses(
+        (status = 200, description = "Coupon details", body = CouponResponse),
+        (status = 404, description = "Coupon not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_coupon(
+    auth: AuthUser,
+    State(state): State<SharedState>,
+    Path(code): Path<String>,
+) -> Result<Json<CouponResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let code_upper = code.trim().to_uppercase();
+    let coupon_model = coupon::Entity::find()
+        .filter(coupon::Column::TenantId.eq(auth.tenant_id.0))
+        .filter(coupon::Column::Code.eq(&code_upper))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: format!("Coupon code '{}' not found", code_upper),
+                }),
+            )
+        })?;
+
+    Ok(Json(coupon_model.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/promotions/coupons/{code}",
+    tag = "Promotions",
+    security(("bearer_auth" = [])),
+    params(
+        ("code" = String, Path, description = "Coupon Code")
+    ),
+    request_body = UpdateCouponRequest,
+    responses(
+        (status = 200, description = "Coupon updated successfully", body = CouponResponse),
+        (status = 404, description = "Coupon not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_coupon(
+    auth: AuthUser,
+    State(state): State<SharedState>,
+    Path(code): Path<String>,
+    Json(payload): Json<UpdateCouponRequest>,
+) -> Result<Json<CouponResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let code_upper = code.trim().to_uppercase();
+    let coupon_model = coupon::Entity::find()
+        .filter(coupon::Column::TenantId.eq(auth.tenant_id.0))
+        .filter(coupon::Column::Code.eq(&code_upper))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: format!("Coupon code '{}' not found", code_upper),
+                }),
+            )
+        })?;
+
+    let mut active: coupon::ActiveModel = coupon_model.into();
+    if let Some(dt) = payload.discount_type {
+        active.discount_type = Set(dt);
+    }
+    if let Some(dv) = payload.discount_value {
+        active.discount_value = Set(dv);
+    }
+    if let Some(min_order) = payload.min_order_amount {
+        active.min_order_amount = Set(Some(min_order));
+    }
+    if let Some(max_disc) = payload.max_discount_amount {
+        active.max_discount_amount = Set(Some(max_disc));
+    }
+    if let Some(usage_limit) = payload.usage_limit {
+        active.usage_limit = Set(Some(usage_limit));
+    }
+    if let Some(from) = payload.valid_from {
+        active.valid_from = Set(Some(from));
+    }
+    if let Some(until) = payload.valid_until {
+        active.valid_until = Set(Some(until));
+    }
+    if let Some(is_active) = payload.is_active {
+        active.is_active = Set(is_active);
+    }
+    active.updated_at = Set(Utc::now());
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/promotions/coupons/{code}",
+    tag = "Promotions",
+    security(("bearer_auth" = [])),
+    params(
+        ("code" = String, Path, description = "Coupon Code")
+    ),
+    responses(
+        (status = 200, description = "Coupon deleted"),
+        (status = 404, description = "Coupon not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_coupon(
+    auth: AuthUser,
+    State(state): State<SharedState>,
+    Path(code): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let code_upper = code.trim().to_uppercase();
+    let coupon_model = coupon::Entity::find()
+        .filter(coupon::Column::TenantId.eq(auth.tenant_id.0))
+        .filter(coupon::Column::Code.eq(&code_upper))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: format!("Coupon code '{}' not found", code_upper),
+                }),
+            )
+        })?;
+
+    let active: coupon::ActiveModel = coupon_model.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "code": code_upper
+    })))
 }

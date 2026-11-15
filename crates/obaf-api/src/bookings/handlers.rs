@@ -22,6 +22,11 @@ pub struct CreateBookingRequest {
     pub notes: Option<String>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateBookingStatusRequest {
+    pub status: String,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct BookingResponse {
     pub id: Uuid,
@@ -213,6 +218,120 @@ pub async fn check_out_booking(
     );
 
     Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/bookings/{id}",
+    tag = "Bookings",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Booking ID")
+    ),
+    responses(
+        (status = 200, description = "Booking details", body = BookingResponse),
+        (status = 404, description = "Booking not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_booking(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let booking_model = booking::Entity::find()
+        .filter(booking::Column::Id.eq(id))
+        .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Booking not found"))?;
+
+    Ok(Json(booking_model.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/bookings/{id}/status",
+    tag = "Bookings",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Booking ID")
+    ),
+    request_body = UpdateBookingStatusRequest,
+    responses(
+        (status = 200, description = "Booking status updated", body = BookingResponse),
+        (status = 404, description = "Booking not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_booking_status(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateBookingStatusRequest>,
+) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let booking_model = booking::Entity::find()
+        .filter(booking::Column::Id.eq(id))
+        .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Booking not found"))?;
+
+    let mut active: booking::ActiveModel = booking_model.into();
+    active.status = Set(payload.status);
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
+
+    state.broadcast_event(
+        "booking.status_updated",
+        serde_json::json!({
+            "booking_id": updated.id,
+            "resource": updated.resource_name,
+            "status": updated.status
+        }),
+    );
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/bookings/{id}",
+    tag = "Bookings",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Booking ID")
+    ),
+    responses(
+        (status = 200, description = "Booking cancelled / deleted"),
+        (status = 404, description = "Booking not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_booking(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    let booking_model = booking::Entity::find()
+        .filter(booking::Column::Id.eq(id))
+        .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Booking not found"))?;
+
+    let active: booking::ActiveModel = booking_model.into();
+    active
+        .delete(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Delete failed: {}", e)))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "booking_id": id
+    })))
 }
 
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {

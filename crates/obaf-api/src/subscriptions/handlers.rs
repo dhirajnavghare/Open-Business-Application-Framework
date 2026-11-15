@@ -281,6 +281,73 @@ pub async fn check_in_member(
     })))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/subscriptions/{id}",
+    tag = "Subscriptions",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Subscription ID")
+    ),
+    responses(
+        (status = 200, description = "Subscription details", body = SubscriptionResponse),
+        (status = 404, description = "Subscription not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_subscription(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<SubscriptionResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let sub = subscription::Entity::find()
+        .filter(subscription::Column::Id.eq(id))
+        .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Subscription not found"))?;
+
+    Ok(Json(sub.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/subscriptions/{id}",
+    tag = "Subscriptions",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Subscription ID")
+    ),
+    responses(
+        (status = 200, description = "Subscription deleted"),
+        (status = 404, description = "Subscription not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_subscription(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    let sub = subscription::Entity::find()
+        .filter(subscription::Column::Id.eq(id))
+        .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Subscription not found"))?;
+
+    let active: subscription::ActiveModel = sub.into();
+    active
+        .delete(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Delete failed: {}", e)))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "subscription_id": id
+    })))
+}
+
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
     (
         StatusCode::INTERNAL_SERVER_ERROR,

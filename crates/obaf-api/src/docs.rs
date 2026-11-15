@@ -49,6 +49,9 @@ use utoipa::{
         crate::inventory::handlers::get_stock_balance,
         crate::inventory::handlers::create_stock_location,
         crate::inventory::handlers::list_stock_locations,
+        crate::inventory::handlers::get_stock_location,
+        crate::inventory::handlers::update_stock_location,
+        crate::inventory::handlers::delete_stock_location,
         // Procurement
         crate::procurement::handlers::create_purchase_order,
         crate::procurement::handlers::list_purchase_orders,
@@ -67,12 +70,17 @@ use utoipa::{
         // Bookings
         crate::bookings::handlers::create_booking,
         crate::bookings::handlers::list_bookings,
+        crate::bookings::handlers::get_booking,
+        crate::bookings::handlers::update_booking_status,
+        crate::bookings::handlers::delete_booking,
         crate::bookings::handlers::check_in_booking,
         crate::bookings::handlers::check_out_booking,
         // Subscriptions
         crate::subscriptions::handlers::create_subscription,
         crate::subscriptions::handlers::list_subscriptions,
+        crate::subscriptions::handlers::get_subscription,
         crate::subscriptions::handlers::update_status,
+        crate::subscriptions::handlers::delete_subscription,
         crate::subscriptions::handlers::check_in_member,
         // Webhooks
         crate::webhooks::handlers::register_webhook,
@@ -103,6 +111,9 @@ use utoipa::{
         // Promotions & Coupons
         crate::promotions::handlers::create_coupon,
         crate::promotions::handlers::list_coupons,
+        crate::promotions::handlers::get_coupon,
+        crate::promotions::handlers::update_coupon,
+        crate::promotions::handlers::delete_coupon,
         crate::promotions::handlers::validate_coupon,
         crate::promotions::handlers::redeem_coupon,
         // POS Shifts
@@ -196,6 +207,7 @@ use utoipa::{
             crate::sync::handlers::SyncPullResponse,
             crate::inventory::handlers::ProductStockBalance,
             crate::inventory::handlers::CreateStockLocationRequest,
+            crate::inventory::handlers::UpdateStockLocationRequest,
             crate::inventory::handlers::StockLocationResponse,
             crate::billing::handlers::IssueCreditNoteRequest,
             crate::billing::handlers::CreditNoteResponse,
@@ -204,6 +216,7 @@ use utoipa::{
             crate::billing::handlers::ConvertCurrencyRequest,
             crate::billing::handlers::ConvertCurrencyResponse,
             crate::promotions::handlers::CreateCouponRequest,
+            crate::promotions::handlers::UpdateCouponRequest,
             crate::promotions::handlers::CouponResponse,
             crate::promotions::handlers::ValidateCouponRequest,
             crate::promotions::handlers::ValidateCouponResponse,

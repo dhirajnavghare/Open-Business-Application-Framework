@@ -17,4 +17,10 @@ pub fn inventory_routes() -> Router<SharedState> {
             "/locations",
             post(handlers::create_stock_location).get(handlers::list_stock_locations),
         )
+        .route(
+            "/locations/:id",
+            get(handlers::get_stock_location)
+                .patch(handlers::update_stock_location)
+                .delete(handlers::delete_stock_location),
+        )
 }
