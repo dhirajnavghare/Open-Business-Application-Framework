@@ -3,8 +3,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Schema};
 use tracing::info;
 
 use crate::entities::{
-    api_key, audit_log, booking, customer, order, order_item, organization, payment, product,
-    stock_movement, subscription, supplier, user, webhook,
+    api_key, audit_log, booking, credit_note, customer, order, order_item, organization, payment,
+    pos_shift, product, stock_location, stock_movement, subscription, supplier, user, webhook,
 };
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
@@ -21,16 +21,21 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     create_table_if_not_exists(db, backend, &schema, webhook::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, audit_log::Entity).await?;
 
-    // Catalog & Inventory
+    // Catalog & Multi-Location Inventory
     create_table_if_not_exists(db, backend, &schema, product::Entity).await?;
+    create_table_if_not_exists(db, backend, &schema, stock_location::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, stock_movement::Entity).await?;
 
     // Orders & Transactions
     create_table_if_not_exists(db, backend, &schema, order::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, order_item::Entity).await?;
 
-    // Billing & Payments
+    // Billing, Payments & Credit Notes
     create_table_if_not_exists(db, backend, &schema, payment::Entity).await?;
+    create_table_if_not_exists(db, backend, &schema, credit_note::Entity).await?;
+
+    // POS Shifts & Cash Drawer
+    create_table_if_not_exists(db, backend, &schema, pos_shift::Entity).await?;
 
     // Scheduling, Bookings & Subscriptions
     create_table_if_not_exists(db, backend, &schema, booking::Entity).await?;

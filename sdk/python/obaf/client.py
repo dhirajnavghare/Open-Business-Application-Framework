@@ -195,6 +195,58 @@ class ObafClient:
         """Get daily payment and revenue settlement summary."""
         return self._request("GET", "/api/v1/payments/settlement")
 
+    # --- Multi-Location Warehouses ---
+    def create_stock_location(self, name: str, code: str, address: Optional[str] = None) -> Dict[str, Any]:
+        """Create a physical stock location or warehouse."""
+        payload = {"name": name, "code": code, "address": address}
+        return self._request("POST", "/api/v1/inventory/locations", payload=payload)
+
+    def list_stock_locations(self) -> List[Dict[str, Any]]:
+        """List active stock locations."""
+        return self._request("GET", "/api/v1/inventory/locations")
+
+    # --- POS Cash Drawer & Shift Management ---
+    def open_shift(self, register_name: str, opening_float: str) -> Dict[str, Any]:
+        """Open a new cashier drawer shift with opening float."""
+        payload = {"register_name": register_name, "opening_float": opening_float}
+        return self._request("POST", "/api/v1/pos/shifts/open", payload=payload)
+
+    def get_current_shift(self) -> Dict[str, Any]:
+        """Get active shift details for current cashier."""
+        return self._request("GET", "/api/v1/pos/shifts/current")
+
+    def close_shift(self, shift_id: str, counted_cash: str, notes: Optional[str] = None) -> Dict[str, Any]:
+        """Close cashier shift and reconcile counted cash variance."""
+        payload = {"counted_cash": counted_cash, "notes": notes}
+        return self._request("POST", f"/api/v1/pos/shifts/{shift_id}/close", payload=payload)
+
+    def list_shifts(self) -> List[Dict[str, Any]]:
+        """List historical POS shifts."""
+        return self._request("GET", "/api/v1/pos/shifts")
+
+    # --- Credit Notes ---
+    def issue_credit_note(
+        self,
+        amount: str,
+        tax_amount: str,
+        reason: str,
+        order_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Issue an immutable financial credit note."""
+        payload = {
+            "amount": amount,
+            "tax_amount": tax_amount,
+            "reason": reason,
+            "order_id": order_id,
+            "customer_id": customer_id,
+        }
+        return self._request("POST", "/api/v1/billing/credit-notes", payload=payload)
+
+    def list_credit_notes(self) -> List[Dict[str, Any]]:
+        """List all credit notes."""
+        return self._request("GET", "/api/v1/billing/credit-notes")
+
     # --- Global Search ---
     def search(self, query: str) -> Dict[str, Any]:
         """Perform cross-entity global search."""

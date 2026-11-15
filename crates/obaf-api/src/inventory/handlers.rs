@@ -208,3 +208,110 @@ pub async fn get_stock_balance(
         movements_count,
     }))
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct CreateStockLocationRequest {
+    pub name: String,
+    pub code: String,
+    pub address: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct StockLocationResponse {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub name: String,
+    pub code: String,
+    pub address: Option<String>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<obaf_database::entities::stock_location::Model> for StockLocationResponse {
+    fn from(m: obaf_database::entities::stock_location::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            name: m.name,
+            code: m.code,
+            address: m.address,
+            is_active: m.is_active,
+            created_at: m.created_at,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/inventory/locations",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    request_body = CreateStockLocationRequest,
+    responses(
+        (status = 201, description = "Stock location created successfully", body = StockLocationResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn create_stock_location(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Json(payload): Json<CreateStockLocationRequest>,
+) -> Result<(StatusCode, Json<StockLocationResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::stock_location;
+
+    let loc_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    let new_loc = stock_location::ActiveModel {
+        id: Set(loc_id),
+        tenant_id: Set(auth.tenant_id.as_uuid()),
+        name: Set(payload.name),
+        code: Set(payload.code.to_uppercase()),
+        address: Set(payload.address),
+        is_active: Set(true),
+        created_at: Set(now),
+    };
+
+    let inserted = new_loc.insert(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to create stock location: {}", e),
+            }),
+        )
+    })?;
+
+    Ok((StatusCode::CREATED, Json(inserted.into())))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/inventory/locations",
+    tag = "Inventory",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of stock locations and warehouses", body = Vec<StockLocationResponse>),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn list_stock_locations(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<StockLocationResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::stock_location;
+
+    let locations = stock_location::Entity::find()
+        .filter(stock_location::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    Ok(Json(locations.into_iter().map(Into::into).collect()))
+}

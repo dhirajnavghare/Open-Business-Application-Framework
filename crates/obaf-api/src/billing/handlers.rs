@@ -445,3 +445,175 @@ pub async fn render_html_invoice(
 
     Ok(axum::response::Html(html))
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct IssueCreditNoteRequest {
+    pub order_id: Option<Uuid>,
+    pub customer_id: Option<Uuid>,
+    pub amount: Decimal,
+    pub tax_amount: Decimal,
+    pub reason: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CreditNoteResponse {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub credit_note_number: String,
+    pub order_id: Option<Uuid>,
+    pub customer_id: Option<Uuid>,
+    pub amount: Decimal,
+    pub tax_amount: Decimal,
+    pub reason: String,
+    pub status: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<obaf_database::entities::credit_note::Model> for CreditNoteResponse {
+    fn from(m: obaf_database::entities::credit_note::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            credit_note_number: m.credit_note_number,
+            order_id: m.order_id,
+            customer_id: m.customer_id,
+            amount: m.amount,
+            tax_amount: m.tax_amount,
+            reason: m.reason,
+            status: m.status,
+            created_at: m.created_at,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/credit-notes",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    request_body = IssueCreditNoteRequest,
+    responses(
+        (status = 201, description = "Credit note issued successfully", body = CreditNoteResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn issue_credit_note(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Json(payload): Json<IssueCreditNoteRequest>,
+) -> Result<(StatusCode, Json<CreditNoteResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::credit_note;
+    use sea_orm::{ActiveModelTrait, Set};
+
+    let cn_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let cn_number = format!("CN-{}", &cn_id.to_string()[..8].to_uppercase());
+
+    let new_cn = credit_note::ActiveModel {
+        id: Set(cn_id),
+        tenant_id: Set(auth.tenant_id.as_uuid()),
+        credit_note_number: Set(cn_number.clone()),
+        order_id: Set(payload.order_id),
+        customer_id: Set(payload.customer_id),
+        amount: Set(payload.amount),
+        tax_amount: Set(payload.tax_amount),
+        reason: Set(payload.reason),
+        status: Set("ISSUED".to_string()),
+        created_at: Set(now),
+    };
+
+    let inserted = new_cn.insert(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to issue credit note: {}", e),
+            }),
+        )
+    })?;
+
+    state.broadcast_event(
+        "billing.credit_note_issued",
+        serde_json::json!({
+            "credit_note_id": cn_id,
+            "credit_note_number": cn_number,
+            "amount": payload.amount
+        }),
+    );
+
+    Ok((StatusCode::CREATED, Json(inserted.into())))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/credit-notes",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of credit notes", body = Vec<CreditNoteResponse>)
+    )
+)]
+pub async fn list_credit_notes(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<CreditNoteResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::credit_note;
+    use sea_orm::QueryOrder;
+
+    let items = credit_note::Entity::find()
+        .filter(credit_note::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .order_by_desc(credit_note::Column::CreatedAt)
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    Ok(Json(items.into_iter().map(Into::into).collect()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/credit-notes/{id}",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Credit note details", body = CreditNoteResponse),
+        (status = 404, description = "Credit note not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_credit_note(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<CreditNoteResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::credit_note;
+
+    let item = credit_note::Entity::find()
+        .filter(credit_note::Column::Id.eq(id))
+        .filter(credit_note::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Credit note not found".to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(item.into()))
+}

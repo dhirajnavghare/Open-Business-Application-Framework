@@ -490,6 +490,93 @@ pub async fn schema_discovery() -> Json<SchemaDiscoveryResponse> {
                 "revoke".to_string(),
             ],
         },
+        EntitySchema {
+            entity: "stock_location".to_string(),
+            display_name: "Warehouses & Storage Locations".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "name".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some("Warehouse or location name".to_string()),
+                },
+                SchemaField {
+                    name: "code".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some(
+                        "Short unique location code (e.g. WH-01, POS-BAR)".to_string(),
+                    ),
+                },
+            ],
+            actions: vec!["list".to_string(), "create".to_string()],
+        },
+        EntitySchema {
+            entity: "pos_shift".to_string(),
+            display_name: "POS Registers & Cashier Shifts".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "register_name".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some("POS Terminal or Register name".to_string()),
+                },
+                SchemaField {
+                    name: "opening_float".to_string(),
+                    field_type: "decimal".to_string(),
+                    required: true,
+                    ui_component: "currency_input".to_string(),
+                    description: Some("Opening cash float in drawer".to_string()),
+                },
+                SchemaField {
+                    name: "status".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "status_badge".to_string(),
+                    description: Some("OPEN or CLOSED".to_string()),
+                },
+            ],
+            actions: vec![
+                "list".to_string(),
+                "open".to_string(),
+                "current".to_string(),
+                "close".to_string(),
+            ],
+        },
+        EntitySchema {
+            entity: "credit_note".to_string(),
+            display_name: "Credit Notes & Returns".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "credit_note_number".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some("Sequential credit note ID".to_string()),
+                },
+                SchemaField {
+                    name: "amount".to_string(),
+                    field_type: "decimal".to_string(),
+                    required: true,
+                    ui_component: "currency_input".to_string(),
+                    description: Some("Credit note amount".to_string()),
+                },
+                SchemaField {
+                    name: "reason".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some("Reason for issuance (refund, billing error)".to_string()),
+                },
+            ],
+            actions: vec!["list".to_string(), "create".to_string(), "view".to_string()],
+        },
     ];
 
     Json(SchemaDiscoveryResponse { entities })

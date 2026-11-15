@@ -13,4 +13,8 @@ pub fn inventory_routes() -> Router<SharedState> {
             post(handlers::record_movement).get(handlers::list_movements),
         )
         .route("/balance/:product_id", get(handlers::get_stock_balance))
+        .route(
+            "/locations",
+            post(handlers::create_stock_location).get(handlers::list_stock_locations),
+        )
 }

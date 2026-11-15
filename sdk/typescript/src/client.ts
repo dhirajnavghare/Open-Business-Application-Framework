@@ -162,6 +162,61 @@ export class ObafClient {
     return this.request("GET", "/api/v1/payments/settlement");
   }
 
+  // --- Multi-Location Warehouses ---
+  async createStockLocation(payload: {
+    name: string;
+    code: string;
+    address?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/inventory/locations", payload);
+  }
+
+  async listStockLocations(): Promise<any[]> {
+    return this.request("GET", "/api/v1/inventory/locations");
+  }
+
+  // --- POS Cash Drawer & Shift Management ---
+  async openShift(payload: {
+    register_name: string;
+    opening_float: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/pos/shifts/open", payload);
+  }
+
+  async getCurrentShift(): Promise<any> {
+    return this.request("GET", "/api/v1/pos/shifts/current");
+  }
+
+  async closeShift(
+    shiftId: string,
+    payload: { counted_cash: string; notes?: string }
+  ): Promise<any> {
+    return this.request("POST", `/api/v1/pos/shifts/${shiftId}/close`, payload);
+  }
+
+  async listShifts(): Promise<any[]> {
+    return this.request("GET", "/api/v1/pos/shifts");
+  }
+
+  // --- Credit Notes ---
+  async issueCreditNote(payload: {
+    amount: string;
+    tax_amount: string;
+    reason: string;
+    order_id?: string;
+    customer_id?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/billing/credit-notes", payload);
+  }
+
+  async listCreditNotes(): Promise<any[]> {
+    return this.request("GET", "/api/v1/billing/credit-notes");
+  }
+
+  async getCreditNote(id: string): Promise<any> {
+    return this.request("GET", `/api/v1/billing/credit-notes/${id}`);
+  }
+
   // --- Search & Offline Sync ---
   async search(query: string): Promise<any> {
     return this.request("GET", `/api/v1/search?q=${encodeURIComponent(query)}`);

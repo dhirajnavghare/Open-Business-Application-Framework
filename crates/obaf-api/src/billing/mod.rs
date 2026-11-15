@@ -16,4 +16,9 @@ pub fn billing_routes() -> Router<SharedState> {
             "/orders/:id/invoice.html",
             get(handlers::render_html_invoice),
         )
+        .route(
+            "/credit-notes",
+            post(handlers::issue_credit_note).get(handlers::list_credit_notes),
+        )
+        .route("/credit-notes/:id", get(handlers::get_credit_note))
 }
