@@ -1,14 +1,14 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
 use chrono::Utc;
 use obaf_database::entities::product;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::auth::extractor::{AuthErrorResponse, AuthUser};
@@ -107,11 +107,22 @@ pub async fn create_product(
     Ok((StatusCode::CREATED, Json(inserted.into())))
 }
 
+#[derive(Deserialize, ToSchema, IntoParams)]
+pub struct ProductFilterQuery {
+    pub search: Option<String>,
+    pub category_id: Option<Uuid>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
 #[utoipa::path(
     get,
     path = "/api/v1/catalog/products",
     tag = "Catalog",
     security(("bearer_auth" = [])),
+    params(
+        ProductFilterQuery
+    ),
     responses(
         (status = 200, description = "List of products for current tenant", body = Vec<ProductResponse>),
         (status = 401, description = "Unauthorized", body = AuthErrorResponse)
@@ -120,19 +131,40 @@ pub async fn create_product(
 pub async fn list_products(
     State(state): State<SharedState>,
     auth: AuthUser,
+    Query(query): Query<ProductFilterQuery>,
 ) -> Result<Json<Vec<ProductResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
-    let products = product::Entity::find()
-        .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
-        .all(&state.db)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
-                }),
-            )
-        })?;
+    let mut q =
+        product::Entity::find().filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()));
+
+    if let Some(cat) = query.category_id {
+        q = q.filter(product::Column::CategoryId.eq(cat));
+    }
+
+    if let Some(s) = query.search {
+        let pattern = format!("%{}%", s);
+        q = q.filter(
+            product::Column::Name
+                .like(&pattern)
+                .or(product::Column::Sku.like(&pattern)),
+        );
+    }
+
+    if let Some(limit) = query.limit {
+        q = q.limit(limit);
+    }
+
+    if let Some(offset) = query.offset {
+        q = q.offset(offset);
+    }
+
+    let products = q.all(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Database error: {}", e),
+            }),
+        )
+    })?;
 
     let resp = products.into_iter().map(Into::into).collect();
     Ok(Json(resp))

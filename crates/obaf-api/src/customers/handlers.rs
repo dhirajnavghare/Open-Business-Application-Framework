@@ -1,13 +1,13 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
 use chrono::{DateTime, Utc};
 use obaf_database::entities::customer;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::auth::extractor::{AuthErrorResponse, AuthUser};
@@ -101,11 +101,21 @@ pub async fn create_customer(
     Ok((StatusCode::CREATED, Json(inserted.into())))
 }
 
+#[derive(Deserialize, ToSchema, IntoParams)]
+pub struct CustomerFilterQuery {
+    pub search: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
 #[utoipa::path(
     get,
     path = "/api/v1/customers",
     tag = "Customers",
     security(("bearer_auth" = [])),
+    params(
+        CustomerFilterQuery
+    ),
     responses(
         (status = 200, description = "List of customers", body = Vec<CustomerResponse>),
         (status = 401, description = "Unauthorized", body = AuthErrorResponse)
@@ -114,19 +124,37 @@ pub async fn create_customer(
 pub async fn list_customers(
     State(state): State<SharedState>,
     auth: AuthUser,
+    Query(query): Query<CustomerFilterQuery>,
 ) -> Result<Json<Vec<CustomerResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
-    let customers = customer::Entity::find()
-        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
-        .all(&state.db)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
-                }),
-            )
-        })?;
+    let mut q =
+        customer::Entity::find().filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()));
+
+    if let Some(s) = query.search {
+        let pattern = format!("%{}%", s);
+        q = q.filter(
+            customer::Column::Name
+                .like(&pattern)
+                .or(customer::Column::Email.like(&pattern))
+                .or(customer::Column::Phone.like(&pattern)),
+        );
+    }
+
+    if let Some(limit) = query.limit {
+        q = q.limit(limit);
+    }
+
+    if let Some(offset) = query.offset {
+        q = q.offset(offset);
+    }
+
+    let customers = q.all(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Database error: {}", e),
+            }),
+        )
+    })?;
 
     let resp = customers.into_iter().map(Into::into).collect();
     Ok(Json(resp))
