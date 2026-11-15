@@ -71,6 +71,14 @@ pub async fn metrics_check(State(state): State<SharedState>) -> Response {
         .into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/llms.txt",
+    tag = "Health",
+    responses(
+        (status = 200, description = "AI Agent context and documentation standard file conforming to /llms.txt", content_type = "text/markdown")
+    )
+)]
 pub async fn llms_txt() -> Response {
     let content = include_str!("../../../llms.txt");
     (

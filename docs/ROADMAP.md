@@ -19,6 +19,7 @@ This document details the milestone ordering, acceptance criteria, and delivered
 | **8** | **Domain Expansion** | 22 comprehensive industry presets (Retail Grocery, Hotel Management, Manufacturing Jobwork, Courier Fleet, Clinic OPD, etc.) | ✅ Completed |
 | **9** | **Advanced Platform Capabilities** | Offline edge batch sync (`/api/v1/sync`), dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon | ✅ Completed |
 | **10** | **Enterprise Commerce & Supply Chain** | Procurement (PO lifecycle), Persistent Coupons, Multi-Currency Exchange, POS Cash Drawer Shifts, Multi-Location Warehouses, Credit Notes, Polyglot SDKs | ✅ Completed |
+| **11** | **Developer Experience & AI Integrations** | `/llms.txt` standard & endpoint, 60s guided tour (`make tour`), 1-click cloud DevContainer, live CLI diagnostics (`obaf status`), Token Bucket rate limiting middleware | ✅ Completed |
 
 ---
 
@@ -94,3 +95,11 @@ This document details the milestone ordering, acceptance criteria, and delivered
 - [x] **POS Cash Drawer Shifts**: Cashier shift management (`pos_shift`) with opening float, cash sales, refunds, expected cash, and variance reconciliation.
 - [x] **Immutable Credit Notes Engine**: Formal financial credit note issuance (`credit_note`) for returns and adjustments.
 - [x] **Polyglot Client SDKs**: Official zero-dependency Python SDK (`sdk/python`) and TypeScript SDK (`sdk/typescript`) supporting all operational endpoints.
+
+### Phase 11: Developer Experience, AI Integrations & High-Scale Resilience
+- [x] **The `llms.txt` AI Context Standard**: Repo-root `llms.txt` and native `GET /llms.txt` endpoint enabling AI coding assistants (Cursor, Claude Code, Copilot, Windsurf) to ingest complete API specs and models in 1 prompt.
+- [x] **60-Second Guided Tour**: Self-contained interactive terminal tour (`scripts/tour.py`, `scripts/tour.sh`, `make tour`) proving out bootstrap, stock inward, POS ordering, 3-way split billing, and thermal receipt generation.
+- [x] **1-Click Cloud Development**: Complete VS Code Dev Containers and GitHub Codespaces workspace configuration (`.devcontainer/devcontainer.json`).
+- [x] **Live System Diagnostics**: `obaf-cli status` and `make status` inspecting running server health, latency, OpenAPI specs, `/llms.txt` context, Prometheus metrics, and local database tenant counts.
+- [x] **Token Bucket Rate Limiting Middleware**: Active Axum traffic-shaping layer with dynamic client key resolution, emitting `X-RateLimit-Remaining` and returning `HTTP 429 Too Many Requests` with `Retry-After`.
+- [x] **Viral Launch Playbook**: Comprehensive launch templates and technical distribution strategy for Hacker News, Reddit, Twitter/X, and Product Hunt (`docs/LAUNCH_PLAYBOOK.md`).

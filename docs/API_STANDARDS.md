@@ -23,6 +23,8 @@ Core Resource Namespaces:
 - Omni-Channel Global Search: `/api/v1/search`
 - Offline Edge Synchronization: `/api/v1/sync/push`, `/api/v1/sync/pull`
 - Introspection & Admin: `/api/v1/meta/schema`, `/api/v1/meta/info`, `/api/v1/admin/setup/preset`, `/api/v1/admin/tenants`
+- Health & Observability: `/health`, `/metrics`
+- AI Agent Context & Documentation: `/llms.txt`, `/swagger-ui`, `/api/v1/openapi.json`
 
 ---
 
@@ -35,6 +37,8 @@ Core Resource Namespaces:
 | `x-request-id` | Both | Distributed tracing correlation ID (echoed back in response headers) |
 | `Idempotency-Key` | Request | Unique client-generated UUID for deduplicating mutations (`/orders`, `/payments`) |
 | `X-Idempotent-Replay` | Response | Set to `true` when a request was fulfilled from cached idempotent replay |
+| `X-RateLimit-Remaining`| Response | Remaining token bucket quota for the calling client or tenant |
+| `Retry-After` | Response | Recommended cooling duration in seconds when receiving HTTP `429 Too Many Requests` |
 | `X-Content-Type-Options`| Response | Set to `nosniff` for MIME-sniffing prevention |
 | `X-Frame-Options` | Response | Set to `DENY` for clickjacking mitigation |
 | `Strict-Transport-Security` | Response | `max-age=31536000; includeSubDomains` (HSTS) |
@@ -52,6 +56,7 @@ Core Resource Namespaces:
 | `404 Not Found` | Resource not found | Resource does not exist or belongs to another tenant |
 | `409 Conflict` | Unique constraint conflict | Duplicate organization slug or order number |
 | `422 Unprocessable` | Schema validation error | Custom metadata failed preset JSON schema |
+| `429 Too Many Requests`| Rate limit exceeded | Token bucket burst capacity exceeded; client must wait `Retry-After` seconds |
 
 ---
 

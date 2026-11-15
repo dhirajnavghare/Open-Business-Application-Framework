@@ -9,6 +9,7 @@ use utoipa::{
         // Health
         crate::health::health_check,
         crate::health::metrics_check,
+        crate::health::llms_txt,
         // Meta
         crate::meta::engine_info,
         crate::meta::schema_discovery,

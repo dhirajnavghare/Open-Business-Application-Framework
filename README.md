@@ -18,6 +18,7 @@
 [![CI](https://github.com/dhirajnavghare/Open-Business-Application-Framework/actions/workflows/ci.yml/badge.svg)](https://github.com/dhirajnavghare/Open-Business-Application-Framework/actions)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-brightgreen.svg)](http://localhost:8080/swagger-ui)
 [![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)](Dockerfile)
+[![Dev Containers](https://img.shields.io/badge/Dev%20Containers-Ready-blue.svg)](.devcontainer/devcontainer.json)
 
 </div>
 
@@ -75,7 +76,15 @@ Instead of building hardcoded, isolated tables for each industry, OBAF abstracts
 ## 🚀 Quickstart in 30 Seconds
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.80+)
+- [Rust](https://rustup.rs/) (1.80+) or 1-Click [GitHub Codespaces / VS Code Dev Containers](.devcontainer/devcontainer.json)
+
+### ⏱️ Experience the 60-Second Interactive Tour
+Run a complete guided simulation (boots ephemeral server, bootstraps tenant, handles stock inward, places order, splits bill, and renders thermal receipt) in under 60 seconds:
+```bash
+make tour
+# Or directly via script:
+./scripts/tour.sh
+```
 
 ### 1. Clone & Run
 ```bash
@@ -100,17 +109,24 @@ You will see:
  🚀 Server running at: http://127.0.0.1:8080
  📖 Swagger UI Docs:   http://127.0.0.1:8080/swagger-ui
  ⚡ OpenAPI JSON Spec: http://127.0.0.1:8080/api/v1/openapi.json
+ 🤖 AI Agent Context:  http://127.0.0.1:8080/llms.txt
  🩺 Health Check:      http://127.0.0.1:8080/health
+ 📊 Prometheus Metric: http://127.0.0.1:8080/metrics
  ────────────────────────────────────────────────────────────
 ```
 
-Open **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** in your browser to interactively test endpoints.
+Open **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** in your browser to interactively test endpoints, or query **[http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)** with Cursor, Claude Code, or Copilot for instant AI context.
 
 ## 💻 Developer CLI (`obaf-cli`)
 
-OBAF includes a standalone CLI binary for instant setup, database health checks, preset listing, and token generation:
+OBAF includes a standalone CLI binary for instant setup, live system diagnostics, database health checks, preset listing, and token generation:
 
 ```bash
+# Check live server status, response latency, and database stats
+cargo run -p obaf-cli -- status
+# Or via Makefile:
+make status
+
 # Verify environment, database connectivity, and migrations
 cargo run -p obaf-cli -- doctor
 
@@ -221,6 +237,9 @@ npx @hey-api/openapi-ts -i http://localhost:8080/api/v1/openapi.json -o ./client
 | **Webhooks Engine** | `/api/v1/webhooks` | Automated HTTP dispatch with HMAC-SHA256 signatures (`X-OBAF-Signature`) |
 | **Real-time Event Hub** | `/api/v1/ws/events` | Axum WebSockets for live Kitchen Display (KDS) & cashier sync |
 | **SaaS Multi-Tenancy** | `/api/v1/admin/tenants`| Organization quota metering, tenant database routing (`TenantPoolRouter`) |
+| **Traffic Shaping & DoS** | Global Middleware | Token Bucket Rate Limiting (`X-RateLimit-Remaining`, `Retry-After`, HTTP 429) |
+| **AI Agent Context** | `/llms.txt` | Standardized LLM context file for Cursor, Claude Code, Copilot, Windsurf |
+| **Health & Observability**| `/health`, `/metrics` | Database ping health check and Prometheus operational metrics |
 
 ---
 

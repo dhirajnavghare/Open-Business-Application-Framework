@@ -21,7 +21,21 @@ OBAF is written in pure asynchronous Rust and is designed with **zero-friction c
 
 ---
 
-## 2. 3-Step Quickstart
+## ⚡ 1-Click Cloud Workspace (Dev Containers / GitHub Codespaces)
+
+If you don't wish to install Rust, Python, and Node locally, OBAF is fully configured with **VS Code Dev Containers** and **GitHub Codespaces** via [`.devcontainer/devcontainer.json`](../.devcontainer/devcontainer.json):
+
+1. Click **Open in GitHub Codespaces** on GitHub, or press `F1` in VS Code and select `Dev Containers: Reopen in Container`.
+2. The pre-configured environment provisions:
+   - Rust 1.80+ with `rust-analyzer`, `clippy`, and `rustfmt`
+   - Python 3.11 with test tools
+   - Node.js 20 for the TypeScript SDK
+   - Automatic execution of `make setup` and dependency caching
+3. You are immediately ready to run `make tour` or `make dev` without any local host configuration.
+
+---
+
+## 2. 3-Step Quickstart (Local Workstation)
 
 ### Step 1: Clone the Repository
 ```bash
@@ -47,6 +61,8 @@ Once running, navigate to:
 * 🚀 **Server Health Check:** [http://127.0.0.1:8080/health](http://127.0.0.1:8080/health)
 * 📖 **Interactive Swagger UI:** [http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)
 * ⚡ **OpenAPI 3.1 Spec:** [http://127.0.0.1:8080/api/v1/openapi.json](http://127.0.0.1:8080/api/v1/openapi.json)
+* 🤖 **AI Agent Context (`llms.txt`):** [http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)
+* 📊 **Prometheus Metrics:** [http://127.0.0.1:8080/metrics](http://127.0.0.1:8080/metrics)
 * 🔍 **Dynamic Schema Discovery:** [http://127.0.0.1:8080/api/v1/meta/schema](http://127.0.0.1:8080/api/v1/meta/schema)
 
 ---
@@ -60,6 +76,8 @@ A comprehensive [`Makefile`](file:///Users/dhirajnavghare/Developer/Open-Busines
 | `make setup` | Initialize `.env`, create `data/`, and verify dependencies |
 | `make build` | Run all checks and tests, then build release binaries |
 | `make dev` / `make run` | Run `obaf-server` in development mode |
+| `make status` | Check live server health, response latency, and database metrics (`obaf status`) |
+| `make tour` | Run 60-second interactive guided terminal demo (`scripts/tour.sh`) |
 | `make worker` | Run the background worker daemon (`obaf-worker`) |
 | `make doctor` | Run `obaf doctor` to verify DB, schema, and preset integrity |
 | `make presets` | List all 22 domain presets (`obaf presets`) |

@@ -115,10 +115,16 @@ In accordance with Brewer's CAP Theorem and the PACELC extension:
 - Webhooks exceeding maximum retry thresholds transition to `DEAD_LETTER` status, preserving payload history for manual replay without blocking the main event queue.
 
 ### 5.5 Token Bucket Rate Limiting (Traffic Shaping & DoS Mitigation)
-- Implemented via `obaf_core::TokenBucketRateLimiter`.
+- Implemented via `obaf_core::TokenBucketRateLimiter` and wired directly into the Axum request pipeline via `from_fn_with_state` in `obaf-api`.
+- Client key resolved dynamically:
+  1. Hashed Bearer token prefix from `Authorization` header for authenticated tenant requests.
+  2. First client IP from `X-Forwarded-For` or `CF-Connecting-IP` proxy headers for public clients.
+  3. Default fallback bucket for direct unauthenticated traffic.
 - Implements continuous token replenishment based on elapsed time:
   $$\text{tokens}(t) = \min\left(\text{capacity}, \text{tokens}(t_0) + \Delta t \times \text{refill\_rate}\right)$$
-- Enforces strict burst protection and noisy-neighbor isolation across multi-tenant API clients.
+- Responses inject `X-RateLimit-Remaining: <count>` on permitted requests.
+- When burst limits are exhausted, immediately responds with **HTTP `429 Too Many Requests`**, setting `Retry-After: <seconds>` and `X-RateLimit-Remaining: 0`.
+- Internal probes and documentation (`/health`, `/metrics`, `/llms.txt`, `/swagger-ui`) bypass rate limiting to guarantee monitoring availability.
 - Inactive buckets are automatically pruned to prevent memory leaks.
 
 ### 5.6 Circuit Breaker Pattern (Cascading Failure Protection)

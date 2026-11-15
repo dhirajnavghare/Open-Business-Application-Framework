@@ -78,6 +78,13 @@ Welcome to the foundational release of **Open Business Application Framework (OB
   - M2M API Keys (`X-API-Key`) with SHA-256 hashing.
   - Suppliers directory (`/api/v1/suppliers`).
   - Extended CLI commands: `obaf seed`, `obaf export`, `obaf backup`, `obaf restore`, `obaf migrate`, `obaf new-preset`.
+- **Developer Experience, AI Integrations & High-Scale Resilience:**
+  - Standardized `llms.txt` specification at repository root and native `GET /llms.txt` HTTP endpoint for AI coding assistants.
+  - Interactive 60-second guided terminal demonstration (`scripts/tour.py`, `scripts/tour.sh`, `make tour`).
+  - 1-Click Cloud Workspace configuration for GitHub Codespaces and VS Code Remote Containers (`.devcontainer/devcontainer.json`).
+  - Real-time system health and latency diagnostics command (`obaf-cli status` and `make status`).
+  - Active Token Bucket rate limiting middleware in `obaf-api` injecting `X-RateLimit-Remaining` and returning `HTTP 429 Too Many Requests` with `Retry-After`.
+  - Comprehensive launch playbook and community submission copy (`docs/LAUNCH_PLAYBOOK.md`).
 - **Developer Experience & Infrastructure:**
   - Multi-stage `Dockerfile` producing an ultra-lightweight ~25MB unprivileged (`USER obaf`) container image.
   - Cross-platform `Makefile` with targets for `setup`, `dev`, `worker`, `doctor`, `presets`, `check`, `fmt`, `test`, `test-e2e`, `test-all`, `sdk-ts`, `sdk-py`, and `docker-*`.
