@@ -202,3 +202,97 @@ pub async fn update_status(
 
     Ok(Json(updated.into()))
 }
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/subscriptions/{id}/check-in",
+    tag = "Subscriptions",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Subscription ID")
+    ),
+    responses(
+        (status = 200, description = "Member checked in successfully", body = serde_json::Value),
+        (status = 400, description = "Subscription is not active", body = AuthErrorResponse),
+        (status = 404, description = "Subscription not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn check_in_member(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    let sub = subscription::Entity::find()
+        .filter(subscription::Column::Id.eq(id))
+        .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Subscription not found"))?;
+
+    if sub.status.to_uppercase() != "ACTIVE" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!("Cannot check in: subscription is {}", sub.status),
+            }),
+        ));
+    }
+
+    // Parse existing metadata, update check-in count and timestamp
+    let mut meta: serde_json::Value =
+        serde_json::from_str(&sub.metadata).unwrap_or(serde_json::json!({}));
+    let total_check_ins = meta
+        .get("check_in_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0)
+        + 1;
+    let now = Utc::now();
+    meta["check_in_count"] = serde_json::json!(total_check_ins);
+    meta["last_check_in_at"] = serde_json::json!(now.to_rfc3339());
+
+    let mut active: subscription::ActiveModel = sub.clone().into();
+    active.metadata = Set(meta.to_string());
+    active.updated_at = Set(now);
+
+    let _ = active
+        .update(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
+
+    state.broadcast_event(
+        "subscription.check_in",
+        serde_json::json!({
+            "subscription_id": sub.id,
+            "customer_id": sub.customer_id,
+            "plan_name": sub.plan_name,
+            "total_check_ins": total_check_ins,
+            "timestamp": now.to_rfc3339()
+        }),
+    );
+
+    Ok(Json(serde_json::json!({
+        "status": "checked_in",
+        "subscription_id": sub.id,
+        "customer_id": sub.customer_id,
+        "plan_name": sub.plan_name,
+        "total_check_ins": total_check_ins,
+        "last_check_in_at": now.to_rfc3339()
+    })))
+}
+
+fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(AuthErrorResponse { error: msg }),
+    )
+}
+
+fn not_found_err(msg: &str) -> (StatusCode, Json<AuthErrorResponse>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(AuthErrorResponse {
+            error: msg.to_string(),
+        }),
+    )
+}

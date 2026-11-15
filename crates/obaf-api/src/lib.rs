@@ -11,6 +11,7 @@ pub mod inventory;
 pub mod meta;
 pub mod orders;
 pub mod payments;
+pub mod reports;
 pub mod router;
 pub mod state;
 pub mod subscriptions;

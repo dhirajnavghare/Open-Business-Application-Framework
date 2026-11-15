@@ -1,4 +1,8 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use chrono::{DateTime, Utc};
 use obaf_database::entities::booking;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -119,4 +123,110 @@ pub async fn list_bookings(
 
     let resp = bookings.into_iter().map(Into::into).collect();
     Ok(Json(resp))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/bookings/{id}/check-in",
+    tag = "Bookings",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Booking ID")
+    ),
+    responses(
+        (status = 200, description = "Booking checked in", body = BookingResponse),
+        (status = 404, description = "Booking not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn check_in_booking(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let booking_model = booking::Entity::find()
+        .filter(booking::Column::Id.eq(id))
+        .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Booking not found"))?;
+
+    let mut active: booking::ActiveModel = booking_model.into();
+    active.status = Set("CHECKED_IN".to_string());
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
+
+    state.broadcast_event(
+        "booking.checked_in",
+        serde_json::json!({
+            "booking_id": updated.id,
+            "resource": updated.resource_name,
+            "status": updated.status
+        }),
+    );
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/bookings/{id}/check-out",
+    tag = "Bookings",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Booking ID")
+    ),
+    responses(
+        (status = 200, description = "Booking checked out / completed", body = BookingResponse),
+        (status = 404, description = "Booking not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn check_out_booking(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let booking_model = booking::Entity::find()
+        .filter(booking::Column::Id.eq(id))
+        .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Database error: {}", e)))?
+        .ok_or_else(|| not_found_err("Booking not found"))?;
+
+    let mut active: booking::ActiveModel = booking_model.into();
+    active.status = Set("COMPLETED".to_string());
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
+
+    state.broadcast_event(
+        "booking.checked_out",
+        serde_json::json!({
+            "booking_id": updated.id,
+            "resource": updated.resource_name,
+            "status": updated.status
+        }),
+    );
+
+    Ok(Json(updated.into()))
+}
+
+fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(AuthErrorResponse { error: msg }),
+    )
+}
+
+fn not_found_err(msg: &str) -> (StatusCode, Json<AuthErrorResponse>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(AuthErrorResponse {
+            error: msg.to_string(),
+        }),
+    )
 }

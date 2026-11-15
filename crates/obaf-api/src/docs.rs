@@ -38,14 +38,21 @@ use utoipa::{
         // Bookings
         crate::bookings::handlers::create_booking,
         crate::bookings::handlers::list_bookings,
+        crate::bookings::handlers::check_in_booking,
+        crate::bookings::handlers::check_out_booking,
         // Subscriptions
         crate::subscriptions::handlers::create_subscription,
         crate::subscriptions::handlers::list_subscriptions,
         crate::subscriptions::handlers::update_status,
+        crate::subscriptions::handlers::check_in_member,
         // Webhooks
         crate::webhooks::handlers::register_webhook,
         crate::webhooks::handlers::list_webhooks,
         crate::webhooks::handlers::test_webhook,
+        // Reports
+        crate::reports::handlers::get_dashboard_metrics,
+        crate::reports::handlers::get_kitchen_prep_sheet,
+        crate::reports::handlers::get_sales_by_payment_method,
         // Billing
         crate::billing::handlers::calculate_tax,
         crate::billing::handlers::split_bill,
@@ -95,6 +102,9 @@ use utoipa::{
             crate::billing::handlers::SplitBillResponse,
             crate::billing::handlers::SplitBillShare,
             crate::billing::handlers::ReceiptResponse,
+            crate::reports::handlers::DashboardMetrics,
+            crate::reports::handlers::KitchenPrepItem,
+            crate::reports::handlers::PaymentMethodSummary,
         )
     ),
     modifiers(&SecurityAddon),
@@ -110,6 +120,7 @@ use utoipa::{
         (name = "Subscriptions", description = "Membership plans, renewals, and recurring subscriptions"),
         (name = "Webhooks", description = "Real-time event webhooks for WhatsApp, Zapier, and automation"),
         (name = "Billing", description = "GST/VAT tax calculations, bill splitting, and invoice/receipt generation"),
+        (name = "Reports", description = "Operational dashboards, kitchen prep sheets, and sales metrics"),
         (name = "Meta", description = "Dynamic introspection and schema discovery for headless admin panels"),
         (name = "Admin", description = "Platform management and domain preset bootstrapping")
     ),
