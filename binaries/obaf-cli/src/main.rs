@@ -71,6 +71,18 @@ enum Commands {
         #[arg(long, help = "Human-readable display name")]
         title: Option<String>,
     },
+    /// Scaffold a new turnkey business project with Docker, .env, and SDK clients
+    Init {
+        #[arg(help = "Name of the new project directory to create")]
+        project_name: String,
+        #[arg(
+            short,
+            long,
+            default_value = "retail_grocery",
+            help = "Business domain preset (e.g. restaurant_pos, pharmacy, hotel_management)"
+        )]
+        preset: String,
+    },
     /// Create a timestamped backup of the SQLite database
     Backup {
         #[arg(short, long, default_value = "data/obaf.db")]
@@ -254,6 +266,138 @@ async fn main() -> anyhow::Result<()> {
             fs::create_dir_all("config/presets")?;
             fs::write(&file_path, serde_json::to_string_pretty(&template)?)?;
             println!("✨ Created new preset template at: {}", file_path);
+        }
+
+        Commands::Init {
+            project_name,
+            preset,
+        } => {
+            let project_path = Path::new(&project_name);
+            if project_path.exists() {
+                anyhow::bail!("Directory '{}' already exists!", project_name);
+            }
+            fs::create_dir_all(project_path)?;
+            fs::create_dir_all(project_path.join("data"))?;
+
+            // 1. .env
+            let env_content = format!(
+                "HOST=0.0.0.0\nPORT=8080\nDATABASE_URL=sqlite:///app/data/obaf.db?mode=rwc\nJWT_SECRET={}\nOBAF_DEFAULT_PRESET={}\n",
+                Uuid::new_v4().simple(),
+                preset
+            );
+            fs::write(project_path.join(".env"), env_content)?;
+
+            // 2. docker-compose.yml
+            let compose_content = format!(
+                r#"services:
+  obaf:
+    image: ghcr.io/dhirajnavghare/obaf-server:latest
+    container_name: {}-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DATABASE_URL=sqlite:///app/data/obaf.db?mode=rwc
+    volumes:
+      - ./data:/app/data
+"#,
+                project_name
+            );
+            fs::write(project_path.join("docker-compose.yml"), compose_content)?;
+
+            // 3. client.ts
+            let ts_client = format!(
+                r#"// Official TypeScript Client Starter for {}
+import {{ ObafClient }} from "@obaf/sdk";
+
+const client = new ObafClient({{ baseUrl: "http://127.0.0.1:8080" }});
+
+async function main() {{
+  const health = await client.health();
+  console.log("Server Health:", health);
+
+  console.log("Bootstrapping demo tenant with preset: {}");
+  const tenant = await client.bootstrap({{
+    organization_name: "My {}",
+    slug: "my-{}",
+    preset: "{}",
+    admin_email: "admin@example.com",
+    admin_name: "Store Manager",
+    password: "Password123!",
+  }});
+  console.log("Tenant ready:", tenant);
+}}
+
+main().catch(console.error);
+"#,
+                project_name, preset, project_name, project_name, preset
+            );
+            fs::write(project_path.join("client.ts"), ts_client)?;
+
+            // 4. client.py
+            let py_client = format!(
+                r#"# Official Python Client Starter for {}
+from obaf import ObafClient
+
+client = ObafClient(base_url="http://127.0.0.1:8080")
+
+def main():
+    health = client.health()
+    print("Server Health:", health)
+
+    print("Bootstrapping demo tenant with preset: {}")
+    tenant = client.bootstrap(
+        organization_name="My {}",
+        slug="my-{}",
+        preset="{}",
+        admin_email="admin@example.com",
+        admin_name="Store Manager",
+        password="Password123!",
+    )
+    print("Tenant ready:", tenant)
+
+if __name__ == "__main__":
+    main()
+"#,
+                project_name, preset, project_name, project_name, preset
+            );
+            fs::write(project_path.join("client.py"), py_client)?;
+
+            // 5. README.md
+            let readme_content = format!(
+                r#"# {}
+
+Turnkey business application powered by **Open Business Application Framework (OBAF)**.
+- **Configured Domain Preset:** `{}`
+- **API Documentation:** http://localhost:8080/swagger-ui
+- **Health Check:** http://localhost:8080/health
+
+## Getting Started
+
+```bash
+# 1. Start the OBAF server
+docker compose up -d
+
+# 2. Run TypeScript or Python clients
+deno run -A client.ts  # or bun client.ts / ts-node client.ts
+python3 client.py
+```
+"#,
+                project_name, preset
+            );
+            fs::write(project_path.join("README.md"), readme_content)?;
+
+            println!(
+                "✨ Successfully initialized new OBAF project: {}",
+                project_name
+            );
+            println!("📁 Location:    {}", project_path.display());
+            println!("📦 Preset:      {}", preset);
+            println!("\nNext steps:");
+            println!("  cd {}", project_name);
+            println!("  docker compose up -d");
         }
 
         Commands::Backup {

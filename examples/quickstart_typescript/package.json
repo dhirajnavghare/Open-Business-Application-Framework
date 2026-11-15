@@ -1,0 +1,13 @@
+{
+  "name": "obaf-quickstart-typescript",
+  "version": "0.1.0",
+  "description": "Turnkey TypeScript reference example for Open Business Application Framework",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "node --loader ts-node/esm index.ts"
+  },
+  "dependencies": {
+    "@obaf/sdk": "file:../../sdk/typescript"
+  }
+}

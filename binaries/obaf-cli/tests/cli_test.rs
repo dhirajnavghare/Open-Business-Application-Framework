@@ -112,3 +112,28 @@ fn test_cli_seed_and_export() {
 
     let _ = fs::remove_file(db_path);
 }
+
+#[test]
+fn test_cli_init_project() {
+    let test_dir = "/tmp/test_obaf_init_bistro";
+    let _ = fs::remove_dir_all(test_dir);
+
+    let bin = env!("CARGO_BIN_EXE_obaf-cli");
+    let output = Command::new(bin)
+        .current_dir(get_workspace_root())
+        .args(["init", test_dir, "--preset", "restaurant_pos"])
+        .output()
+        .expect("Failed to execute obaf-cli init");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Successfully initialized new OBAF project"));
+
+    assert!(Path::new(test_dir).join(".env").exists());
+    assert!(Path::new(test_dir).join("docker-compose.yml").exists());
+    assert!(Path::new(test_dir).join("client.ts").exists());
+    assert!(Path::new(test_dir).join("client.py").exists());
+    assert!(Path::new(test_dir).join("README.md").exists());
+
+    let _ = fs::remove_dir_all(test_dir);
+}

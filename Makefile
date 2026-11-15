@@ -85,6 +85,10 @@ test-e2e:
 test-all: test test-e2e sdk-ts sdk-py
 	@echo "🎉 All workspace tests, SDK checks, and e2e suites passed!"
 
+benchmark:
+	@chmod +x scripts/benchmark.sh
+	./scripts/benchmark.sh
+
 sdk-ts:
 	@echo "Building and testing TypeScript SDK..."
 	npx -y -p typescript tsc -p sdk/typescript/tsconfig.json
