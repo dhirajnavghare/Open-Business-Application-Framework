@@ -11,6 +11,7 @@ COPY crates ./crates
 COPY binaries ./binaries
 COPY examples ./examples
 COPY config ./config
+COPY scripts ./scripts
 COPY llms.txt README.md LICENSE NOTICE ./
 
 # Execute automated tests during container build to guarantee zero-defect images
@@ -34,6 +35,7 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -54,10 +56,12 @@ COPY --from=builder /app/LICENSE /app/LICENSE
 COPY --from=builder /app/NOTICE /app/NOTICE
 COPY --from=builder /app/llms.txt /app/llms.txt
 
+# Copy entrypoint script
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create data directory for SQLite and ensure ownership
 RUN mkdir -p /app/data && chown -R obaf:obaf /app
-
-USER obaf
 
 ENV PORT=8080
 ENV HOST=0.0.0.0
@@ -68,4 +72,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://127.0.0.1:8080/health || exit 1
 
-ENTRYPOINT ["/app/obaf-server"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["/app/obaf-server"]

@@ -8,23 +8,52 @@ use tracing::info;
 pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnection> {
     info!("Connecting to database: {}", sanitize_url(database_url));
 
-    // Handle SQLite file directory creation if needed
-    if database_url.starts_with("sqlite://") {
-        if let Some(path_str) = database_url
-            .strip_prefix("sqlite://")
-            .and_then(|s| s.split('?').next())
-        {
-            if path_str != ":memory:" {
-                let path = std::path::Path::new(path_str);
-                if let Some(parent) = path.parent() {
-                    if !parent.as_os_str().is_empty() && !parent.exists() {
+    // Handle SQLite file directory creation & permissions verification
+    if database_url.starts_with("sqlite://") || database_url.starts_with("sqlite:") {
+        let raw_path = if let Some(p) = database_url.strip_prefix("sqlite://") {
+            p
+        } else {
+            database_url.strip_prefix("sqlite:").unwrap_or_default()
+        };
+        let path_str = raw_path.split('?').next().unwrap_or("");
+        if !path_str.is_empty() && path_str != ":memory:" {
+            let path = std::path::Path::new(path_str);
+            if let Some(parent) = path.parent() {
+                if !parent.as_os_str().is_empty() {
+                    if !parent.exists() {
                         std::fs::create_dir_all(parent).map_err(|e| ObafError::Database {
                             message: format!(
-                                "Failed to create SQLite directory {}: {}",
+                                "Failed to create SQLite directory '{}': {}. \
+                                If deploying via Docker, ensure the host volume directory is writable.",
                                 parent.display(),
                                 e
                             ),
                         })?;
+                    } else {
+                        // Validate directory write permissions before attempting connection
+                        let probe_file =
+                            parent.join(format!(".obaf_write_probe_{}", std::process::id()));
+                        match std::fs::OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .truncate(true)
+                            .open(&probe_file)
+                        {
+                            Ok(_) => {
+                                let _ = std::fs::remove_file(probe_file);
+                            }
+                            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                                return Err(ObafError::Database {
+                                    message: format!(
+                                        "Permission denied: SQLite directory '{}' is not writable by the current process. \
+                                        If deploying in Docker on Linux, ensure the host volume has write permissions: \
+                                        run 'chmod -R 777 ./data' or 'chown -R 999:999 ./data' on the host server.",
+                                        parent.display()
+                                    ),
+                                });
+                            }
+                            Err(_) => {} // Ignore other probe errors and let Database::connect handle
+                        }
                     }
                 }
             }

@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: obaf-worker
-    entrypoint: ["/app/obaf-worker"]
+    entrypoint: ["docker-entrypoint.sh", "/app/obaf-worker"]
     environment:
       - DATABASE_URL=sqlite:///app/data/obaf.db?mode=rwc
       - OBAF_WORKER_INTERVAL_SECS=30
