@@ -325,7 +325,7 @@ async function main() {{
     preset: "{}",
     admin_email: "admin@example.com",
     admin_name: "Store Manager",
-    password: "Password123!",
+    admin_password: "Password123!",
   }});
   console.log("Tenant ready:", tenant);
 }}
@@ -354,7 +354,7 @@ def main():
         preset="{}",
         admin_email="admin@example.com",
         admin_name="Store Manager",
-        password="Password123!",
+        admin_password="Password123!",
     )
     print("Tenant ready:", tenant)
 

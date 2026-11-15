@@ -90,21 +90,25 @@ class ObafClient:
     # --- Authentication & Organization Onboarding ---
     def bootstrap(
         self,
-        org_name: str,
-        slug: str,
-        preset: str,
-        admin_email: str,
-        admin_name: str,
-        admin_password: str,
+        org_name: Optional[str] = None,
+        slug: str = "",
+        preset: str = "",
+        admin_email: str = "",
+        admin_name: str = "",
+        admin_password: Optional[str] = None,
+        organization_name: Optional[str] = None,
+        password: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Bootstrap a new tenant organization and primary administrator."""
+        resolved_name = organization_name if organization_name is not None else (org_name or "")
+        resolved_pass = admin_password if admin_password is not None else (password or "")
         payload = {
-            "organization_name": org_name,
+            "organization_name": resolved_name,
             "slug": slug,
             "preset": preset,
             "admin_email": admin_email,
             "admin_name": admin_name,
-            "admin_password": admin_password,
+            "admin_password": resolved_pass,
         }
         return self._request("POST", "/api/v1/admin/setup", payload=payload)
 

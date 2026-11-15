@@ -93,14 +93,24 @@ export class ObafClient {
 
   // --- Authentication & Onboarding ---
   async bootstrap(payload: {
-    organization_name: string;
+    organization_name?: string;
+    org_name?: string;
     slug: string;
     preset: string;
     admin_email: string;
     admin_name: string;
-    admin_password: string;
+    admin_password?: string;
+    password?: string;
   }): Promise<any> {
-    return this.request("POST", "/api/v1/admin/setup", payload);
+    const body = {
+      organization_name: payload.organization_name ?? payload.org_name ?? "",
+      slug: payload.slug,
+      preset: payload.preset,
+      admin_email: payload.admin_email,
+      admin_name: payload.admin_name,
+      admin_password: payload.admin_password ?? payload.password,
+    };
+    return this.request("POST", "/api/v1/admin/setup", body);
   }
 
   async login(email: string, password: string): Promise<string> {

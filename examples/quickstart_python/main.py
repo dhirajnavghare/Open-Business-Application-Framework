@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 # Add sdk/python to path
@@ -17,11 +18,27 @@ def main():
 
     # 2. Schema Discovery
     schema = client.schema_discovery()
-    print(f"2. Schema Discovery: {len(schema.get('entities', []))} entities introspection complete.")
+    print(f"2. Schema Discovery: {len(schema.get('entities', []))} entities introspected.")
 
-    # 3. Currency Conversion
-    conversion = client.convert_currency("USD", "EUR", 250.0)
-    print("3. Currency Conversion (250 USD -> EUR):", conversion)
+    # 3. Bootstrap Organization
+    ts = int(time.time())
+    tenant = client.bootstrap(
+        organization_name=f"Quickstart Enterprise {ts}",
+        slug=f"qs-enterprise-{ts}",
+        preset="retail_grocery",
+        admin_email=f"admin-{ts}@quickstart.com",
+        admin_name="Quickstart Admin",
+        password="Password123!",
+    )
+    print(f"3. Tenant Bootstrapped: {tenant.get('organization_name')} (Preset: {tenant.get('preset')})")
+
+    # 4. Authenticate & Configure Currency Exchange
+    client.login(f"admin-{ts}@quickstart.com", "Password123!")
+    client.set_exchange_rate(from_currency="USD", to_currency="EUR", rate="0.92")
+
+    # 5. Currency Conversion
+    conversion = client.convert_currency(amount="250.00", from_currency="USD", to_currency="EUR")
+    print("4. Currency Conversion (250 USD -> EUR):", conversion)
 
     print("\n✨ OBAF Python SDK Client is ready for AI agents, automations, and data pipelines!")
 

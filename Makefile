@@ -93,6 +93,8 @@ sdk-ts:
 	@echo "Building and testing TypeScript SDK..."
 	npx -y -p typescript tsc -p sdk/typescript/tsconfig.json
 	node --test sdk/typescript/test/*.test.mjs
+	@echo "Verifying TypeScript Quickstart..."
+	npx -y -p typescript tsc -p examples/quickstart_typescript/tsconfig.json --noEmit
 
 sdk-py:
 	@echo "Testing Python SDK..."

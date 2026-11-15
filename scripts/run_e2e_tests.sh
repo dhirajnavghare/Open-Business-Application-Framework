@@ -66,4 +66,8 @@ python3 tests/test_services_gym_bookings.py
 python3 tests/test_webhooks_and_invoices.py
 python3 tests/test_procurement_and_promotions_e2e.py
 
-echo "🎉 All End-to-End Test Suites passed successfully!"
+echo "🚀 Verifying Reference Quickstarts..."
+python3 examples/quickstart_python/main.py
+npx -y tsx examples/quickstart_typescript/index.ts
+
+echo "🎉 All End-to-End Test Suites and Quickstart Validations passed successfully!"

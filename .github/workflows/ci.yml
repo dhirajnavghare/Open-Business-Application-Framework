@@ -60,6 +60,19 @@ jobs:
           npx -y -p typescript tsc -p sdk/typescript/tsconfig.json
           node --test sdk/typescript/test/*.test.mjs
 
+      - name: Verify Quickstart TypeScript Types
+        run: npx -y -p typescript tsc -p examples/quickstart_typescript/tsconfig.json --noEmit
+
+      - name: Run Multi-Domain E2E Test Suites & Quickstarts
+        run: |
+          chmod +x scripts/run_e2e_tests.sh
+          ./scripts/run_e2e_tests.sh
+
+      - name: Run High-Concurrency Benchmark
+        run: |
+          chmod +x scripts/benchmark.sh
+          ./scripts/benchmark.sh
+
   docker-build:
     name: Docker Image Build Test
     runs-on: ubuntu-latest
