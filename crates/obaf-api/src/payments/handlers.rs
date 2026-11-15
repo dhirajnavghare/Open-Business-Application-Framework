@@ -1,10 +1,16 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    Json,
+};
 use chrono::{DateTime, Utc};
 use obaf_database::entities::payment;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::auth::extractor::{AuthErrorResponse, AuthUser};
@@ -155,4 +161,175 @@ pub async fn daily_settlement(
         bank_transfer_total,
         total_transactions: count,
     }))
+}
+
+#[derive(Deserialize, ToSchema, IntoParams)]
+pub struct PaymentFilterQuery {
+    pub order_id: Option<Uuid>,
+    pub customer_id: Option<Uuid>,
+    pub payment_method: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct RefundPaymentRequest {
+    pub reason: Option<String>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/payments",
+    tag = "Payments",
+    security(("bearer_auth" = [])),
+    params(
+        PaymentFilterQuery
+    ),
+    responses(
+        (status = 200, description = "List of payments", body = Vec<PaymentResponse>),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn list_payments(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Query(query): Query<PaymentFilterQuery>,
+) -> Result<Json<Vec<PaymentResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
+    let mut q = payment::Entity::find()
+        .filter(payment::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .order_by_desc(payment::Column::CreatedAt);
+
+    if let Some(oid) = query.order_id {
+        q = q.filter(payment::Column::OrderId.eq(oid));
+    }
+
+    if let Some(cid) = query.customer_id {
+        q = q.filter(payment::Column::CustomerId.eq(cid));
+    }
+
+    if let Some(pm) = query.payment_method {
+        q = q.filter(payment::Column::PaymentMethod.eq(pm.to_uppercase()));
+    }
+
+    if let Some(st) = query.status {
+        q = q.filter(payment::Column::Status.eq(st.to_uppercase()));
+    }
+
+    let limit = query.limit.unwrap_or(50).min(200);
+    q = q.limit(limit);
+
+    if let Some(offset) = query.offset {
+        q = q.offset(offset);
+    }
+
+    let payments = q.all(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Database error: {}", e),
+            }),
+        )
+    })?;
+
+    let resp = payments.into_iter().map(Into::into).collect();
+    Ok(Json(resp))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/payments/{id}/refund",
+    tag = "Payments",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Payment ID to refund")
+    ),
+    request_body = RefundPaymentRequest,
+    responses(
+        (status = 200, description = "Payment refunded successfully", body = PaymentResponse),
+        (status = 400, description = "Payment already refunded or invalid", body = AuthErrorResponse),
+        (status = 404, description = "Payment not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn refund_payment(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<RefundPaymentRequest>,
+) -> Result<Json<PaymentResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let payment_model = payment::Entity::find()
+        .filter(payment::Column::Id.eq(id))
+        .filter(payment::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Payment not found".to_string(),
+                }),
+            )
+        })?;
+
+    if payment_model.status.to_uppercase() == "REFUNDED" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Payment has already been refunded".to_string(),
+            }),
+        ));
+    }
+
+    let original_amount = payment_model.amount;
+    let mut active: payment::ActiveModel = payment_model.into();
+    active.status = Set("REFUNDED".to_string());
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to update payment status: {}", e),
+            }),
+        )
+    })?;
+
+    // Record audit log
+    crate::admin::audit::record_audit_log(
+        &state.db,
+        crate::admin::audit::NewAuditEntry {
+            tenant_id: auth.tenant_id.as_uuid(),
+            actor_id: Some(auth.user_id),
+            action: "PAYMENT_REFUNDED".to_string(),
+            entity_type: "payment".to_string(),
+            entity_id: Some(id.to_string()),
+            details: serde_json::json!({
+                "amount": original_amount,
+                "reason": payload.reason
+            }),
+            ip_address: None,
+        },
+    )
+    .await;
+
+    // Real-time broadcast
+    state.broadcast_event(
+        "payment.refunded",
+        serde_json::json!({
+            "payment_id": id,
+            "amount": original_amount,
+            "reason": payload.reason
+        }),
+    );
+
+    Ok(Json(updated.into()))
 }

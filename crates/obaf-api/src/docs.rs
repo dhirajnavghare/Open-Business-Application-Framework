@@ -35,7 +35,9 @@ use utoipa::{
         crate::orders::handlers::update_status,
         // Payments
         crate::payments::handlers::record_payment,
+        crate::payments::handlers::list_payments,
         crate::payments::handlers::daily_settlement,
+        crate::payments::handlers::refund_payment,
         // Bookings
         crate::bookings::handlers::create_booking,
         crate::bookings::handlers::list_bookings,
@@ -91,6 +93,7 @@ use utoipa::{
             crate::orders::handlers::OrderItemResponse,
             crate::orders::handlers::UpdateOrderStatusRequest,
             crate::payments::handlers::RecordPaymentRequest,
+            crate::payments::handlers::RefundPaymentRequest,
             crate::payments::handlers::PaymentResponse,
             crate::payments::handlers::DailySettlementSummary,
             crate::bookings::handlers::CreateBookingRequest,
