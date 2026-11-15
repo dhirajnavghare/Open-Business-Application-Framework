@@ -79,7 +79,11 @@ Welcome to the foundational release of **Open Business Application Framework (OB
   - Suppliers directory (`/api/v1/suppliers`).
   - Extended CLI commands: `obaf seed`, `obaf export`, `obaf backup`, `obaf restore`, `obaf migrate`, `obaf new-preset`.
 - **Developer Experience & Infrastructure:**
-  - Multi-stage `Dockerfile` producing an ultra-lightweight ~18-25MB scratch/Debian-slim container.
+  - Multi-stage `Dockerfile` producing an ultra-lightweight ~25MB unprivileged (`USER obaf`) container image.
+  - Cross-platform `Makefile` with targets for `setup`, `dev`, `worker`, `doctor`, `presets`, `check`, `fmt`, `test`, `test-e2e`, `test-all`, `sdk-ts`, `sdk-py`, and `docker-*`.
+  - Comprehensive `docs/DEVELOPER_SETUP.md` and `docs/DEPLOYMENT_RUNBOOK.md` covering single-node edge vs clustered HA deployment topologies.
+  - Complete Webhooks lifecycle with `GET`, `PATCH`, and `DELETE /api/v1/webhooks/:id` endpoints.
+  - Complete SDK bindings across both Python and TypeScript client libraries for Webhooks, Bookings, Subscriptions, and Reports.
   - Zero-config local development: runs instantly on local SQLite without Docker or PostgreSQL daemons.
-  - `docker-compose.yml` supporting instant multi-container deployment with PostgreSQL.
-  - Complete CI workflow (`.github/workflows/ci.yml`) covering format, clippy, unit tests, and container builds.
+  - `docker-compose.yml` supporting instant multi-container deployment with PostgreSQL and background worker.
+  - Complete CI workflow (`.github/workflows/ci.yml`) covering format, clippy, unit tests, container builds, and SDK verification.
