@@ -65,6 +65,16 @@ enum Commands {
         #[arg(short, long, default_value = "data/obaf.db")]
         destination: String,
     },
+    /// Run database schema migrations explicitly against target database
+    Migrate {
+        #[arg(
+            short,
+            long,
+            default_value = "sqlite://data/obaf.db?mode=rwc",
+            env = "DATABASE_URL"
+        )]
+        database_url: String,
+    },
 }
 
 #[tokio::main]
@@ -228,6 +238,13 @@ async fn main() -> anyhow::Result<()> {
                 "♻️  Database successfully restored from {} to: {}",
                 source, destination
             );
+        }
+
+        Commands::Migrate { database_url } => {
+            println!("🚀 Executing OBAF database migrations on: {}", database_url);
+            let db = establish_connection(&database_url).await?;
+            run_migrations(&db).await?;
+            println!("✅ All migrations applied successfully!");
         }
     }
 

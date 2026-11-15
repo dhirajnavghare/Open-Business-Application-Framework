@@ -9,6 +9,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
 COPY crates ./crates
 COPY binaries ./binaries
+COPY examples ./examples
 
 # Build release binary
 RUN cargo build --release -p obaf-server
