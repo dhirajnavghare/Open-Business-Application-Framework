@@ -25,3 +25,12 @@ pub mod webhooks;
 
 pub use router::create_router;
 pub use state::{AppState, SharedState};
+
+#[cfg(test)]
+mod compile_time_tests {
+    use super::*;
+    use static_assertions::assert_impl_all;
+
+    // Compile-time static assertion verifying Axum AppState thread-safety invariants
+    assert_impl_all!(AppState: Send, Sync, Clone);
+}

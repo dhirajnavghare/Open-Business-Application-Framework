@@ -26,3 +26,18 @@ pub use rules::{
 pub use schema_validation::validate_metadata;
 pub use security::{generate_token, hash_password, verify_password, verify_token, JwtClaims};
 pub use tenant::{BranchId, TenantContext, TenantId};
+
+#[cfg(test)]
+mod compile_time_tests {
+    use super::*;
+    use static_assertions::assert_impl_all;
+
+    // Compile-time static assertions ensuring thread-safety & trait invariants
+    assert_impl_all!(Money: Send, Sync, Clone, PartialEq);
+    assert_impl_all!(AuditContext: Send, Sync, Clone);
+    assert_impl_all!(TenantContext: Send, Sync, Clone);
+    assert_impl_all!(TokenBucketRateLimiter: Send, Sync);
+    assert_impl_all!(CircuitBreaker: Send, Sync);
+    assert_impl_all!(TtlCache<String, String>: Send, Sync);
+    assert_impl_all!(ExtensionRegistry: Send, Sync);
+}
