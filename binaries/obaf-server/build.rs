@@ -45,12 +45,56 @@ fn main() {
                     );
                 }
             }
+
+            // Semantic validation: preset_id must match filename stem
+            let expected_id = path.file_stem().unwrap().to_str().unwrap();
+            let preset_id = json["preset_id"].as_str().unwrap_or("");
+            if preset_id != expected_id {
+                panic!(
+                    "Build-time test failure: Preset file {} has preset_id '{}' which does not match filename '{}'",
+                    path.display(),
+                    preset_id,
+                    expected_id
+                );
+            }
+
+            // Semantic validation: active_modules must be a non-empty list of strings
+            let modules = json["active_modules"].as_array().unwrap_or_else(|| {
+                panic!(
+                    "Build-time test failure: Preset file {} active_modules must be an array",
+                    path.display()
+                )
+            });
+            if modules.is_empty() {
+                panic!(
+                    "Build-time test failure: Preset file {} active_modules cannot be empty",
+                    path.display()
+                );
+            }
+
+            // Semantic validation: workflow_states must be a non-empty list of strings
+            let states = json["workflow_states"].as_array().unwrap_or_else(|| {
+                panic!(
+                    "Build-time test failure: Preset file {} workflow_states must be an array",
+                    path.display()
+                )
+            });
+            if states.is_empty() {
+                panic!(
+                    "Build-time test failure: Preset file {} workflow_states cannot be empty",
+                    path.display()
+                );
+            }
+
             preset_count += 1;
         }
     }
 
-    if preset_count == 0 {
-        panic!("Build-time test failure: No preset templates found in config/presets");
+    if preset_count < 22 {
+        panic!(
+            "Build-time test failure: Expected at least 22 preset templates in config/presets, found {}",
+            preset_count
+        );
     }
 
     // 2. Validate baseline configuration file

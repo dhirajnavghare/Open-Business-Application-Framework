@@ -38,9 +38,14 @@ setup:
 	@cargo --version > /dev/null 2>&1 || (echo "❌ Cargo not found. Please install Rust from https://rustup.rs" && exit 1)
 	@echo "✅ Setup complete. Run 'make doctor' or 'make dev' to begin."
 
-build: check test
-	@echo "📦 Building production release binaries after full test verification..."
+build: check test sdk-ts sdk-py
+	@echo "📦 Building production release binaries..."
 	cargo build --release --workspace
+	@echo "🧪 Running post-build release binary smoke tests..."
+	./target/release/obaf-cli doctor --database-url "sqlite:///tmp/build_smoke.db?mode=rwc"
+	./target/release/obaf-cli presets > /dev/null
+	@rm -f /tmp/build_smoke.db*
+	@echo "✅ Build completed and all automated build-time tests passed!"
 
 install-hooks:
 	@echo "🔧 Installing Git pre-commit verification hook..."
@@ -85,8 +90,9 @@ test-all: test test-e2e sdk-ts sdk-py
 	@echo "🎉 All workspace tests, SDK checks, and e2e suites passed!"
 
 sdk-ts:
-	@echo "Building TypeScript SDK..."
-	npx -y -p typescript tsc -p sdk/typescript/tsconfig.json --noEmit
+	@echo "Building and testing TypeScript SDK..."
+	npx -y -p typescript tsc -p sdk/typescript/tsconfig.json
+	node --test sdk/typescript/test/*.test.mjs
 
 sdk-py:
 	@echo "Testing Python SDK..."

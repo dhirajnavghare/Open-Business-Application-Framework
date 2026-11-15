@@ -56,7 +56,8 @@ jobs:
 
       - name: Verify TypeScript SDK
         run: |
-          npx -y -p typescript tsc -p sdk/typescript/tsconfig.json --noEmit
+          npx -y -p typescript tsc -p sdk/typescript/tsconfig.json
+          node --test sdk/typescript/test/*.test.mjs
 
   docker-build:
     name: Docker Image Build Test

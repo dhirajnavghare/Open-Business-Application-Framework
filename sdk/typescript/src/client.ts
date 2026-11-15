@@ -2,6 +2,7 @@ export interface ObafClientConfig {
   baseUrl?: string;
   token?: string;
   apiKey?: string;
+  timeoutMs?: number;
 }
 
 export class ObafError extends Error {
@@ -19,11 +20,13 @@ export class ObafClient {
   public baseUrl: string;
   public token?: string;
   public apiKey?: string;
+  public timeoutMs: number;
 
   constructor(config: ObafClientConfig = {}) {
     this.baseUrl = (config.baseUrl || "http://127.0.0.1:8080").replace(/\/+$/, "");
     this.token = config.token;
     this.apiKey = config.apiKey;
+    this.timeoutMs = config.timeoutMs ?? 30000;
   }
 
   private async request<T = any>(
@@ -46,11 +49,20 @@ export class ObafClient {
       headers["X-API-Key"] = this.apiKey;
     }
 
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const isJson = res.headers.get("content-type")?.includes("application/json");
     const data = isJson ? await res.json() : await res.text();

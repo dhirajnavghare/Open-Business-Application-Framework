@@ -7,6 +7,7 @@ class ObafError(Exception):
     """Base exception for all OBAF client errors."""
     def __init__(self, message: str, status_code: Optional[int] = None, response_body: Any = None):
         super().__init__(message)
+        self.message = message
         self.status_code = status_code
         self.response_body = response_body
 

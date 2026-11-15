@@ -18,6 +18,11 @@ RUN cargo test --release --workspace
 # Build release binaries
 RUN cargo build --release -p obaf-server -p obaf-cli -p obaf-worker
 
+# Run automated release binary smoke tests to verify runtime linking, migration integrity & presets
+RUN /app/target/release/obaf-cli doctor --database-url "sqlite:///tmp/build_smoke.db?mode=rwc" \
+    && /app/target/release/obaf-cli presets \
+    && rm -f /tmp/build_smoke.db*
+
 # ========================================================
 # Stage 2: Minimal runtime image (~25MB)
 # ========================================================
