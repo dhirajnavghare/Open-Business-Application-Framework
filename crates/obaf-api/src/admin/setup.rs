@@ -187,6 +187,24 @@ pub async fn bootstrap_preset(
         )
     })?;
 
+    super::audit::record_audit_log(
+        &state.db,
+        super::audit::NewAuditEntry {
+            tenant_id: org_id,
+            actor_id: Some(user_id),
+            action: "PRESET_BOOTSTRAPPED".to_string(),
+            entity_type: "organization".to_string(),
+            entity_id: Some(org_id.to_string()),
+            details: serde_json::json!({
+                "organization_name": payload.organization_name,
+                "preset": payload.preset,
+                "admin_user_id": user_id
+            }),
+            ip_address: None,
+        },
+    )
+    .await;
+
     Ok((
         StatusCode::CREATED,
         Json(BootstrapPresetResponse {

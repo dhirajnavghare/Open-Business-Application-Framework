@@ -3,8 +3,8 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Schema};
 use tracing::info;
 
 use crate::entities::{
-    booking, customer, order, order_item, organization, payment, product, stock_movement,
-    subscription, user, webhook,
+    audit_log, booking, customer, order, order_item, organization, payment, product,
+    stock_movement, subscription, user, webhook,
 };
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
@@ -12,11 +12,12 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let backend = db.get_database_backend();
     let schema = Schema::new(backend);
 
-    // Platform, Tenant & Webhooks
+    // Platform, Tenant, Audit & Webhooks
     create_table_if_not_exists(db, backend, &schema, organization::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, user::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, customer::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, webhook::Entity).await?;
+    create_table_if_not_exists(db, backend, &schema, audit_log::Entity).await?;
 
     // Catalog & Inventory
     create_table_if_not_exists(db, backend, &schema, product::Entity).await?;

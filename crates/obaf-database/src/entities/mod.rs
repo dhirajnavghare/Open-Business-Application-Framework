@@ -1,3 +1,4 @@
+pub mod audit_log;
 pub mod booking;
 pub mod customer;
 pub mod order;
@@ -10,6 +11,7 @@ pub mod subscription;
 pub mod user;
 pub mod webhook;
 
+pub use audit_log::Entity as AuditLog;
 pub use booking::Entity as Booking;
 pub use customer::Entity as Customer;
 pub use order::Entity as Order;

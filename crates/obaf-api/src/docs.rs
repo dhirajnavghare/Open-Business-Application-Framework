@@ -13,6 +13,7 @@ use utoipa::{
         crate::meta::schema_discovery,
         // Admin
         crate::admin::setup::bootstrap_preset,
+        crate::admin::audit::list_audit_logs,
         // Auth
         crate::auth::handlers::login,
         crate::auth::handlers::register,
@@ -72,6 +73,7 @@ use utoipa::{
             crate::admin::setup::BootstrapPresetRequest,
             crate::admin::setup::BootstrapPresetResponse,
             crate::admin::setup::ApiErrorResponse,
+            crate::admin::audit::AuditLogResponse,
             crate::auth::handlers::LoginRequest,
             crate::auth::handlers::LoginResponse,
             crate::auth::handlers::RegisterUserRequest,
