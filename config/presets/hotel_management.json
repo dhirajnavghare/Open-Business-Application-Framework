@@ -1,0 +1,41 @@
+{
+  "preset_id": "hotel_management",
+  "name": "Hotel, Resort & Hospitality Operations",
+  "version": "1.0.0",
+  "description": "Room reservations, guest check-in/out lifecycle, housekeeping state machine, minibar folios, and hospitality luxury tax",
+  "active_modules": [
+    "bookings",
+    "customers",
+    "catalog",
+    "orders",
+    "billing",
+    "payments",
+    "reports"
+  ],
+  "default_tax_slabs": [
+    { "name": "Room Tariff GST 12%", "rate": 0.12 },
+    { "name": "Luxury Suite GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "reserved",
+    "checked_in",
+    "room_service_active",
+    "settlement_pending",
+    "checked_out",
+    "cancelled"
+  ],
+  "custom_fields": {
+    "booking": {
+      "type": "object",
+      "properties": {
+        "room_number": { "type": "string" },
+        "room_type": { "type": "string", "enum": ["Deluxe", "Executive Suite", "Ocean View", "Standard"] },
+        "guest_id_proof": { "type": "string" },
+        "num_adults": { "type": "integer", "minimum": 1 },
+        "num_children": { "type": "integer", "minimum": 0 },
+        "complimentary_breakfast": { "type": "boolean" }
+      },
+      "required": ["room_number", "room_type", "guest_id_proof"]
+    }
+  }
+}

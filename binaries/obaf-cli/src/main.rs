@@ -44,6 +44,27 @@ enum Commands {
         #[arg(long, default_value_t = 24)]
         expiry_hours: u64,
     },
+    /// Scaffold a new business domain preset template in config/presets/
+    NewPreset {
+        #[arg(help = "Unique identifier of the preset (e.g. salon_spa, dental_clinic)")]
+        name: String,
+        #[arg(long, help = "Human-readable display name")]
+        title: Option<String>,
+    },
+    /// Create a timestamped backup of the SQLite database
+    Backup {
+        #[arg(short, long, default_value = "data/obaf.db")]
+        source: String,
+        #[arg(short, long)]
+        destination: Option<String>,
+    },
+    /// Safely restore the database from a backup file
+    Restore {
+        #[arg(short, long, help = "Path to the backup file to restore from")]
+        source: String,
+        #[arg(short, long, default_value = "data/obaf.db")]
+        destination: String,
+    },
 }
 
 #[tokio::main]
@@ -125,6 +146,88 @@ async fn main() -> anyhow::Result<()> {
             println!("🛡️  Role: {}", role);
             println!("⏱️  Expiry: {} hours", expiry_hours);
             println!("\nBearer Token:\n{}", token);
+        }
+
+        Commands::NewPreset { name, title } => {
+            let preset_id = name.to_lowercase().replace('-', "_");
+            let file_path = format!("config/presets/{}.json", preset_id);
+            if Path::new(&file_path).exists() {
+                anyhow::bail!("Preset file {} already exists!", file_path);
+            }
+
+            let display_name = title.unwrap_or_else(|| {
+                name.replace('_', " ")
+                    .split_whitespace()
+                    .map(|w| {
+                        let mut c = w.chars();
+                        match c.next() {
+                            None => String::new(),
+                            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            });
+
+            let template = serde_json::json!({
+                "preset_id": preset_id,
+                "name": display_name,
+                "version": "1.0.0",
+                "description": format!("Custom domain operations and workflow preset for {}", display_name),
+                "active_modules": ["customers", "catalog", "orders", "billing", "payments"],
+                "default_tax_slabs": [
+                    { "name": "Standard GST 18%", "rate": 0.18 }
+                ],
+                "workflow_states": ["pending", "confirmed", "in_progress", "completed", "cancelled"]
+            });
+
+            fs::create_dir_all("config/presets")?;
+            fs::write(&file_path, serde_json::to_string_pretty(&template)?)?;
+            println!("✨ Created new preset template at: {}", file_path);
+        }
+
+        Commands::Backup {
+            source,
+            destination,
+        } => {
+            let src = Path::new(&source);
+            if !src.exists() {
+                anyhow::bail!("Source database file {} does not exist!", source);
+            }
+
+            let dest_str = destination.unwrap_or_else(|| {
+                let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+                format!("data/backups/obaf_{}.db", ts)
+            });
+
+            let dest = Path::new(&dest_str);
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            fs::copy(src, dest)?;
+            println!("💾 Database successfully backed up to: {}", dest_str);
+        }
+
+        Commands::Restore {
+            source,
+            destination,
+        } => {
+            let src = Path::new(&source);
+            if !src.exists() {
+                anyhow::bail!("Backup file {} does not exist!", source);
+            }
+
+            let dest = Path::new(&destination);
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            fs::copy(src, dest)?;
+            println!(
+                "♻️  Database successfully restored from {} to: {}",
+                source, destination
+            );
         }
     }
 

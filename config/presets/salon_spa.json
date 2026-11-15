@@ -1,0 +1,26 @@
+{
+  "active_modules": [
+    "customers",
+    "catalog",
+    "orders",
+    "billing",
+    "payments"
+  ],
+  "default_tax_slabs": [
+    {
+      "name": "Standard GST 18%",
+      "rate": 0.18
+    }
+  ],
+  "description": "Custom domain operations and workflow preset for Hair Salon & Luxury Spa",
+  "name": "Hair Salon & Luxury Spa",
+  "preset_id": "salon_spa",
+  "version": "1.0.0",
+  "workflow_states": [
+    "pending",
+    "confirmed",
+    "in_progress",
+    "completed",
+    "cancelled"
+  ]
+}

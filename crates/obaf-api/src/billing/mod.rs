@@ -9,6 +9,7 @@ use axum::{
 pub fn billing_routes() -> Router<SharedState> {
     Router::new()
         .route("/calculate-tax", post(handlers::calculate_tax))
+        .route("/apply-rules", post(handlers::apply_rules))
         .route("/split-bill", post(handlers::split_bill))
         .route("/orders/:id/receipt", get(handlers::generate_receipt))
         .route(

@@ -8,12 +8,16 @@ use utoipa::{
     paths(
         // Health
         crate::health::health_check,
+        crate::health::metrics_check,
         // Meta
         crate::meta::engine_info,
         crate::meta::schema_discovery,
         // Admin
         crate::admin::setup::bootstrap_preset,
         crate::admin::audit::list_audit_logs,
+        crate::admin::tenants::provision_tenant,
+        crate::admin::tenants::list_tenants,
+        crate::admin::tenants::get_tenant_usage,
         // Auth
         crate::auth::handlers::login,
         crate::auth::handlers::register,
@@ -61,9 +65,13 @@ use utoipa::{
         crate::reports::handlers::export_inventory_csv,
         // Billing
         crate::billing::handlers::calculate_tax,
+        crate::billing::handlers::apply_rules,
         crate::billing::handlers::split_bill,
         crate::billing::handlers::generate_receipt,
         crate::billing::handlers::render_html_invoice,
+        // Sync
+        crate::sync::handlers::sync_push,
+        crate::sync::handlers::sync_pull,
     ),
     components(
         schemas(
@@ -113,6 +121,21 @@ use utoipa::{
             crate::reports::handlers::DashboardMetrics,
             crate::reports::handlers::KitchenPrepItem,
             crate::reports::handlers::PaymentMethodSummary,
+            crate::admin::tenants::ProvisionTenantRequest,
+            crate::admin::tenants::ProvisionTenantResponse,
+            crate::admin::tenants::TenantSummary,
+            crate::admin::tenants::TenantUsageResponse,
+            crate::billing::handlers::ApplyRulesRequest,
+            obaf_core::rules::PricingRule,
+            obaf_core::rules::RuleCondition,
+            obaf_core::rules::RuleAction,
+            obaf_core::rules::RuleAdjustment,
+            obaf_core::rules::RuleEvaluationResult,
+            crate::sync::handlers::SyncAction,
+            crate::sync::handlers::SyncActionResult,
+            crate::sync::handlers::SyncPushRequest,
+            crate::sync::handlers::SyncPushResponse,
+            crate::sync::handlers::SyncPullResponse,
         )
     ),
     modifiers(&SecurityAddon),
@@ -129,6 +152,7 @@ use utoipa::{
         (name = "Webhooks", description = "Real-time event webhooks for WhatsApp, Zapier, and automation"),
         (name = "Billing", description = "GST/VAT tax calculations, bill splitting, and invoice/receipt generation"),
         (name = "Reports", description = "Operational dashboards, kitchen prep sheets, and sales metrics"),
+        (name = "Sync", description = "Edge and offline synchronization with batch idempotency"),
         (name = "Meta", description = "Dynamic introspection and schema discovery for headless admin panels"),
         (name = "Admin", description = "Platform management and domain preset bootstrapping")
     ),

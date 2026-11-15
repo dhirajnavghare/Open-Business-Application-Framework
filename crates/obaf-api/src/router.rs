@@ -1,4 +1,10 @@
-use axum::{routing::get, Router};
+use axum::{
+    http::{header, HeaderName, HeaderValue},
+    middleware::{from_fn, Next},
+    response::Response,
+    routing::get,
+    Router,
+};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -12,7 +18,7 @@ use crate::catalog::catalog_routes;
 use crate::customers::customer_routes;
 use crate::docs::ApiDoc;
 use crate::events::event_routes;
-use crate::health::health_check;
+use crate::health::{health_check, metrics_check};
 use crate::inventory::inventory_routes;
 use crate::meta::{engine_info, schema_discovery};
 use crate::orders::order_routes;
@@ -20,6 +26,7 @@ use crate::payments::payment_routes;
 use crate::reports::report_routes;
 use crate::state::SharedState;
 use crate::subscriptions::subscription_routes;
+use crate::sync::sync_routes;
 use crate::webhooks::webhook_routes;
 
 pub fn create_router(state: SharedState) -> Router {
@@ -35,8 +42,9 @@ pub fn create_router(state: SharedState) -> Router {
         .allow_headers(Any);
 
     Router::new()
-        // Health check
+        // Health & Metrics checks
         .route("/health", get(health_check))
+        .route("/metrics", get(metrics_check))
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api/v1/openapi.json", openapi))
         // API v1 routes
@@ -53,9 +61,34 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/webhooks", webhook_routes())
         .nest("/api/v1/ws", event_routes())
         .nest("/api/v1/meta", meta_routes)
+        .nest("/api/v1/sync", sync_routes())
         .nest("/api/v1/admin", admin_routes())
         // Global Middlewares
+        .layer(from_fn(security_headers_middleware))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+async fn security_headers_middleware(request: axum::extract::Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(
+        HeaderName::from_static("x-xss-protection"),
+        HeaderValue::from_static("1; mode=block"),
+    );
+    headers.insert(
+        header::STRICT_TRANSPORT_SECURITY,
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    response
 }

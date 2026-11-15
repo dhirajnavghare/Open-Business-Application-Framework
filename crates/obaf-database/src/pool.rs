@@ -1,5 +1,7 @@
-use obaf_core::{ObafError, Result};
+use obaf_core::{ObafError, Result, TenantId};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tracing::info;
 
@@ -60,4 +62,56 @@ fn sanitize_url(url: &str) -> String {
         }
     }
     url.to_string()
+}
+
+/// Thread-safe multi-tenant database router supporting dedicated per-tenant databases
+/// alongside the shared cluster database pool.
+#[derive(Clone)]
+pub struct TenantPoolRouter {
+    default_pool: DatabaseConnection,
+    dedicated_pools: Arc<RwLock<HashMap<TenantId, DatabaseConnection>>>,
+}
+
+impl TenantPoolRouter {
+    pub fn new(default_pool: DatabaseConnection) -> Self {
+        Self {
+            default_pool,
+            dedicated_pools: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Register an isolated, dedicated database connection pool for an enterprise tenant.
+    pub fn register_tenant_pool(
+        &self,
+        tenant_id: TenantId,
+        pool: DatabaseConnection,
+    ) -> Result<()> {
+        let mut lock = self
+            .dedicated_pools
+            .write()
+            .map_err(|_| ObafError::Internal {
+                message: "TenantPoolRouter lock poisoned".into(),
+            })?;
+        lock.insert(tenant_id, pool);
+        Ok(())
+    }
+
+    /// Retrieve the appropriate connection for a tenant: returns dedicated pool if registered,
+    /// otherwise falls back to the primary shared database pool.
+    pub fn get_connection(&self, tenant_id: TenantId) -> DatabaseConnection {
+        let lock = self
+            .dedicated_pools
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(dedicated) = lock.get(&tenant_id) {
+            dedicated.clone()
+        } else {
+            self.default_pool.clone()
+        }
+    }
+
+    /// Get reference to the default shared cluster database pool.
+    pub fn default_connection(&self) -> &DatabaseConnection {
+        &self.default_pool
+    }
 }

@@ -1,0 +1,40 @@
+{
+  "preset_id": "education_coaching",
+  "name": "Education Academy & Coaching Institute",
+  "version": "1.0.0",
+  "description": "Student course enrollment, batch schedule check-in, fee installments, recurring subscriptions, and exam tracking",
+  "active_modules": [
+    "subscriptions",
+    "bookings",
+    "customers",
+    "catalog",
+    "orders",
+    "billing",
+    "payments",
+    "reports"
+  ],
+  "default_tax_slabs": [
+    { "name": "Exempt Education & Tuition", "rate": 0.00 },
+    { "name": "Commercial Study Materials GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "inquiry",
+    "admitted",
+    "batch_assigned",
+    "in_progress",
+    "graduated",
+    "dropped"
+  ],
+  "custom_fields": {
+    "subscription": {
+      "type": "object",
+      "properties": {
+        "student_roll_number": { "type": "string" },
+        "batch_code": { "type": "string" },
+        "course_title": { "type": "string" },
+        "guardian_contact": { "type": "string" }
+      },
+      "required": ["student_roll_number", "batch_code", "course_title"]
+    }
+  }
+}

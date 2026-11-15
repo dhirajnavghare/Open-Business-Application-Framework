@@ -1852,6 +1852,7 @@ name = "obaf-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "obaf-core",
  "obaf-database",
@@ -1874,6 +1875,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "tracing",
  "utoipa",
  "uuid",
 ]
@@ -1890,6 +1892,18 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "obaf-extension-loyalty"
+version = "0.1.0"
+dependencies = [
+ "obaf-core",
+ "rust_decimal",
+ "serde",
+ "serde_json",
  "tracing",
  "uuid",
 ]

@@ -12,6 +12,32 @@ use uuid::Uuid;
 
 use crate::auth::extractor::{AuthErrorResponse, AuthUser};
 use crate::state::SharedState;
+use obaf_core::rules::{evaluate_pricing_rules, PricingRule, RuleEvaluationResult};
+
+#[derive(Deserialize, ToSchema)]
+pub struct ApplyRulesRequest {
+    pub subtotal: Decimal,
+    pub promo_code: Option<String>,
+    pub rules: Vec<PricingRule>,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/apply-rules",
+    tag = "Billing",
+    request_body = ApplyRulesRequest,
+    responses(
+        (status = 200, description = "Dynamic pricing rules, discounts and surcharges evaluated", body = RuleEvaluationResult)
+    )
+)]
+pub async fn apply_rules(Json(payload): Json<ApplyRulesRequest>) -> Json<RuleEvaluationResult> {
+    let result = evaluate_pricing_rules(
+        &payload.rules,
+        payload.subtotal,
+        payload.promo_code.as_deref(),
+    );
+    Json(result)
+}
 
 #[derive(Deserialize, ToSchema)]
 pub struct TaxCalculationRequest {

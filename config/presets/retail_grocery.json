@@ -1,0 +1,50 @@
+{
+  "preset_id": "retail_grocery",
+  "name": "Supermarket & Grocery Retail Operations",
+  "version": "1.0.0",
+  "description": "Multi-category FMCG retail management with barcode POS, dynamic stock ledger, batch/expiry alerts, and GST slabs",
+  "active_modules": [
+    "catalog",
+    "inventory",
+    "customers",
+    "orders",
+    "billing",
+    "payments",
+    "webhooks"
+  ],
+  "default_tax_slabs": [
+    { "name": "Exempt Grains & Staples", "rate": 0.00 },
+    { "name": "Essential FMCG GST 5%", "rate": 0.05 },
+    { "name": "Standard Packaged Foods GST 12%", "rate": 0.12 },
+    { "name": "General Merchandize GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "cart_active",
+    "scanned",
+    "tendered",
+    "paid",
+    "dispatched",
+    "returned"
+  ],
+  "custom_fields": {
+    "product": {
+      "type": "object",
+      "properties": {
+        "barcode": { "type": "string" },
+        "hsn_code": { "type": "string" },
+        "unit_of_measure": { "type": "string", "enum": ["kg", "g", "liter", "piece", "pack"] },
+        "expiry_date": { "type": "string" },
+        "rack_location": { "type": "string" }
+      },
+      "required": ["barcode", "unit_of_measure"]
+    },
+    "order": {
+      "type": "object",
+      "properties": {
+        "checkout_counter": { "type": "string" },
+        "cashier_id": { "type": "string" },
+        "loyalty_phone": { "type": "string" }
+      }
+    }
+  }
+}
