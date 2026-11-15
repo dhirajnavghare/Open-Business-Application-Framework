@@ -53,6 +53,9 @@ use utoipa::{
         crate::reports::handlers::get_dashboard_metrics,
         crate::reports::handlers::get_kitchen_prep_sheet,
         crate::reports::handlers::get_sales_by_payment_method,
+        crate::reports::handlers::export_orders_csv,
+        crate::reports::handlers::export_customers_csv,
+        crate::reports::handlers::export_inventory_csv,
         // Billing
         crate::billing::handlers::calculate_tax,
         crate::billing::handlers::split_bill,

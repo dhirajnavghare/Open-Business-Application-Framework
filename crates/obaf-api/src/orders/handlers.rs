@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use obaf_database::entities::{order, order_item, product};
+use obaf_database::entities::{order, order_item, product, stock_movement};
 use rust_decimal::Decimal;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
@@ -109,6 +109,7 @@ pub async fn create_order(
     let mut tax_total = Decimal::ZERO;
     let mut item_responses = Vec::new();
     let mut items_to_insert = Vec::new();
+    let mut stock_movements_to_insert = Vec::new();
 
     for item_req in &payload.items {
         let p = product::Entity::find()
@@ -152,6 +153,20 @@ pub async fn create_order(
         };
 
         items_to_insert.push(active_item);
+
+        let stock_mv = stock_movement::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            tenant_id: Set(auth.tenant_id.as_uuid()),
+            product_id: Set(p.id),
+            movement_type: Set("SALE".to_string()),
+            quantity: Set(-item_req.quantity),
+            batch_number: Set(None),
+            expiry_date: Set(None),
+            reference_id: Set(Some(order_num.clone())),
+            notes: Set(Some(format!("Sale for order {}", order_num))),
+            created_at: Set(now),
+        };
+        stock_movements_to_insert.push(stock_mv);
 
         item_responses.push(OrderItemResponse {
             id: item_id,
@@ -200,6 +215,18 @@ pub async fn create_order(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
                     error: format!("Failed to insert order item: {}", e),
+                }),
+            )
+        })?;
+    }
+
+    // 3. Insert inventory SALE stock movements
+    for sm in stock_movements_to_insert {
+        sm.insert(&txn).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Failed to record stock movement: {}", e),
                 }),
             )
         })?;
@@ -361,6 +388,10 @@ pub async fn update_status(
             )
         })?;
 
+    let order_num_clone = order_model.order_number.clone();
+    let old_status = order_model.status.clone();
+    let order_id = order_model.id;
+
     let mut active: order::ActiveModel = order_model.into();
     active.status = Set(payload.status.clone());
     active.updated_at = Set(Utc::now());
@@ -373,6 +404,34 @@ pub async fn update_status(
             }),
         )
     })?;
+
+    // If order is cancelled and wasn't cancelled before, restore inventory via RETURN movements
+    if payload.status.to_uppercase() == "CANCELLED" && old_status.to_uppercase() != "CANCELLED" {
+        let items = order_item::Entity::find()
+            .filter(order_item::Column::OrderId.eq(order_id))
+            .all(&state.db)
+            .await
+            .unwrap_or_default();
+
+        for it in items {
+            let return_mv = stock_movement::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                tenant_id: Set(auth.tenant_id.as_uuid()),
+                product_id: Set(it.product_id),
+                movement_type: Set("RETURN".to_string()),
+                quantity: Set(it.quantity),
+                batch_number: Set(None),
+                expiry_date: Set(None),
+                reference_id: Set(Some(order_num_clone.clone())),
+                notes: Set(Some(format!(
+                    "Stock restored from cancelled order {}",
+                    order_num_clone
+                ))),
+                created_at: Set(Utc::now()),
+            };
+            let _ = return_mv.insert(&state.db).await;
+        }
+    }
 
     // Real-time broadcast for live kitchen & status updates
     state.broadcast_event(

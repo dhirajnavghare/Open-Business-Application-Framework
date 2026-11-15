@@ -11,4 +11,7 @@ pub fn report_routes() -> Router<SharedState> {
             "/sales-by-payment-method",
             get(handlers::get_sales_by_payment_method),
         )
+        .route("/export/orders.csv", get(handlers::export_orders_csv))
+        .route("/export/customers.csv", get(handlers::export_customers_csv))
+        .route("/export/inventory.csv", get(handlers::export_inventory_csv))
 }

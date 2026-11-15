@@ -1,4 +1,9 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::State,
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
 use obaf_database::entities::{
     booking, customer, order, order_item, payment, product, subscription,
 };
@@ -239,6 +244,150 @@ pub async fn get_sales_by_payment_method(
         .collect();
 
     Ok(Json(result))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/reports/export/orders.csv",
+    tag = "Reports",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "CSV export of orders", content_type = "text/csv")
+    )
+)]
+pub async fn export_orders_csv(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    let orders = order::Entity::find()
+        .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("DB Error: {}", e)))?;
+
+    let mut csv = String::from(
+        "id,order_number,customer_name,table_or_room,status,subtotal,tax_total,grand_total,created_at\n",
+    );
+    for o in orders {
+        let grand = o.subtotal + o.tax_total - o.discount_total;
+        csv.push_str(&format!(
+            "{},\"{}\",\"{}\",\"{}\",{},{},{},{},{}\n",
+            o.id,
+            o.order_number,
+            o.customer_name.unwrap_or_default().replace('"', "\"\""),
+            o.table_or_room.unwrap_or_default().replace('"', "\"\""),
+            o.status,
+            o.subtotal,
+            o.tax_total,
+            grand,
+            o.created_at.to_rfc3339()
+        ));
+    }
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"orders_export.csv\"",
+            ),
+        ],
+        csv,
+    )
+        .into_response())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/reports/export/customers.csv",
+    tag = "Reports",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "CSV export of customers", content_type = "text/csv")
+    )
+)]
+pub async fn export_customers_csv(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    let customers = customer::Entity::find()
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("DB Error: {}", e)))?;
+
+    let mut csv = String::from("id,name,email,phone,tax_id,address,created_at\n");
+    for c in customers {
+        csv.push_str(&format!(
+            "{},\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{}\n",
+            c.id,
+            c.name.replace('"', "\"\""),
+            c.email.unwrap_or_default().replace('"', "\"\""),
+            c.phone.unwrap_or_default().replace('"', "\"\""),
+            c.tax_id.unwrap_or_default().replace('"', "\"\""),
+            c.address.unwrap_or_default().replace('"', "\"\""),
+            c.created_at.to_rfc3339()
+        ));
+    }
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"customers_export.csv\"",
+            ),
+        ],
+        csv,
+    )
+        .into_response())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/reports/export/inventory.csv",
+    tag = "Reports",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "CSV export of catalog and products", content_type = "text/csv")
+    )
+)]
+pub async fn export_inventory_csv(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    let products = product::Entity::find()
+        .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| internal_err(format!("DB Error: {}", e)))?;
+
+    let mut csv = String::from("id,sku,name,price,cost_price,tax_rate,is_active,created_at\n");
+    for p in products {
+        csv.push_str(&format!(
+            "{},\"{}\",\"{}\",{},{},{},{},{}\n",
+            p.id,
+            p.sku.replace('"', "\"\""),
+            p.name.replace('"', "\"\""),
+            p.price,
+            p.cost_price,
+            p.tax_rate,
+            p.is_active,
+            p.created_at.to_rfc3339()
+        ));
+    }
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"inventory_export.csv\"",
+            ),
+        ],
+        csv,
+    )
+        .into_response())
 }
 
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
