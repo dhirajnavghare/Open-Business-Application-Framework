@@ -10,6 +10,8 @@
 | **Token Tampering** | Signed HS256 JWT tokens with 24-hour expiry and cryptographic secrets. |
 | **Clickjacking / MIME Sniffing** | Security headers middleware (`nosniff`, `DENY`, `HSTS`, `XSS protection`). |
 | **Replay Attacks (Sync)** | Idempotent transaction keys and client action ID tracking. |
+| **API Flooding / DoS / Rogue Tenants** | Token Bucket rate limiting middleware with `X-RateLimit-Remaining` and `Retry-After` (HTTP 429). |
+| **Machine-to-Machine Spoofing** | SHA-256 hashed API key validation (`X-API-Key`). |
 | **Tampered Webhook Payloads** | Cryptographic HMAC-SHA256 signature verification headers. |
 
 ---
