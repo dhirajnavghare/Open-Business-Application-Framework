@@ -46,16 +46,17 @@ def get(url, token=None):
 
 def main():
     print("--- 1. Bootstrap Organization & Preset ---")
-    slug = f"royal-spice-{int(time.time())}"
+    ts = int(time.time())
+    slug = f"royal-spice-{ts}"
+    email = f"owner-{ts}@royalspice.com"
     bootstrap = post(f"{BASE_URL}/api/v1/admin/setup/preset", {
         "organization_name": "Royal Spice Bistro",
         "slug": slug,
         "preset": "restaurant_pos",
-        "admin_email": f"owner-{int(time.time())}@royalspice.com",
+        "admin_email": email,
         "admin_name": "Owner Anita",
         "admin_password": "secretpassword123"
     })
-    email = f"owner-{int(time.time())}@royalspice.com"
     print("Bootstrap response:", json.dumps(bootstrap, indent=2))
 
     print("\n--- 2. Login via Argon2id & JWT ---")
