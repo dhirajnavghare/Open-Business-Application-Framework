@@ -104,6 +104,85 @@ export class ObafClient {
     return this.request("GET", "/api/v1/auth/me");
   }
 
+  // --- Customers ---
+  async createCustomer(payload: {
+    name: string;
+    phone?: string;
+    email?: string;
+    tax_id?: string;
+    address?: string;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/customers", payload);
+  }
+
+  async listCustomers(): Promise<any[]> {
+    return this.request("GET", "/api/v1/customers");
+  }
+
+  async getCustomer(customerId: string): Promise<any> {
+    return this.request("GET", `/api/v1/customers/${customerId}`);
+  }
+
+  async updateCustomer(
+    customerId: string,
+    payload: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      tax_id?: string;
+      address?: string;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/customers/${customerId}`, payload);
+  }
+
+  async deleteCustomer(customerId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/customers/${customerId}`);
+  }
+
+  // --- Suppliers ---
+  async createSupplier(payload: {
+    name: string;
+    contact_person?: string;
+    phone?: string;
+    email?: string;
+    tax_id?: string;
+    address?: string;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/suppliers", payload);
+  }
+
+  async listSuppliers(): Promise<any[]> {
+    return this.request("GET", "/api/v1/suppliers");
+  }
+
+  async getSupplier(supplierId: string): Promise<any> {
+    return this.request("GET", `/api/v1/suppliers/${supplierId}`);
+  }
+
+  async updateSupplier(
+    supplierId: string,
+    payload: {
+      name?: string;
+      contact_person?: string;
+      phone?: string;
+      email?: string;
+      tax_id?: string;
+      address?: string;
+      metadata?: Record<string, any>;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/suppliers/${supplierId}`, payload);
+  }
+
+  async deleteSupplier(supplierId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/suppliers/${supplierId}`);
+  }
+
   // --- Catalog ---
   async createProduct(payload: {
     sku: string;
@@ -118,6 +197,29 @@ export class ObafClient {
 
   async listProducts(): Promise<any[]> {
     return this.request("GET", "/api/v1/catalog/products");
+  }
+
+  async getProduct(productId: string): Promise<any> {
+    return this.request("GET", `/api/v1/catalog/products/${productId}`);
+  }
+
+  async updateProduct(
+    productId: string,
+    payload: {
+      sku?: string;
+      name?: string;
+      price?: string;
+      tax_rate?: string;
+      cost_price?: string;
+      metadata?: Record<string, any>;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/catalog/products/${productId}`, payload);
+  }
+
+  async deleteProduct(productId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/catalog/products/${productId}`);
   }
 
   // --- Orders & Transactions ---

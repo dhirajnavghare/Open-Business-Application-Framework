@@ -12,5 +12,10 @@ pub fn catalog_routes() -> Router<SharedState> {
             "/products",
             post(handlers::create_product).get(handlers::list_products),
         )
-        .route("/products/:id", get(handlers::get_product))
+        .route(
+            "/products/:id",
+            get(handlers::get_product)
+                .patch(handlers::update_product)
+                .delete(handlers::delete_product),
+        )
 }

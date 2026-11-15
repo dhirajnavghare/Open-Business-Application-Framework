@@ -12,5 +12,10 @@ pub fn customer_routes() -> Router<SharedState> {
             "/",
             post(handlers::create_customer).get(handlers::list_customers),
         )
-        .route("/:id", get(handlers::get_customer))
+        .route(
+            "/:id",
+            get(handlers::get_customer)
+                .patch(handlers::update_customer)
+                .delete(handlers::delete_customer),
+        )
 }

@@ -26,6 +26,18 @@ pub struct CreateSupplierRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateSupplierRequest {
+    pub name: Option<String>,
+    pub contact_person: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub tax_id: Option<String>,
+    pub address: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct SupplierResponse {
     pub id: Uuid,
@@ -204,4 +216,146 @@ pub async fn get_supplier(
         })?;
 
     Ok(Json(supplier.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/suppliers/{id}",
+    tag = "Suppliers",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Supplier ID")
+    ),
+    request_body = UpdateSupplierRequest,
+    responses(
+        (status = 200, description = "Supplier updated successfully", body = SupplierResponse),
+        (status = 404, description = "Supplier not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_supplier(
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+    Json(payload): Json<UpdateSupplierRequest>,
+) -> Result<Json<SupplierResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let supplier = supplier::Entity::find_by_id(id)
+        .filter(supplier::Column::TenantId.eq(auth.tenant_id.0))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: format!("Supplier with ID {} not found", id),
+                }),
+            )
+        })?;
+
+    let mut active: supplier::ActiveModel = supplier.into();
+
+    if let Some(name) = payload.name {
+        active.name = Set(name);
+    }
+    if let Some(contact) = payload.contact_person {
+        active.contact_person = Set(Some(contact));
+    }
+    if let Some(phone) = payload.phone {
+        active.phone = Set(Some(phone));
+    }
+    if let Some(email) = payload.email {
+        active.email = Set(Some(email));
+    }
+    if let Some(tax_id) = payload.tax_id {
+        active.tax_id = Set(Some(tax_id));
+    }
+    if let Some(address) = payload.address {
+        active.address = Set(Some(address));
+    }
+    if let Some(meta) = payload.metadata {
+        active.metadata = Set(meta.to_string());
+    }
+    if let Some(is_active) = payload.is_active {
+        active.is_active = Set(is_active);
+    }
+    active.updated_at = Set(Utc::now());
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/suppliers/{id}",
+    tag = "Suppliers",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Supplier ID")
+    ),
+    responses(
+        (status = 200, description = "Supplier deleted successfully"),
+        (status = 404, description = "Supplier not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_supplier(
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    State(state): State<SharedState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let supplier = supplier::Entity::find_by_id(id)
+        .filter(supplier::Column::TenantId.eq(auth.tenant_id.0))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: format!("Supplier with ID {} not found", id),
+                }),
+            )
+        })?;
+
+    let active: supplier::ActiveModel = supplier.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: e.to_string(),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "supplier_id": id
+    })))
 }

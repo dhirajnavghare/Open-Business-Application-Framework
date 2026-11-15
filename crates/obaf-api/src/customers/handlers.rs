@@ -23,6 +23,16 @@ pub struct CreateCustomerRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateCustomerRequest {
+    pub name: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub tax_id: Option<String>,
+    pub address: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct CustomerResponse {
     pub id: Uuid,
@@ -201,4 +211,140 @@ pub async fn get_customer(
         })?;
 
     Ok(Json(c.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/customers/{id}",
+    tag = "Customers",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Customer ID")
+    ),
+    request_body = UpdateCustomerRequest,
+    responses(
+        (status = 200, description = "Customer updated successfully", body = CustomerResponse),
+        (status = 404, description = "Customer not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_customer(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateCustomerRequest>,
+) -> Result<Json<CustomerResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let c = customer::Entity::find()
+        .filter(customer::Column::Id.eq(id))
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Customer not found".to_string(),
+                }),
+            )
+        })?;
+
+    let mut active: customer::ActiveModel = c.into();
+
+    if let Some(name) = payload.name {
+        active.name = Set(name);
+    }
+    if let Some(phone) = payload.phone {
+        active.phone = Set(Some(phone));
+    }
+    if let Some(email) = payload.email {
+        active.email = Set(Some(email));
+    }
+    if let Some(tax_id) = payload.tax_id {
+        active.tax_id = Set(Some(tax_id));
+    }
+    if let Some(address) = payload.address {
+        active.address = Set(Some(address));
+    }
+    if let Some(meta) = payload.metadata {
+        active.metadata = Set(meta.to_string());
+    }
+    active.updated_at = Set(Utc::now());
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to update customer: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/customers/{id}",
+    tag = "Customers",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Customer ID")
+    ),
+    responses(
+        (status = 200, description = "Customer deleted successfully"),
+        (status = 404, description = "Customer not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_customer(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let c = customer::Entity::find()
+        .filter(customer::Column::Id.eq(id))
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Customer not found".to_string(),
+                }),
+            )
+        })?;
+
+    let active: customer::ActiveModel = c.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to delete customer: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "customer_id": id
+    })))
 }

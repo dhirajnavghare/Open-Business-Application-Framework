@@ -145,6 +145,36 @@ class ObafClient:
         """Get customer profile by ID."""
         return self._request("GET", f"/api/v1/customers/{customer_id}")
 
+    def update_customer(
+        self,
+        customer_id: str,
+        name: Optional[str] = None,
+        phone: Optional[str] = None,
+        email: Optional[str] = None,
+        tax_id: Optional[str] = None,
+        address: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Update customer profile."""
+        payload = {}
+        if name is not None:
+            payload["name"] = name
+        if phone is not None:
+            payload["phone"] = phone
+        if email is not None:
+            payload["email"] = email
+        if tax_id is not None:
+            payload["tax_id"] = tax_id
+        if address is not None:
+            payload["address"] = address
+        if metadata is not None:
+            payload["metadata"] = metadata
+        return self._request("PATCH", f"/api/v1/customers/{customer_id}", payload=payload)
+
+    def delete_customer(self, customer_id: str) -> Dict[str, Any]:
+        """Delete customer by ID."""
+        return self._request("DELETE", f"/api/v1/customers/{customer_id}")
+
     def create_supplier(
         self,
         name: str,
@@ -175,6 +205,42 @@ class ObafClient:
         """Get supplier profile by ID."""
         return self._request("GET", f"/api/v1/suppliers/{supplier_id}")
 
+    def update_supplier(
+        self,
+        supplier_id: str,
+        name: Optional[str] = None,
+        contact_person: Optional[str] = None,
+        phone: Optional[str] = None,
+        email: Optional[str] = None,
+        tax_id: Optional[str] = None,
+        address: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        is_active: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update vendor/supplier profile."""
+        payload = {}
+        if name is not None:
+            payload["name"] = name
+        if contact_person is not None:
+            payload["contact_person"] = contact_person
+        if phone is not None:
+            payload["phone"] = phone
+        if email is not None:
+            payload["email"] = email
+        if tax_id is not None:
+            payload["tax_id"] = tax_id
+        if address is not None:
+            payload["address"] = address
+        if metadata is not None:
+            payload["metadata"] = metadata
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request("PATCH", f"/api/v1/suppliers/{supplier_id}", payload=payload)
+
+    def delete_supplier(self, supplier_id: str) -> Dict[str, Any]:
+        """Delete supplier by ID."""
+        return self._request("DELETE", f"/api/v1/suppliers/{supplier_id}")
+
     # --- Catalog & Products ---
     def create_product(
         self,
@@ -199,6 +265,43 @@ class ObafClient:
     def list_products(self) -> List[Dict[str, Any]]:
         """List all active products in tenant catalog."""
         return self._request("GET", "/api/v1/catalog/products")
+
+    def get_product(self, product_id: str) -> Dict[str, Any]:
+        """Get product details by ID."""
+        return self._request("GET", f"/api/v1/catalog/products/{product_id}")
+
+    def update_product(
+        self,
+        product_id: str,
+        sku: Optional[str] = None,
+        name: Optional[str] = None,
+        price: Optional[str] = None,
+        tax_rate: Optional[str] = None,
+        cost_price: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        is_active: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update product details, pricing, tax, or metadata."""
+        payload = {}
+        if sku is not None:
+            payload["sku"] = sku
+        if name is not None:
+            payload["name"] = name
+        if price is not None:
+            payload["price"] = price
+        if tax_rate is not None:
+            payload["tax_rate"] = tax_rate
+        if cost_price is not None:
+            payload["cost_price"] = cost_price
+        if metadata is not None:
+            payload["metadata"] = metadata
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request("PATCH", f"/api/v1/catalog/products/{product_id}", payload=payload)
+
+    def delete_product(self, product_id: str) -> Dict[str, Any]:
+        """Delete product by ID."""
+        return self._request("DELETE", f"/api/v1/catalog/products/{product_id}")
 
     # --- Orders & Transactions ---
     def create_order(

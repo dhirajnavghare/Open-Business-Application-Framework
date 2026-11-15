@@ -25,6 +25,18 @@ pub struct CreateProductRequest {
     pub metadata: Option<serde_json::Value>, // Dynamic industry attributes (dosage, spicy level, etc.)
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateProductRequest {
+    pub sku: Option<String>,
+    pub name: Option<String>,
+    pub price: Option<Decimal>,
+    pub cost_price: Option<Decimal>,
+    pub tax_rate: Option<Decimal>,
+    pub category_id: Option<Uuid>,
+    pub metadata: Option<serde_json::Value>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct ProductResponse {
     pub id: Uuid,
@@ -211,4 +223,148 @@ pub async fn get_product(
         })?;
 
     Ok(Json(p.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/catalog/products/{id}",
+    tag = "Catalog",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Product ID")
+    ),
+    request_body = UpdateProductRequest,
+    responses(
+        (status = 200, description = "Product updated successfully", body = ProductResponse),
+        (status = 404, description = "Product not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_product(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateProductRequest>,
+) -> Result<Json<ProductResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let p = product::Entity::find()
+        .filter(product::Column::Id.eq(id))
+        .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Product not found".to_string(),
+                }),
+            )
+        })?;
+
+    let mut active: product::ActiveModel = p.into();
+
+    if let Some(sku) = payload.sku {
+        active.sku = Set(sku);
+    }
+    if let Some(name) = payload.name {
+        active.name = Set(name);
+    }
+    if let Some(price) = payload.price {
+        active.price = Set(price);
+    }
+    if let Some(cost_price) = payload.cost_price {
+        active.cost_price = Set(cost_price);
+    }
+    if let Some(tax_rate) = payload.tax_rate {
+        active.tax_rate = Set(tax_rate);
+    }
+    if let Some(cat_id) = payload.category_id {
+        active.category_id = Set(Some(cat_id));
+    }
+    if let Some(meta) = payload.metadata {
+        active.metadata = Set(meta.to_string());
+    }
+    if let Some(is_active) = payload.is_active {
+        active.is_active = Set(is_active);
+    }
+    active.updated_at = Set(Utc::now());
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to update product: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/catalog/products/{id}",
+    tag = "Catalog",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Product ID")
+    ),
+    responses(
+        (status = 200, description = "Product deleted successfully"),
+        (status = 404, description = "Product not found", body = AuthErrorResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_product(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    let p = product::Entity::find()
+        .filter(product::Column::Id.eq(id))
+        .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Product not found".to_string(),
+                }),
+            )
+        })?;
+
+    let active: product::ActiveModel = p.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to delete product: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "product_id": id
+    })))
 }
