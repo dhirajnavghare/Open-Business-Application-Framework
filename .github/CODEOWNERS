@@ -1,0 +1,67 @@
+# ==============================================================================
+# Open Business Application Framework (OBAF) - Code Owners
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# ==============================================================================
+
+# Global Default Owner
+# Catches all repository files unless overridden by a more specific path below.
+* @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Core Framework Architecture & Primitives
+# ------------------------------------------------------------------------------
+/crates/obaf-core/                     @dhirajnavghare
+/crates/obaf-database/                 @dhirajnavghare
+/crates/obaf-api/                      @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Production Daemon & Tooling Binaries
+# ------------------------------------------------------------------------------
+/binaries/obaf-server/                 @dhirajnavghare
+/binaries/obaf-worker/                 @dhirajnavghare
+/binaries/obaf-cli/                    @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Business Domain Presets (Declarative JSON Configurations)
+# ------------------------------------------------------------------------------
+/config/presets/                       @dhirajnavghare
+/config/default.toml                   @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Official Polyglot Client SDKs
+# ------------------------------------------------------------------------------
+/sdk/python/                           @dhirajnavghare
+/sdk/typescript/                       @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Extensions & Examples
+# ------------------------------------------------------------------------------
+/examples/                             @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# CI/CD Workflows, Containerization & Infrastructure
+# ------------------------------------------------------------------------------
+/.github/                              @dhirajnavghare
+/.github/workflows/                    @dhirajnavghare
+/.devcontainer/                        @dhirajnavghare
+/Dockerfile                            @dhirajnavghare
+/docker-compose.yml                    @dhirajnavghare
+/Makefile                              @dhirajnavghare
+/install.sh                            @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Security, Compliance & Governance
+# ------------------------------------------------------------------------------
+/SECURITY.md                           @dhirajnavghare
+/docs/SECURITY_ARCHITECTURE.md         @dhirajnavghare
+/LICENSE*                              @dhirajnavghare
+/CODE_OF_CONDUCT.md                    @dhirajnavghare
+/CONTRIBUTING.md                       @dhirajnavghare
+
+# ------------------------------------------------------------------------------
+# Architecture, System Design & Documentation
+# ------------------------------------------------------------------------------
+/docs/                                 @dhirajnavghare
+/llms.txt                              @dhirajnavghare
+/README.md                             @dhirajnavghare
+/CHANGELOG.md                          @dhirajnavghare
