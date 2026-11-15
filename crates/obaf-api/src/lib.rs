@@ -15,6 +15,7 @@ pub mod reports;
 pub mod router;
 pub mod state;
 pub mod subscriptions;
+pub mod suppliers;
 pub mod sync;
 pub mod webhooks;
 

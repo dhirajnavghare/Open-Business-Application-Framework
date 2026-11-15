@@ -1,3 +1,4 @@
+pub mod api_key;
 pub mod audit_log;
 pub mod booking;
 pub mod customer;
@@ -8,9 +9,11 @@ pub mod payment;
 pub mod product;
 pub mod stock_movement;
 pub mod subscription;
+pub mod supplier;
 pub mod user;
 pub mod webhook;
 
+pub use api_key::Entity as ApiKey;
 pub use audit_log::Entity as AuditLog;
 pub use booking::Entity as Booking;
 pub use customer::Entity as Customer;
@@ -21,5 +24,6 @@ pub use payment::Entity as Payment;
 pub use product::Entity as Product;
 pub use stock_movement::Entity as StockMovement;
 pub use subscription::Entity as Subscription;
+pub use supplier::Entity as Supplier;
 pub use user::Entity as User;
 pub use webhook::Entity as Webhook;

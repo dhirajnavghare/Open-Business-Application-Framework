@@ -14,8 +14,8 @@ async fn test_database_migrations_sqlite_in_memory() {
 #[test]
 fn test_schema_statements_postgres_compatibility() {
     use obaf_database::entities::{
-        audit_log, booking, customer, order, order_item, organization, payment, product,
-        stock_movement, subscription, user, webhook,
+        api_key, audit_log, booking, customer, order, order_item, organization, payment, product,
+        stock_movement, subscription, supplier, user, webhook,
     };
 
     let schema = Schema::new(DbBackend::Postgres);
@@ -24,7 +24,9 @@ fn test_schema_statements_postgres_compatibility() {
     let entities = vec![
         schema.create_table_from_entity(organization::Entity),
         schema.create_table_from_entity(user::Entity),
+        schema.create_table_from_entity(api_key::Entity),
         schema.create_table_from_entity(customer::Entity),
+        schema.create_table_from_entity(supplier::Entity),
         schema.create_table_from_entity(webhook::Entity),
         schema.create_table_from_entity(audit_log::Entity),
         schema.create_table_from_entity(product::Entity),

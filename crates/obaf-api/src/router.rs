@@ -26,6 +26,7 @@ use crate::payments::payment_routes;
 use crate::reports::report_routes;
 use crate::state::SharedState;
 use crate::subscriptions::subscription_routes;
+use crate::suppliers::supplier_routes;
 use crate::sync::sync_routes;
 use crate::webhooks::webhook_routes;
 
@@ -50,6 +51,7 @@ pub fn create_router(state: SharedState) -> Router {
         // API v1 routes
         .nest("/api/v1/auth", auth_routes())
         .nest("/api/v1/customers", customer_routes())
+        .nest("/api/v1/suppliers", supplier_routes())
         .nest("/api/v1/catalog", catalog_routes())
         .nest("/api/v1/inventory", inventory_routes())
         .nest("/api/v1/orders", order_routes())

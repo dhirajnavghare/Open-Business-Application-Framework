@@ -13,4 +13,6 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+sea-orm.workspace = true
+rust_decimal.workspace = true
 anyhow.workspace = true
