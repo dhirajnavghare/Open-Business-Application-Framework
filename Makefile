@@ -1,4 +1,4 @@
-.PHONY: help setup dev run status worker doctor presets check fmt test test-e2e test-all tour sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
+.PHONY: help setup dev run status monitor openapi worker doctor presets check fmt test test-e2e test-all tour sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
 
 # Default shell
 SHELL := /bin/bash
@@ -12,6 +12,8 @@ help:
 	@echo "  make build         - Run all checks and tests, then build release binaries"
 	@echo "  make dev           - Run obaf-server in local development mode"
 	@echo "  make status        - Check live server health, metrics, and database stats"
+	@echo "  make monitor       - Continuous live terminal monitoring loop"
+	@echo "  make openapi       - Export active OpenAPI 3.1 JSON spec to docs/openapi.json"
 	@echo "  make tour          - Run 60-second interactive guided terminal demo"
 	@echo "  make worker        - Run background worker daemon"
 	@echo "  make doctor        - Verify database, migrations, and presets"
@@ -64,6 +66,12 @@ run: dev
 
 status:
 	cargo run -p obaf-cli -- status
+
+monitor:
+	cargo run -p obaf-cli -- status --watch
+
+openapi:
+	cargo run -p obaf-cli -- openapi --output docs/openapi.json
 
 worker:
 	cargo run -p obaf-worker -- --interval-secs 30

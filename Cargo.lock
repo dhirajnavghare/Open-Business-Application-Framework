@@ -1855,6 +1855,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "obaf-api",
  "obaf-core",
  "obaf-database",
  "reqwest",
@@ -1863,6 +1864,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "utoipa",
  "uuid",
 ]
 

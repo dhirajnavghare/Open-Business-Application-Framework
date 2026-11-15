@@ -243,3 +243,26 @@ fn test_cli_status() {
     assert!(stdout.contains("Local Domain Engine:"));
     assert!(stdout.contains("Domain Presets:"));
 }
+
+#[test]
+fn test_cli_openapi_export() {
+    let out_file = "/tmp/test_cli_openapi_export.json";
+    let _ = fs::remove_file(out_file);
+
+    let bin = env!("CARGO_BIN_EXE_obaf-cli");
+    let output = Command::new(bin)
+        .current_dir(get_workspace_root())
+        .args(["openapi", "--output", out_file])
+        .output()
+        .expect("Failed to execute obaf-cli openapi");
+
+    assert!(output.status.success());
+    assert!(Path::new(out_file).exists());
+
+    let content = fs::read_to_string(out_file).expect("Read exported openapi file");
+    assert!(content.contains("\"openapi\": \"3.1.0\""));
+    assert!(content.contains("Open Business Application Framework (OBAF) API"));
+    assert!(content.contains("/api/v1/catalog/products"));
+
+    let _ = fs::remove_file(out_file);
+}

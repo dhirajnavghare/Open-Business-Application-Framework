@@ -54,6 +54,22 @@ enum Commands {
             help = "Optional database URL to check tenant and table statistics"
         )]
         database_url: String,
+        #[arg(
+            short,
+            long,
+            default_value_t = false,
+            help = "Continuous monitoring mode (refreshes every 2 seconds)"
+        )]
+        watch: bool,
+    },
+    /// Export the compiled OpenAPI 3.1 JSON specification
+    Openapi {
+        #[arg(
+            short,
+            long,
+            help = "Output file path (e.g. docs/openapi.json). Prints to stdout if omitted."
+        )]
+        output: Option<String>,
     },
     /// Verify database connectivity, schema migrations, and preset health
     Doctor {
@@ -168,130 +184,194 @@ enum Commands {
     },
 }
 
+async fn print_system_status(
+    client: &reqwest::Client,
+    base_url: &str,
+    health_url: &str,
+    metrics_url: &str,
+    llms_url: &str,
+    database_url: &str,
+) {
+    let start = std::time::Instant::now();
+    println!("┌──────────────────────────────────────────────────────────────────┐");
+    println!("│        Open Business Application Framework (OBAF) System Status  │");
+    println!("└──────────────────────────────────────────────────────────────────┘\n");
+
+    match client.get(health_url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            let elapsed = start.elapsed();
+            let health_json: serde_json::Value = resp.json().await.unwrap_or_default();
+            let version = health_json
+                .get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or(env!("CARGO_PKG_VERSION"));
+            let db_status = health_json
+                .get("database")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+
+            println!("  🚀 Server Endpoint:   🟢 ONLINE ({})", base_url);
+            println!("  ⚡ Response Latency:  {:.2?}", elapsed);
+            println!("  🏷️  Framework Version: v{}", version);
+            println!(
+                "  🗄️  Database Status:   {}",
+                if db_status == "connected" {
+                    "🟢 Connected"
+                } else {
+                    "🔴 Unreachable"
+                }
+            );
+
+            // Check OpenAPI & Swagger UI
+            let swagger_url = format!("{}/swagger-ui", base_url);
+            let openapi_ok = client
+                .get(format!("{}/api/v1/openapi.json", base_url))
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
+            if openapi_ok {
+                println!("  📖 Swagger UI Docs:   🟢 Available ({})", swagger_url);
+            } else {
+                println!("  📖 Swagger UI Docs:   ⚪ Not Available");
+            }
+
+            // Check LLMs.txt AI Context
+            let llms_ok = client
+                .get(llms_url)
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
+            if llms_ok {
+                println!("  🤖 AI Agent Context:  🟢 Available ({})", llms_url);
+            }
+
+            // Check Prometheus metrics
+            if let Ok(m_resp) = client.get(metrics_url).send().await {
+                if m_resp.status().is_success() {
+                    println!("  📊 Prometheus Metric: 🟢 Active ({})", metrics_url);
+                }
+            }
+        }
+        Ok(resp) => {
+            println!(
+                "  🚀 Server Endpoint:   ⚠️ UNEXPECTED STATUS (HTTP {}) at {}",
+                resp.status(),
+                base_url
+            );
+        }
+        Err(_) => {
+            println!(
+                "  🚀 Server Endpoint:   🔴 OFFLINE (Cannot connect to {})",
+                base_url
+            );
+            println!(
+                "     Hint: Run 'make dev' or 'cargo run -p obaf-server' to launch the API engine."
+            );
+        }
+    }
+
+    // Local Database & Presets Summary
+    println!("\n  📦 Local Domain Engine:");
+    let presets_dir = find_presets_dir();
+    if presets_dir.exists() && presets_dir.is_dir() {
+        let count = fs::read_dir(&presets_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+                    .count()
+            })
+            .unwrap_or(0);
+        println!("  • Domain Presets:     {} available out-of-the-box", count);
+    }
+
+    // Inspect database connection directly if available
+    if let Ok(db) = establish_connection(database_url).await {
+        use sea_orm::ConnectionTrait;
+        if let Ok(Some(row)) = db
+            .query_one(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                "SELECT COUNT(*) as count FROM organizations;".to_string(),
+            ))
+            .await
+        {
+            let count: i64 = row.try_get("", "count").unwrap_or(0);
+            println!("  • Active Tenants:     {} provisioned in database", count);
+        }
+    }
+    println!("────────────────────────────────────────────────────────────────────\n");
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Status { url, database_url } => {
-            let start = std::time::Instant::now();
+        Commands::Status {
+            url,
+            database_url,
+            watch,
+        } => {
             let base_url = url.trim_end_matches('/');
             let health_url = format!("{}/health", base_url);
             let metrics_url = format!("{}/metrics", base_url);
             let llms_url = format!("{}/llms.txt", base_url);
-
-            println!("┌──────────────────────────────────────────────────────────────────┐");
-            println!("│        Open Business Application Framework (OBAF) System Status  │");
-            println!("└──────────────────────────────────────────────────────────────────┘\n");
 
             let client = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(3))
                 .build()
                 .unwrap_or_default();
 
-            match client.get(&health_url).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    let elapsed = start.elapsed();
-                    let health_json: serde_json::Value = resp.json().await.unwrap_or_default();
-                    let version = health_json
-                        .get("version")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(env!("CARGO_PKG_VERSION"));
-                    let db_status = health_json
-                        .get("database")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown");
+            if watch {
+                println!(
+                    "👀 Entering live monitoring mode (polling every 2s, press Ctrl+C to stop)...\n"
+                );
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+                loop {
+                    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+                    print_system_status(
+                        &client,
+                        base_url,
+                        &health_url,
+                        &metrics_url,
+                        &llms_url,
+                        &database_url,
+                    )
+                    .await;
+                    interval.tick().await;
+                }
+            } else {
+                print_system_status(
+                    &client,
+                    base_url,
+                    &health_url,
+                    &metrics_url,
+                    &llms_url,
+                    &database_url,
+                )
+                .await;
+            }
+        }
 
-                    println!("  🚀 Server Endpoint:   🟢 ONLINE ({})", base_url);
-                    println!("  ⚡ Response Latency:  {:.2?}", elapsed);
-                    println!("  🏷️  Framework Version: v{}", version);
-                    println!(
-                        "  🗄️  Database Status:   {}",
-                        if db_status == "connected" {
-                            "🟢 Connected"
-                        } else {
-                            "🔴 Unreachable"
-                        }
-                    );
+        Commands::Openapi { output } => {
+            use utoipa::OpenApi;
+            let spec = obaf_api::docs::ApiDoc::openapi()
+                .to_pretty_json()
+                .map_err(|e| anyhow::anyhow!("Failed to serialize OpenAPI spec: {}", e))?;
 
-                    // Check OpenAPI & Swagger UI
-                    let swagger_url = format!("{}/swagger-ui", base_url);
-                    let openapi_ok = client
-                        .get(format!("{}/api/v1/openapi.json", base_url))
-                        .send()
-                        .await
-                        .map(|r| r.status().is_success())
-                        .unwrap_or(false);
-                    if openapi_ok {
-                        println!("  📖 Swagger UI Docs:   🟢 Available ({})", swagger_url);
-                    } else {
-                        println!("  📖 Swagger UI Docs:   ⚪ Not Available");
-                    }
-
-                    // Check LLMs.txt AI Context
-                    let llms_ok = client
-                        .get(&llms_url)
-                        .send()
-                        .await
-                        .map(|r| r.status().is_success())
-                        .unwrap_or(false);
-                    if llms_ok {
-                        println!("  🤖 AI Agent Context:  🟢 Available ({})", llms_url);
-                    }
-
-                    // Check Prometheus metrics
-                    if let Ok(m_resp) = client.get(&metrics_url).send().await {
-                        if m_resp.status().is_success() {
-                            println!("  📊 Prometheus Metric: 🟢 Active ({})", metrics_url);
-                        }
+            if let Some(path) = output {
+                if let Some(parent) = Path::new(&path).parent() {
+                    if !parent.as_os_str().is_empty() && !parent.exists() {
+                        fs::create_dir_all(parent)?;
                     }
                 }
-                Ok(resp) => {
-                    println!(
-                        "  🚀 Server Endpoint:   ⚠️ UNEXPECTED STATUS (HTTP {}) at {}",
-                        resp.status(),
-                        base_url
-                    );
-                }
-                Err(_) => {
-                    println!(
-                        "  🚀 Server Endpoint:   🔴 OFFLINE (Cannot connect to {})",
-                        base_url
-                    );
-                    println!("     Hint: Run 'make dev' or 'cargo run -p obaf-server' to launch the API engine.");
-                }
+                fs::write(&path, &spec)?;
+                println!("✅ OpenAPI 3.1 JSON specification written to: {}", path);
+            } else {
+                println!("{}", spec);
             }
-
-            // Local Database & Presets Summary
-            println!("\n  📦 Local Domain Engine:");
-            let presets_dir = find_presets_dir();
-            if presets_dir.exists() && presets_dir.is_dir() {
-                let count = fs::read_dir(&presets_dir)
-                    .map(|entries| {
-                        entries
-                            .filter_map(|e| e.ok())
-                            .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
-                            .count()
-                    })
-                    .unwrap_or(0);
-                println!("  • Domain Presets:     {} available out-of-the-box", count);
-            }
-
-            // Inspect database connection directly if available
-            if let Ok(db) = establish_connection(&database_url).await {
-                use sea_orm::ConnectionTrait;
-                if let Ok(Some(row)) = db
-                    .query_one(sea_orm::Statement::from_string(
-                        db.get_database_backend(),
-                        "SELECT COUNT(*) as count FROM organizations;".to_string(),
-                    ))
-                    .await
-                {
-                    let count: i64 = row.try_get("", "count").unwrap_or(0);
-                    println!("  • Active Tenants:     {} provisioned in database", count);
-                }
-            }
-            println!("────────────────────────────────────────────────────────────────────\n");
         }
 
         Commands::Doctor { database_url } => {

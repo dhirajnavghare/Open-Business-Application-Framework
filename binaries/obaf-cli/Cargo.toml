@@ -17,6 +17,8 @@ sea-orm.workspace = true
 rust_decimal.workspace = true
 anyhow.workspace = true
 reqwest.workspace = true
+obaf-api.workspace = true
+utoipa.workspace = true
 
 [build-dependencies]
 serde_json.workspace = true

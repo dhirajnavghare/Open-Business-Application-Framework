@@ -54,3 +54,12 @@ The `audit_logs` table stores an append-only record of administrative actions, s
 - `credit_notes`: Formal immutable credit notes for merchandise returns and billing corrections (`credit_note_number`, `amount`, `reason`, `order_id`, `customer_id`).
 - `coupons`: Promotional codes with percentage or flat discounts, subtotal thresholds, maximum discount caps, usage allowances, and expiration dates.
 - `currency_exchange_rates`: Dynamic conversion rates between ISO-4217 currencies supporting direct and reciprocal 128-bit decimal conversions.
+
+---
+
+## 7. High-Throughput Read/Write Replica Routing
+
+For enterprise PostgreSQL multi-node clusters, `crates/obaf-database` provides the `ReadWriteRouter` abstraction:
+- Directs write mutations (`writer()`) exclusively to primary PostgreSQL instances.
+- Seamlessly distributes read-only queries (`reader()`) across registered read replicas using lock-free atomic round-robin load balancing.
+- Safely falls back to the primary database when no read replicas are configured.

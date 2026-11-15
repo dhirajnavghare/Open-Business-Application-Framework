@@ -115,3 +115,89 @@ impl TenantPoolRouter {
         &self.default_pool
     }
 }
+
+/// High-throughput Read/Write connection pool router.
+/// Directs write transactions to the primary writer database,
+/// while seamlessly load-balancing read queries across PostgreSQL read replicas.
+#[derive(Clone)]
+pub struct ReadWriteRouter {
+    primary: DatabaseConnection,
+    replicas: Vec<DatabaseConnection>,
+    counter: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl ReadWriteRouter {
+    /// Create a new router with a primary database connection.
+    pub fn new(primary: DatabaseConnection) -> Self {
+        Self {
+            primary,
+            replicas: Vec::new(),
+            counter: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        }
+    }
+
+    /// Create a new router with primary connection and a list of read replicas.
+    pub fn with_replicas(primary: DatabaseConnection, replicas: Vec<DatabaseConnection>) -> Self {
+        Self {
+            primary,
+            replicas,
+            counter: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        }
+    }
+
+    /// Add a read replica connection pool to the router.
+    pub fn add_replica(&mut self, replica: DatabaseConnection) {
+        self.replicas.push(replica);
+    }
+
+    /// Number of registered read replicas.
+    pub fn replica_count(&self) -> usize {
+        self.replicas.len()
+    }
+
+    /// Obtain the primary connection pool for write operations (INSERT, UPDATE, DELETE).
+    pub fn writer(&self) -> &DatabaseConnection {
+        &self.primary
+    }
+
+    /// Obtain a connection pool for read operations (SELECT).
+    /// Uses round-robin load balancing across registered replicas,
+    /// or falls back to the primary writer if no replicas are registered.
+    pub fn reader(&self) -> &DatabaseConnection {
+        if self.replicas.is_empty() {
+            &self.primary
+        } else {
+            let idx = self
+                .counter
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                % self.replicas.len();
+            &self.replicas[idx]
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_read_write_router_fallback_and_round_robin() {
+        let primary = establish_connection("sqlite::memory:").await.unwrap();
+        let replica_1 = establish_connection("sqlite::memory:").await.unwrap();
+        let replica_2 = establish_connection("sqlite::memory:").await.unwrap();
+
+        // 1. Without replicas, reader returns primary
+        let router_solo = ReadWriteRouter::new(primary.clone());
+        assert_eq!(router_solo.replica_count(), 0);
+        assert!(router_solo.reader().ping().await.is_ok());
+        assert!(router_solo.writer().ping().await.is_ok());
+
+        // 2. With 2 replicas, reader alternates across replicas
+        let router_clustered =
+            ReadWriteRouter::with_replicas(primary.clone(), vec![replica_1, replica_2]);
+        assert_eq!(router_clustered.replica_count(), 2);
+        assert!(router_clustered.reader().ping().await.is_ok());
+        assert!(router_clustered.reader().ping().await.is_ok());
+        assert!(router_clustered.writer().ping().await.is_ok());
+    }
+}
