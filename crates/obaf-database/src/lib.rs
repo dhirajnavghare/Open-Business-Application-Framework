@@ -18,7 +18,7 @@ pub mod pool;
 
 pub use entities::*;
 pub use migration::run_migrations;
-pub use pool::{establish_connection, ReadWriteRouter, TenantPoolRouter};
+pub use pool::{establish_connection, sanitize_url, ReadWriteRouter, TenantPoolRouter};
 pub use sea_orm::DatabaseConnection;
 
 #[cfg(test)]

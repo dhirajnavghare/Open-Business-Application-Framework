@@ -1,0 +1,33 @@
+[Unit]
+Description=Open Business Application Framework (OBAF) Background Worker
+Documentation=https://github.com/dhirajnavghare/Open-Business-Application-Framework
+After=network.target network-online.target obaf-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=obaf
+Group=obaf
+WorkingDirectory=/var/lib/obaf
+ExecStart=/usr/local/bin/obaf-worker
+Restart=always
+RestartSec=5s
+
+# Environment configuration
+Environment=RUST_LOG=info
+Environment=OBAF_WORKER_INTERVAL_SECS=30
+EnvironmentFile=-/etc/obaf/obaf.env
+
+# High-concurrency descriptors
+LimitNOFILE=65536
+
+# System hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

@@ -4641,6 +4641,36 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service is degraded (database unreachable)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "live_check",
+        "responses": {
+          "200": {
+            "description": "Liveness probe: verifies process is responsive and not deadlocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4672,6 +4702,36 @@
             "description": "Prometheus-compatible operational metrics",
             "content": {
               "text/plain": {}
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "ready_check",
+        "responses": {
+          "200": {
+            "description": "Readiness probe: verifies service can accept client traffic and connect to database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service not ready to accept traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
             }
           }
         }
@@ -5998,6 +6058,21 @@
           }
         }
       },
+      "LivenessResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      },
       "LoginRequest": {
         "type": "object",
         "required": [
@@ -6667,6 +6742,21 @@
             "type": "string"
           },
           "unit_cost": {
+            "type": "string"
+          }
+        }
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "status": {
             "type": "string"
           }
         }

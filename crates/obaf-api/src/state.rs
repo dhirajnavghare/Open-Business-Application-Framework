@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use obaf_core::{TokenBucketRateLimiter, TtlCache};
-use obaf_database::DatabaseConnection;
+use obaf_database::{DatabaseConnection, ReadWriteRouter};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
@@ -10,6 +10,7 @@ use crate::webhooks::dispatcher::dispatch_webhooks_background;
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
+    pub router: ReadWriteRouter,
     pub jwt_secret: String,
     pub event_sender: broadcast::Sender<String>,
     pub http_client: reqwest::Client,
@@ -21,6 +22,15 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(db: DatabaseConnection, jwt_secret: impl Into<String>) -> Self {
+        let router = ReadWriteRouter::new(db.clone());
+        Self::with_router(db, router, jwt_secret)
+    }
+
+    pub fn with_router(
+        db: DatabaseConnection,
+        router: ReadWriteRouter,
+        jwt_secret: impl Into<String>,
+    ) -> Self {
         let (event_sender, _) = broadcast::channel(1024);
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
@@ -38,6 +48,7 @@ impl AppState {
 
         Self {
             db,
+            router,
             jwt_secret: jwt_secret.into(),
             event_sender,
             http_client,
@@ -46,6 +57,17 @@ impl AppState {
             idempotency_cache,
             rate_limiter,
         }
+    }
+
+    /// Access database connection pool for read operations (queries, reports, searches).
+    /// Load-balances across registered read replicas or falls back to primary.
+    pub fn reader(&self) -> &DatabaseConnection {
+        self.router.reader()
+    }
+
+    /// Access primary database connection pool for write operations (inserts, updates, deletes).
+    pub fn writer(&self) -> &DatabaseConnection {
+        self.router.writer()
     }
 
     pub fn broadcast_event(&self, event_type: &str, payload: serde_json::Value) {

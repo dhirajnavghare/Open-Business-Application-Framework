@@ -20,7 +20,7 @@ use crate::catalog::catalog_routes;
 use crate::customers::customer_routes;
 use crate::docs::ApiDoc;
 use crate::events::event_routes;
-use crate::health::{health_check, llms_txt, metrics_check};
+use crate::health::{health_check, live_check, llms_txt, metrics_check, ready_check};
 use crate::inventory::inventory_routes;
 use crate::meta::{engine_info, schema_discovery};
 use crate::orders::order_routes;
@@ -51,6 +51,8 @@ pub fn create_router(state: SharedState) -> Router {
     Router::new()
         // Health, Metrics & AI Agent discovery endpoints
         .route("/health", get(health_check))
+        .route("/live", get(live_check))
+        .route("/ready", get(ready_check))
         .route("/metrics", get(metrics_check))
         .route("/llms.txt", get(llms_txt))
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
@@ -92,6 +94,8 @@ async fn rate_limit_middleware(
     let path = request.uri().path();
     // Exclude health, metrics, documentation, and metadata endpoints from rate limiting
     if path == "/health"
+        || path == "/live"
+        || path == "/ready"
         || path == "/metrics"
         || path == "/llms.txt"
         || path.starts_with("/swagger-ui")

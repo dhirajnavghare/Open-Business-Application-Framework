@@ -97,4 +97,19 @@ async fn test_server_binary_startup_and_endpoints() {
     let llms_text = llms_res.text().await.unwrap();
     assert!(llms_text.contains("Open Business Application Framework (OBAF)"));
     assert!(llms_text.contains("Core Capabilities"));
+
+    // 5. Check /live liveness probe
+    let live_url = format!("http://127.0.0.1:{}/live", test_port);
+    let live_res = client.get(&live_url).send().await.unwrap();
+    assert_eq!(live_res.status(), reqwest::StatusCode::OK);
+    let live_json: serde_json::Value = live_res.json().await.unwrap();
+    assert_eq!(live_json["status"], "alive");
+
+    // 6. Check /ready readiness probe
+    let ready_url = format!("http://127.0.0.1:{}/ready", test_port);
+    let ready_res = client.get(&ready_url).send().await.unwrap();
+    assert_eq!(ready_res.status(), reqwest::StatusCode::OK);
+    let ready_json: serde_json::Value = ready_res.json().await.unwrap();
+    assert_eq!(ready_json["status"], "ready");
+    assert_eq!(ready_json["database"], "connected");
 }

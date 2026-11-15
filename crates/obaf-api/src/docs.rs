@@ -8,6 +8,8 @@ use utoipa::{
     paths(
         // Health
         crate::health::health_check,
+        crate::health::live_check,
+        crate::health::ready_check,
         crate::health::metrics_check,
         crate::health::llms_txt,
         // Meta
@@ -131,6 +133,8 @@ use utoipa::{
     components(
         schemas(
             crate::health::HealthResponse,
+            crate::health::LivenessResponse,
+            crate::health::ReadinessResponse,
             crate::meta::EngineInfoResponse,
             crate::meta::SchemaDiscoveryResponse,
             crate::meta::SchemaField,

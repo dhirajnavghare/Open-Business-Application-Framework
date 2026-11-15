@@ -10,6 +10,8 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub url: String,
+    #[serde(default)]
+    pub replicas: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -33,6 +35,7 @@ impl AppConfig {
             .set_default("server.host", "127.0.0.1")?
             .set_default("server.port", 8080)?
             .set_default("database.url", "sqlite://data/obaf.db?mode=rwc")?
+            .set_default("database.replicas", Vec::<String>::new())?
             .set_default(
                 "security.jwt_secret",
                 "dev_secret_please_change_in_production",
@@ -49,6 +52,20 @@ impl AppConfig {
         // Allow direct DATABASE_URL / OBAF_DATABASE_URL environment variable override
         if let Ok(db_url) = env::var("DATABASE_URL").or_else(|_| env::var("OBAF_DATABASE_URL")) {
             builder = builder.set_override("database.url", db_url)?;
+        }
+
+        // Allow DATABASE_REPLICAS / OBAF_DATABASE_REPLICAS comma-separated environment variable
+        if let Ok(replicas_str) =
+            env::var("DATABASE_REPLICAS").or_else(|_| env::var("OBAF_DATABASE_REPLICAS"))
+        {
+            let list: Vec<String> = replicas_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !list.is_empty() {
+                builder = builder.set_override("database.replicas", list)?;
+            }
         }
 
         // Allow PORT / HOST environment variable overrides
@@ -94,5 +111,15 @@ mod tests {
         assert!(!cfg.server.host.is_empty());
         assert!(cfg.server.port > 0);
         assert!(!cfg.database.url.is_empty());
+    }
+
+    #[test]
+    fn test_replicas_env_parsing() {
+        env::set_var("DATABASE_REPLICAS", "sqlite://rep1.db, sqlite://rep2.db");
+        let cfg = AppConfig::load().expect("Config should load with replicas");
+        assert_eq!(cfg.database.replicas.len(), 2);
+        assert_eq!(cfg.database.replicas[0], "sqlite://rep1.db");
+        assert_eq!(cfg.database.replicas[1], "sqlite://rep2.db");
+        env::remove_var("DATABASE_REPLICAS");
     }
 }

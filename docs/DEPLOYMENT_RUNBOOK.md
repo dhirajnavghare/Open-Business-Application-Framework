@@ -72,7 +72,10 @@ OBAF evaluates configuration using a deterministic priority cascade:
 |---|---|---|---|---|
 | `OBAF_SERVER_PORT` / `PORT` / `OBAF_SERVER__PORT` | `server.port` | `u16` | `8080` | TCP port the HTTP and WebSocket listener binds to |
 | `OBAF_SERVER_HOST` / `HOST` / `OBAF_SERVER__HOST` | `server.host` | `string` | `127.0.0.1` (`0.0.0.0` in container) | Network interface IP address to bind |
-| `DATABASE_URL` / `OBAF_DATABASE_URL` | `database.url` | `string` | `sqlite://data/obaf.db?mode=rwc` | PostgreSQL or SQLite connection URI |
+| `DATABASE_URL` / `OBAF_DATABASE_URL` | `database.url` | `string` | `sqlite://data/obaf.db?mode=rwc` | PostgreSQL or SQLite primary connection URI |
+| `DATABASE_REPLICAS` / `OBAF_DATABASE_REPLICAS` | `database.replicas` | `list<string>` | `[]` | Comma-separated list of read-only replica database URIs for automatic round-robin query load balancing |
+| `DATABASE_MAX_CONNECTIONS` / `OBAF_DATABASE_MAX_CONNECTIONS` | N/A | `u32` | `50` (PG) / `25` (SQLite) | Maximum concurrent connections in the connection pool |
+| `DATABASE_MIN_CONNECTIONS` / `OBAF_DATABASE_MIN_CONNECTIONS` | N/A | `u32` | `5` (PG) / `1` (SQLite) | Minimum idle connections preserved in the pool |
 | `OBAF_SECURITY_JWT_SECRET` / `JWT_SECRET` | `security.jwt_secret` | `string` | `dev_secret...` | High-entropy secret key for HMAC-SHA256 JWT signing (≥ 32 chars in production) |
 | `OBAF_SECURITY_TOKEN_EXPIRY_HOURS` | `security.token_expiry_hours` | `u64` | `24` | Default validity window in hours for generated auth tokens |
 | `OBAF_WORKER_INTERVAL_SECS` | N/A | `u64` | `30` | Interval in seconds between reconciliation sweeps in `obaf-worker` |
@@ -171,10 +174,10 @@ ENTRYPOINT ["/app/obaf-server"]
 
 ### 4.2 Docker Compose Profiles
 
-The root [`docker-compose.yml`](file:///Users/dhirajnavghare/Developer/Open-Business-Application-Framework/docker-compose.yml) provides two primary operating profiles:
+The root [`docker-compose.yml`](file:///Users/dhirajnavghare/Developer/Open-Business-Application-Framework/docker-compose.yml) provides turnkey operational profiles:
 
 ```bash
-# 1. Start Zero-Dependency SQLite Stack:
+# 1. Start Zero-Dependency SQLite Stack (Ideal for local testing, pop-up kiosks, edge nodes):
 docker compose up -d obaf-sqlite
 
 # 2. Start Clustered PostgreSQL Stack:
@@ -183,11 +186,46 @@ docker compose --profile postgres up -d
 # 3. Start PostgreSQL Stack with Background Worker:
 docker compose --profile postgres --profile worker up -d
 
-# 4. View real-time aggregated logs:
+# 4. Turnkey Single-Server Production Deployment (Automated Let's Encrypt TLS via Caddy):
+DOMAIN=api.mybusiness.com docker compose --profile production up -d
+
+# 5. View real-time aggregated logs:
 docker compose logs -f
 ```
 
-### 4.3 OS-Independence & Multi-Architecture Support
+### 4.3 Bare-Metal / Virtual Machine Systemd Deployment (Non-Docker)
+
+For bare-metal Linux servers (Debian, Ubuntu, RHEL, Arch) without container overhead, hardened systemd service units are provided in `scripts/systemd/`:
+
+```bash
+# 1. Install compiled binaries
+sudo cp target/release/obaf-server /usr/local/bin/
+sudo cp target/release/obaf-worker /usr/local/bin/
+sudo cp target/release/obaf-cli /usr/local/bin/
+
+# 2. Create unprivileged system user & working directories
+sudo useradd -r -s /bin/false obaf
+sudo mkdir -p /var/lib/obaf /etc/obaf
+sudo chown -R obaf:obaf /var/lib/obaf
+
+# 3. Configure production environment file
+sudo tee /etc/obaf/obaf.env > /dev/null << 'EOF'
+PORT=8080
+HOST=127.0.0.1
+DATABASE_URL=postgres://obaf:secure_password@127.0.0.1:5432/obaf_prod
+JWT_SECRET=production_high_entropy_jwt_secret_min_32_characters
+RUST_LOG=info
+EOF
+sudo chmod 600 /etc/obaf/obaf.env
+
+# 4. Install and start systemd units
+sudo cp scripts/systemd/obaf-server.service /etc/systemd/system/
+sudo cp scripts/systemd/obaf-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now obaf-server obaf-worker
+```
+
+### 4.4 OS-Independence & Multi-Architecture Support
 
 Deployment via Docker is **100% OS-independent**. Because OBAF's application binaries, runtime libraries (glibc/musl, OpenSSL, CA certificates), timezone databases, and configurations are encapsulated inside the OCI-compliant container image (`debian:bookworm-slim`), the host operating system is completely decoupled from the runtime execution:
 
@@ -311,15 +349,15 @@ spec:
               memory: "256Mi"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /live
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
-            timeoutSeconds: 3
+            timeoutSeconds: 2
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
+              path: /ready
               port: http
             initialDelaySeconds: 3
             periodSeconds: 5

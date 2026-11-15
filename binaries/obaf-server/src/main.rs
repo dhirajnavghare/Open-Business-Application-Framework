@@ -49,8 +49,39 @@ async fn main() -> anyhow::Result<()> {
         anyhow::anyhow!(e)
     })?;
 
-    // 4. Initialize shared state and create Axum router
-    let state = Arc::new(AppState::new(db, cfg.security.jwt_secret));
+    // 4. Connect to read replicas if configured
+    let mut replica_pools = Vec::new();
+    for replica_url in &cfg.database.replicas {
+        match establish_connection(replica_url).await {
+            Ok(rep_conn) => {
+                tracing::info!(
+                    "Registered database read replica: {}",
+                    obaf_database::sanitize_url(replica_url)
+                );
+                replica_pools.push(rep_conn);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to connect to database read replica {}: {}",
+                    obaf_database::sanitize_url(replica_url),
+                    e
+                );
+            }
+        }
+    }
+
+    let router = if replica_pools.is_empty() {
+        obaf_database::ReadWriteRouter::new(db.clone())
+    } else {
+        tracing::info!(
+            "Initialized ReadWriteRouter with 1 primary writer and {} read replicas",
+            replica_pools.len()
+        );
+        obaf_database::ReadWriteRouter::with_replicas(db.clone(), replica_pools)
+    };
+
+    // 5. Initialize shared state and create Axum router
+    let state = Arc::new(AppState::with_router(db, router, cfg.security.jwt_secret));
     let app = create_router(state);
 
     // 5. Print startup banner with direct links
@@ -109,7 +140,7 @@ fn print_banner(bind_addr: &str) {
  🚀 Server running at: http://{}
  📖 Swagger UI Docs:   http://{}/swagger-ui
  ⚡ OpenAPI JSON Spec: http://{}/api/v1/openapi.json
- 🩺 Health Check:      http://{}/health
+ 🩺 Health & Probes:   http://{}/health (/live, /ready)
  ────────────────────────────────────────────────────────────
 "#,
         env!("CARGO_PKG_VERSION"),

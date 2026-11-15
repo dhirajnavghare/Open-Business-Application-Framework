@@ -1,0 +1,34 @@
+[Unit]
+Description=Open Business Application Framework (OBAF) Server
+Documentation=https://github.com/dhirajnavghare/Open-Business-Application-Framework
+After=network.target network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=obaf
+Group=obaf
+WorkingDirectory=/var/lib/obaf
+ExecStart=/usr/local/bin/obaf-server
+Restart=always
+RestartSec=5s
+
+# Environment configuration
+Environment=PORT=8080
+Environment=HOST=127.0.0.1
+Environment=RUST_LOG=info
+EnvironmentFile=-/etc/obaf/obaf.env
+
+# High-concurrency descriptors
+LimitNOFILE=65536
+
+# System hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

@@ -67,5 +67,25 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  # Automated TLS Reverse Proxy Gateway (for Single-Server Production Deployments)
+  caddy:
+    profiles: ["gateway", "production"]
+    image: caddy:2-alpine
+    container_name: obaf-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - obaf-sqlite
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

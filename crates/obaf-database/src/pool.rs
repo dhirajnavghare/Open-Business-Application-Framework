@@ -1,5 +1,5 @@
 use obaf_core::{ObafError, Result, TenantId};
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -31,9 +31,29 @@ pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnecti
         }
     }
 
+    let max_conns = std::env::var("DATABASE_MAX_CONNECTIONS")
+        .or_else(|_| std::env::var("OBAF_DATABASE_MAX_CONNECTIONS"))
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(if database_url.starts_with("sqlite:") {
+            25
+        } else {
+            50
+        });
+
+    let min_conns = std::env::var("DATABASE_MIN_CONNECTIONS")
+        .or_else(|_| std::env::var("OBAF_DATABASE_MIN_CONNECTIONS"))
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(if database_url.starts_with("sqlite:") {
+            1
+        } else {
+            5
+        });
+
     let mut opt = ConnectOptions::new(database_url.to_owned());
-    opt.max_connections(50)
-        .min_connections(5)
+    opt.max_connections(max_conns)
+        .min_connections(min_conns)
         .connect_timeout(Duration::from_secs(10))
         .acquire_timeout(Duration::from_secs(10))
         .idle_timeout(Duration::from_secs(300))
@@ -46,11 +66,20 @@ pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnecti
             message: format!("Database connection error: {}", e),
         })?;
 
+    // Apply high-concurrency pragmas for SQLite (WAL mode, busy timeout, foreign keys)
+    if database_url.starts_with("sqlite:") {
+        let _ = db
+            .execute_unprepared(
+                "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;",
+            )
+            .await;
+    }
+
     info!("Successfully connected to database");
     Ok(db)
 }
 
-fn sanitize_url(url: &str) -> String {
+pub fn sanitize_url(url: &str) -> String {
     // Redact password if present: postgres://user:password@host/db -> postgres://user:***@host/db
     if let Some(at_idx) = url.find('@') {
         if let Some(colon_idx) = url[..at_idx].rfind(':') {
