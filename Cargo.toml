@@ -65,7 +65,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Configuration & Security
 config = "0.14"
 argon2 = "0.5"
-jsonwebtoken = "9.3"
+jsonwebtoken = "10.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 hmac = "0.12"
 sha2 = "0.10"
