@@ -42,11 +42,42 @@ async fn main() -> anyhow::Result<()> {
     // 5. Print startup banner with direct links
     print_banner(&bind_addr);
 
-    // 6. Bind listener and serve
+    // 6. Bind listener and serve with graceful shutdown (System Design Primer)
     let listener = TcpListener::bind(&bind_addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
+    tracing::info!("OBAF server shut down gracefully. All in-flight requests drained.");
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C signal handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received SIGINT (Ctrl+C). Initiating graceful connection drain...");
+        },
+        _ = terminate => {
+            tracing::info!("Received SIGTERM. Initiating graceful connection drain...");
+        },
+    }
 }
 
 fn print_banner(bind_addr: &str) {

@@ -68,15 +68,32 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/sync", sync_routes())
         .nest("/api/v1/admin", admin_routes())
         // Global Middlewares
-        .layer(from_fn(security_headers_middleware))
+        .layer(from_fn(request_id_and_security_middleware))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 
-async fn security_headers_middleware(request: axum::extract::Request, next: Next) -> Response {
+async fn request_id_and_security_middleware(
+    request: axum::extract::Request,
+    next: Next,
+) -> Response {
+    let req_id = request
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+    let req_id_header =
+        HeaderValue::from_str(&req_id).unwrap_or_else(|_| HeaderValue::from_static("obaf-trace"));
+
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+
+    // Distributed tracing request correlation ID (System Design Primer)
+    headers.insert(HeaderName::from_static("x-request-id"), req_id_header);
+
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),

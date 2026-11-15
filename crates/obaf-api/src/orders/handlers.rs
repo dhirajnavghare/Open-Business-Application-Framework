@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
+    response::IntoResponse,
     Json,
 };
 use chrono::Utc;
@@ -81,8 +82,27 @@ pub struct UpdateOrderStatusRequest {
 pub async fn create_order(
     State(state): State<SharedState>,
     auth: AuthUser,
+    headers: HeaderMap,
     Json(payload): Json<CreateOrderRequest>,
-) -> Result<(StatusCode, Json<OrderResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+) -> Result<axum::response::Response, (StatusCode, Json<AuthErrorResponse>)> {
+    // Distributed Systems Pattern: Idempotency Key deduplication (System Design Primer)
+    let idempotency_key = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    if let Some(ref ikey) = idempotency_key {
+        let cache_key = format!("idempotency:order:{}:{}", auth.tenant_id.0, ikey);
+        if let Some((cached_status, cached_json)) = state.idempotency_cache.get(&cache_key) {
+            let mut res_headers = HeaderMap::new();
+            res_headers.insert(
+                HeaderName::from_static("x-idempotent-replay"),
+                HeaderValue::from_static("true"),
+            );
+            return Ok((cached_status, res_headers, Json(cached_json)).into_response());
+        }
+    }
+
     if payload.items.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -253,23 +273,31 @@ pub async fn create_order(
         }),
     );
 
-    Ok((
-        StatusCode::CREATED,
-        Json(OrderResponse {
-            id: order_id,
-            tenant_id: auth.tenant_id.as_uuid(),
-            order_number: order_num,
-            customer_name: payload.customer_name,
-            table_or_room: payload.table_or_room,
-            status: "CONFIRMED".to_string(),
-            subtotal,
-            tax_total,
-            discount_total: Decimal::ZERO,
-            grand_total,
-            items: item_responses,
-            created_at: now,
-        }),
-    ))
+    let response = OrderResponse {
+        id: order_id,
+        tenant_id: auth.tenant_id.as_uuid(),
+        order_number: order_num,
+        customer_name: payload.customer_name,
+        table_or_room: payload.table_or_room,
+        status: "CONFIRMED".to_string(),
+        subtotal,
+        tax_total,
+        discount_total: Decimal::ZERO,
+        grand_total,
+        items: item_responses,
+        created_at: now,
+    };
+
+    if let Some(ref ikey) = idempotency_key {
+        let cache_key = format!("idempotency:order:{}:{}", auth.tenant_id.0, ikey);
+        if let Ok(val) = serde_json::to_value(&response) {
+            state
+                .idempotency_cache
+                .insert(cache_key, (StatusCode::CREATED, val));
+        }
+    }
+
+    Ok((StatusCode::CREATED, Json(response)).into_response())
 }
 
 #[utoipa::path(

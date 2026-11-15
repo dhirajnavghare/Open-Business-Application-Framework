@@ -65,6 +65,13 @@ pub async fn engine_info() -> Json<EngineInfoResponse> {
             "freelance_invoice",
             "pg_hostel",
             "visitor_pass",
+            "salon_spa",
+            "retail_grocery",
+            "hotel_management",
+            "education_coaching",
+            "manufacturing_jobwork",
+            "courier_fleet",
+            "dairy_milk_delivery",
         ],
         active_engines: vec![
             "identity_rbac",
@@ -379,6 +386,108 @@ pub async fn schema_discovery() -> Json<SchemaDiscoveryResponse> {
                 "list".to_string(),
                 "create".to_string(),
                 "test_ping".to_string(),
+            ],
+        },
+        EntitySchema {
+            entity: "supplier".to_string(),
+            display_name: "Suppliers & Vendors".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "name".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some("Supplier trade name or legal business entity".to_string()),
+                },
+                SchemaField {
+                    name: "contact_person".to_string(),
+                    field_type: "string".to_string(),
+                    required: false,
+                    ui_component: "text_input".to_string(),
+                    description: Some("Key account manager or representative".to_string()),
+                },
+                SchemaField {
+                    name: "email".to_string(),
+                    field_type: "string".to_string(),
+                    required: false,
+                    ui_component: "email_input".to_string(),
+                    description: Some("Procurement or accounts payable email".to_string()),
+                },
+                SchemaField {
+                    name: "phone".to_string(),
+                    field_type: "string".to_string(),
+                    required: false,
+                    ui_component: "phone_input".to_string(),
+                    description: Some("Direct phone number".to_string()),
+                },
+            ],
+            actions: vec!["list".to_string(), "create".to_string(), "view".to_string()],
+        },
+        EntitySchema {
+            entity: "stock_movement".to_string(),
+            display_name: "Inventory Ledger Movements".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "product_id".to_string(),
+                    field_type: "uuid".to_string(),
+                    required: true,
+                    ui_component: "product_select".to_string(),
+                    description: Some("Referenced product".to_string()),
+                },
+                SchemaField {
+                    name: "movement_type".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "select_dropdown".to_string(),
+                    description: Some(
+                        "Movement direction (PURCHASE, SALE, RETURN, ADJUSTMENT, LOSS)".to_string(),
+                    ),
+                },
+                SchemaField {
+                    name: "quantity".to_string(),
+                    field_type: "decimal".to_string(),
+                    required: true,
+                    ui_component: "number_input".to_string(),
+                    description: Some("Signed quantity moved".to_string()),
+                },
+            ],
+            actions: vec![
+                "list".to_string(),
+                "create".to_string(),
+                "balance".to_string(),
+            ],
+        },
+        EntitySchema {
+            entity: "api_key".to_string(),
+            display_name: "Machine API Keys & Hardware Credentials".to_string(),
+            primary_key: "id".to_string(),
+            fields: vec![
+                SchemaField {
+                    name: "name".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "text_input".to_string(),
+                    description: Some(
+                        "Descriptive label (e.g. Counter-1 POS Terminal, Kitchen Printer)"
+                            .to_string(),
+                    ),
+                },
+                SchemaField {
+                    name: "permissions".to_string(),
+                    field_type: "string".to_string(),
+                    required: true,
+                    ui_component: "select_dropdown".to_string(),
+                    description: Some(
+                        "Permission scope (read_only, read_write, admin)".to_string(),
+                    ),
+                },
+            ],
+            actions: vec![
+                "list".to_string(),
+                "create".to_string(),
+                "revoke".to_string(),
             ],
         },
     ];

@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
+    response::IntoResponse,
     Json,
 };
 use chrono::{DateTime, Utc};
@@ -78,8 +79,27 @@ impl From<payment::Model> for PaymentResponse {
 pub async fn record_payment(
     State(state): State<SharedState>,
     auth: AuthUser,
+    headers: HeaderMap,
     Json(payload): Json<RecordPaymentRequest>,
-) -> Result<(StatusCode, Json<PaymentResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+) -> Result<axum::response::Response, (StatusCode, Json<AuthErrorResponse>)> {
+    // Distributed Systems Pattern: Idempotency Key deduplication (System Design Primer)
+    let idempotency_key = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    if let Some(ref ikey) = idempotency_key {
+        let cache_key = format!("idempotency:payment:{}:{}", auth.tenant_id.0, ikey);
+        if let Some((cached_status, cached_json)) = state.idempotency_cache.get(&cache_key) {
+            let mut res_headers = HeaderMap::new();
+            res_headers.insert(
+                HeaderName::from_static("x-idempotent-replay"),
+                HeaderValue::from_static("true"),
+            );
+            return Ok((cached_status, res_headers, Json(cached_json)).into_response());
+        }
+    }
+
     let payment_id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -104,7 +124,18 @@ pub async fn record_payment(
         )
     })?;
 
-    Ok((StatusCode::CREATED, Json(inserted.into())))
+    let response: PaymentResponse = inserted.into();
+
+    if let Some(ref ikey) = idempotency_key {
+        let cache_key = format!("idempotency:payment:{}:{}", auth.tenant_id.0, ikey);
+        if let Ok(val) = serde_json::to_value(&response) {
+            state
+                .idempotency_cache
+                .insert(cache_key, (StatusCode::CREATED, val));
+        }
+    }
+
+    Ok((StatusCode::CREATED, Json(response)).into_response())
 }
 
 #[utoipa::path(

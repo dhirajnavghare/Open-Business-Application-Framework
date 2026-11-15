@@ -29,6 +29,7 @@ async fn test_security_headers_middleware() {
     assert_eq!(res.status(), StatusCode::OK);
 
     let headers = res.headers();
+    assert!(headers.get("x-request-id").is_some());
     assert_eq!(
         headers
             .get("x-content-type-options")

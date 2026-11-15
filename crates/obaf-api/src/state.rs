@@ -1,5 +1,8 @@
+use axum::http::StatusCode;
+use obaf_core::{TokenBucketRateLimiter, TtlCache};
 use obaf_database::DatabaseConnection;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::broadcast;
 
 use crate::webhooks::dispatcher::dispatch_webhooks_background;
@@ -11,15 +14,27 @@ pub struct AppState {
     pub event_sender: broadcast::Sender<String>,
     pub http_client: reqwest::Client,
     pub version: &'static str,
+    pub cache: TtlCache<String, String>,
+    pub idempotency_cache: TtlCache<String, (StatusCode, serde_json::Value)>,
+    pub rate_limiter: TokenBucketRateLimiter,
 }
 
 impl AppState {
     pub fn new(db: DatabaseConnection, jwt_secret: impl Into<String>) -> Self {
         let (event_sender, _) = broadcast::channel(1024);
         let http_client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_default();
+
+        // System Design Primer: in-memory Cache-Aside store (10m TTL, 10k capacity)
+        let cache = TtlCache::new(Duration::from_secs(600), 10_000);
+
+        // System Design Primer: Idempotency deduplication store (24h TTL, 50k capacity)
+        let idempotency_cache = TtlCache::new(Duration::from_secs(86_400), 50_000);
+
+        // System Design Primer: Token Bucket Rate Limiter (burst 100 requests, 50 req/sec refill)
+        let rate_limiter = TokenBucketRateLimiter::new(100.0, 50.0);
 
         Self {
             db,
@@ -27,6 +42,9 @@ impl AppState {
             event_sender,
             http_client,
             version: env!("CARGO_PKG_VERSION"),
+            cache,
+            idempotency_cache,
+            rate_limiter,
         }
     }
 
