@@ -4,7 +4,8 @@
     "title": "Open Business Application Framework (OBAF) API",
     "description": "High-performance headless business operations, billing, and workflow engine in Rust.",
     "license": {
-      "name": "MIT OR Apache-2.0"
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
     },
     "version": "0.1.0"
   },

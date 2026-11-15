@@ -13,8 +13,8 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Open Business Application Framework Contributors"]
-license = "MIT OR Apache-2.0"
+authors = ["Dhiraj Navghare <dhirajnavghare@gmail.com>"]
+license = "Apache-2.0"
 repository = "https://github.com/dhirajnavghare/Open-Business-Application-Framework"
 
 [workspace.dependencies]

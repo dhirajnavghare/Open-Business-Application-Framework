@@ -13,7 +13,7 @@
 **The ultra-fast, headless business operations, billing, and workflow engine built in Rust.**  
 *Single binary. Multi-tenant. Multi-database. 100% API-driven.*
 
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![CI](https://github.com/dhirajnavghare/Open-Business-Application-Framework/actions/workflows/ci.yml/badge.svg)](https://github.com/dhirajnavghare/Open-Business-Application-Framework/actions)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-brightgreen.svg)](http://localhost:8080/swagger-ui)
@@ -298,7 +298,7 @@ Open-Business-Application-Framework/
 ---
 
 ## 🗺️ Roadmap & Implemented Phases
-- [x] **Phase 0: Project Definition** (Dual MIT/Apache-2.0 licensing, pinned `rust-toolchain.toml`, ADRs)
+- [x] **Phase 0: Project Definition** (Apache-2.0 licensing, pinned `rust-toolchain.toml`, ADRs)
 - [x] **Phase 1: Foundation** (Cargo Workspace, SeaORM Multi-DB, SQLite/Postgres pooling, Swagger UI, Preset bootstrap API)
 - [x] **Phase 2: Platform Kernel** (JWT Authentication, Argon2id, Role-Based Access Control, Tenant Isolation Middleware)
 - [x] **Phase 3: Core Business Engines** (Catalog, Inventory Stock Ledger, Order State Machine, Invoicing & GST/VAT Tax Engine)
@@ -318,7 +318,13 @@ Contributions are welcome! Please read our [Developer Setup Guide](docs/DEVELOPE
 
 ## 📄 License
 
-Dual-licensed under either of:
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE) or http://opensource.org/licenses/MIT)
-at your option.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the [LICENSE](LICENSE) file for the full license text and [NOTICE](NOTICE) for attribution notices.

@@ -8,7 +8,11 @@ version = "0.1.0"
 description = "Official Python SDK for Open Business Application Framework (OBAF)"
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT OR Apache-2.0" }
-authors = [{ name = "OBAF Contributors" }]
+license = { text = "Apache-2.0" }
+authors = [{ name = "Dhiraj Navghare", email = "dhirajnavghare@gmail.com" }]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+]
 keywords = ["obaf", "business", "pos", "billing", "erp", "headless"]
 dependencies = []

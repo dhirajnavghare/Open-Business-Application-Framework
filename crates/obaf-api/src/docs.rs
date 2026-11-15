@@ -260,7 +260,10 @@ use utoipa::{
         title = "Open Business Application Framework (OBAF) API",
         version = "0.1.0",
         description = "High-performance headless business operations, billing, and workflow engine in Rust.",
-        license(name = "MIT OR Apache-2.0")
+        license(
+            name = "Apache-2.0",
+            url = "https://www.apache.org/licenses/LICENSE-2.0"
+        )
     )
 )]
 pub struct ApiDoc;

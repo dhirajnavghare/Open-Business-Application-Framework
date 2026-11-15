@@ -8,7 +8,7 @@ This document details the milestone ordering, acceptance criteria, and delivered
 
 | Phase | Description | Key Deliverables | Status |
 |:---:|---|---|:---:|
-| **0** | **Project Definition** | Licensing (Dual MIT/Apache-2.0), `rust-toolchain.toml`, Governance, Architecture Decision Records (ADRs) | ✅ Completed |
+| **0** | **Project Definition** | Licensing (Apache-2.0), `rust-toolchain.toml`, Governance, Architecture Decision Records (ADRs) | ✅ Completed |
 | **1** | **Technical Foundation** | Cargo workspace, Tokio + Axum HTTP engine, SeaORM multi-database layer (SQLite + PostgreSQL), configuration loader, structured `tracing` | ✅ Completed |
 | **2** | **Platform Foundation** | Multi-tenant isolation (`TenantId`), Argon2id hashing, Bearer JWT, Machine API keys (`X-API-Key`), Audit logging, OpenAPI/Swagger UI | ✅ Completed |
 | **3** | **Reusable Business Engines** | Catalog & dynamic metadata validation, live double-entry inventory stock ledger, order state machine, printable receipts, WebSocket event hub | ✅ Completed |
@@ -26,7 +26,7 @@ This document details the milestone ordering, acceptance criteria, and delivered
 ## 📋 Phase-by-Phase Acceptance Criteria
 
 ### Phase 0: Project Definition
-- [x] Dual licensing under MIT and Apache-2.0.
+- [x] Licensed under Apache License 2.0.
 - [x] Pinned Rust toolchain (`rust-toolchain.toml`) with Rust 1.80+ compatibility.
 - [x] Code of Conduct ([CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)) and Contributor Guidelines ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 - [x] Foundational Architecture Decision Records (`docs/adr/`).
