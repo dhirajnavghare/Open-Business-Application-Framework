@@ -12,7 +12,8 @@ The Open Business Application Framework (OBAF) is designed as a reusable foundat
    - `crates/obaf-database`: Unified connection pooling (`TenantPoolRouter`), SeaORM entities, migration execution.
    - `crates/obaf-api`: Axum 0.7 REST API, OpenAPI docs (Utoipa), WebSocket event bus, background HMAC webhook workers.
    - `binaries/obaf-server`: Standalone daemon with hierarchical configuration.
-   - `binaries/obaf-cli`: Operational tooling (`doctor`, `presets`, `token`, `backup`, `restore`, `new-preset`).
+   - `binaries/obaf-cli`: Operational tooling (`doctor`, `presets`, `token`, `backup`, `restore`, `new-preset`, `worker`).
+   - `binaries/obaf-worker`: Dedicated background worker daemon for periodic maintenance and scheduled jobs.
 2. **Database Portability**:
    - Zero-configuration local SQLite for edge and development deployments.
    - Clustered PostgreSQL 16+ for enterprise SaaS multi-tenant deployments.

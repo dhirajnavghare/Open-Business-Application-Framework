@@ -24,7 +24,7 @@ Every pull request and commit must pass:
 1. `cargo fmt --all --check`
 2. `cargo check --workspace --all-targets`
 3. `cargo clippy --workspace --all-targets -- -D warnings`
-4. `cargo test --workspace` (all 14+ unit/integration tests)
+4. `cargo test --workspace` (all 24 unit and integration test suites)
 5. Docker multi-stage build check (`Dockerfile`)
 
 ---
@@ -36,4 +36,6 @@ Every pull request and commit must pass:
 - **`tests/test_services_gym_bookings.py`**: Gym subscriptions, check-in attendance, session reservations, EOD settlement summaries.
 - **`tests/test_webhooks_and_invoices.py`**: Real-time webhook dispatch, HMAC signatures, HTML printable invoice rendering.
 - **`tests/test_retail_and_hotel.py`**: Barcode FMCG retail POS checkout, hotel suite reservations, guest check-in/out lifecycles.
+- **`tests/test_procurement_and_promotions_e2e.py`**: Purchase order procurement, inward stock receipts, coupon validations/redemptions, multi-currency conversions.
+- **`tests/test_python_sdk.py`**: Official Python Client SDK initialization and endpoint method coverage.
 - **`tests/benchmark_concurrency.py`**: Multi-worker concurrent load verification.

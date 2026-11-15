@@ -19,6 +19,9 @@ Standard domain event types:
 - `order.created`, `order.status_updated`, `order.completed`, `order.cancelled`
 - `payment.recorded`, `payment.refunded`
 - `stock.low`, `stock.movement_recorded`
+- `purchase_order.created`, `purchase_order.received`
+- `pos.shift_opened`, `pos.shift_closed`
+- `coupon.redeemed`
 - `booking.created`, `booking.checked_in`, `booking.completed`
 - `subscription.renewed`, `subscription.checked_in`
 
@@ -39,3 +42,11 @@ Background workers dispatch HTTP webhooks asynchronously to external automation 
   - `X-Obaf-Signature-256`: Hex-encoded HMAC-SHA256 signature calculated over the JSON payload using the webhook secret.
   - `X-Obaf-Event`: The event type string.
 - Automatic retries with exponential backoff on HTTP 5xx or connection timeouts.
+
+---
+
+## 4. Standalone Worker Daemon (`obaf-worker`)
+
+The standalone background daemon (`binaries/obaf-worker`) runs independently of API servers:
+- Executes periodic tenant maintenance sweeps and scheduled tasks without blocking user-facing HTTP request threads.
+- Supports `--interval-secs` and `--once` execution modes with graceful `SIGINT`/`SIGTERM` signal draining.

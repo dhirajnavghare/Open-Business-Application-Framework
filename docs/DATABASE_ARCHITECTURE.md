@@ -38,3 +38,19 @@ Inventory balances are never modified via unchecked mutable updates. Instead, an
 The `audit_logs` table stores an append-only record of administrative actions, status transitions, and payments:
 - Columns: `id`, `tenant_id`, `actor_id`, `action`, `entity_type`, `entity_id`, `changes`, `ip_address`, `created_at`.
 - Queryable via `GET /api/v1/admin/audit-logs`.
+
+---
+
+## 5. Procurement & Inbound Supply Chain
+
+- `purchase_orders`: Lifecycle tracking (`DRAFT → SUBMITTED → PARTIALLY_RECEIVED → RECEIVED / CANCELLED`) with vendor linkages (`supplier_id`), expected delivery dates, subtotal, and tax totals.
+- `purchase_order_items`: Track `quantity_ordered` vs `quantity_received`. Receiving items triggers automatic positive `stock_movements` (`type = "PURCHASE"`).
+
+---
+
+## 6. Financial Reconciliation & POS Shifts
+
+- `pos_shifts`: Cashier register shift management with opening float, cash sales, refunds, expected cash, counted cash, and variance reconciliation.
+- `credit_notes`: Formal immutable credit notes for merchandise returns and billing corrections (`credit_note_number`, `amount`, `reason`, `order_id`, `customer_id`).
+- `coupons`: Promotional codes with percentage or flat discounts, subtotal thresholds, maximum discount caps, usage allowances, and expiration dates.
+- `currency_exchange_rates`: Dynamic conversion rates between ISO-4217 currencies supporting direct and reciprocal 128-bit decimal conversions.
