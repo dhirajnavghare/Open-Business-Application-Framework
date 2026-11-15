@@ -62,8 +62,16 @@ Welcome to the foundational release of **Open Business Application Framework (OB
   - **Graceful Lifecycle**: Zero-downtime rolling deploys via `tokio::signal` graceful connection draining on `SIGINT` and `SIGTERM`.
 - **Background Worker & Distributed Architecture:**
   - `binaries/obaf-worker`: Standalone daemon for background reconciliation sweeps and scheduled jobs.
+- **Enterprise Commerce & Global Supply Chain:**
+  - **Procurement & PO Lifecycle:** Formal purchase orders (`purchase_order`, `purchase_order_item`), automatic inward stock movements (`type = "PURCHASE"`), and cancellation protection.
+  - **Promotions & Coupons:** Persistent promotional coupons (`coupon`) with percentage/fixed discounts, order thresholds, max discount caps, usage allowances, and atomic redemption.
+  - **Multi-Currency Precision Exchange:** Configurable exchange rates (`currency_exchange_rate`) supporting direct and reciprocal 128-bit decimal currency conversions (`/api/v1/billing/exchange-rates`, `/api/v1/billing/convert-currency`).
+  - **POS Cash Drawer Shifts:** Cashier shift management (`pos_shift`) with opening float, cash sales, refunds, expected cash, and counted cash variance reconciliation.
+  - **Immutable Credit Notes:** Formal financial credit note issuance (`credit_note`) for returned merchandise and billing adjustments.
+  - **Multi-Location Warehouses:** Multi-location stockrooms, warehouses, and fulfillment centers (`stock_location`).
 - **Official Client SDKs:**
-  - `sdk/python`: Zero-dependency, typed Python SDK (`obaf-sdk`).
+  - `sdk/python`: Zero-dependency, typed Python SDK (`obaf-sdk`) using standard library `urllib`.
+  - `sdk/typescript`: Zero-dependency, typed TypeScript SDK (`@obaf/sdk`) using standard `fetch` with full type declarations.
 - **Omni-Channel Capabilities & CLI Tooling:**
   - `/api/v1/search`: Unified multi-entity search endpoint.
   - `/api/v1/inventory/balance/:product_id`: Real-time stock balance calculation.

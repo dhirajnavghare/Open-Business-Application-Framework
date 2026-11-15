@@ -54,7 +54,14 @@ OBAF follows strict inward-pointing dependencies to ensure compile-time boundary
    - Hierarchical configuration loader (`config/default.toml`, environment variables, `DATABASE_URL`).
 
 5. **`binaries/obaf-cli`**:
-   - Operational CLI tool (`obaf doctor`, `obaf presets`, `obaf token`, `obaf backup`, `obaf restore`, `obaf new-preset`).
+   - Operational CLI tool (`obaf doctor`, `obaf presets`, `obaf token`, `obaf backup`, `obaf restore`, `obaf new-preset`, `obaf worker`).
+
+6. **`binaries/obaf-worker`**:
+   - Dedicated background worker daemon for periodic tenant maintenance sweeps and asynchronous queue processing.
+
+7. **Client SDKs**:
+   - `sdk/python`: Zero-dependency Python SDK (`obaf-sdk`).
+   - `sdk/typescript`: Zero-dependency TypeScript SDK (`@obaf/sdk`).
 
 ---
 

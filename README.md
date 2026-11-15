@@ -164,12 +164,18 @@ npx @hey-api/openapi-ts -i http://localhost:8080/api/v1/openapi.json -o ./client
 | **Customers & Parties** | `/api/v1/customers` | Patient/member/client profiles, GSTIN/tax IDs, addresses |
 | **Catalog & Products** | `/api/v1/catalog` | Dynamic custom metadata, exact decimal pricing, categories |
 | **Inventory & Batches** | `/api/v1/inventory` | Double-entry stock ledger, live balance calculation, FEFO expiry tracking |
+| **Warehouses & Locations**| `/api/v1/inventory/locations` | Multi-location stockrooms, fulfillment centers, and warehouse codes |
 | **Suppliers & Vendors** | `/api/v1/suppliers` | Vendor directory, procurement contact persons, tax IDs |
+| **Procurement & POs** | `/api/v1/procurement` | Purchase order lifecycle (`DRAFT → SUBMITTED → RECEIVED`), auto-inward stock movements |
 | **Orders & Workflows** | `/api/v1/orders` | Multi-item state machine with `Idempotency-Key` deduplication |
 | **Payments & Settlements**| `/api/v1/payments` | Cash/Card/UPI transactions, refunds, idempotency, EOD settlement |
+| **POS Cash Drawer** | `/api/v1/pos/shifts` | Cashier drawer shifts, opening floats, cash sales, refunds, expected cash & variance |
 | **Bookings & Slots** | `/api/v1/bookings` | Table/room reservations, appointments, hall scheduling, check-in |
 | **Subscriptions** | `/api/v1/subscriptions`| Recurring plans, pause/resume/cancel, attendance check-in |
+| **Promotions & Coupons**| `/api/v1/promotions` | Promo codes, percentage/fixed discounts, order thresholds, max caps & atomic redemption |
 | **Billing & Rules** | `/api/v1/billing` | GST & VAT, split bills, thermal receipts, HTML invoices, dynamic pricing rules |
+| **Credit Notes** | `/api/v1/billing/credit-notes`| Immutable financial credit notes for returned merchandise and invoice corrections |
+| **Multi-Currency** | `/api/v1/billing/exchange-rates`| Precision 128-bit decimal currency conversion across direct and reciprocal pairings |
 | **Omni-Channel Search**| `/api/v1/search` | Fast unified search across products, orders, customers, and bookings |
 | **Edge Offline Sync** | `/api/v1/sync` | Offline POS batch synchronization with monotonic versioning |
 | **Webhooks Engine** | `/api/v1/webhooks` | Automated HTTP dispatch with HMAC-SHA256 signatures (`X-OBAF-Signature`) |
@@ -219,7 +225,8 @@ Open-Business-Application-Framework/
 │   ├── obaf-cli/              # CLI tooling (`doctor`, `presets`, `seed`, `export`, `backup`)
 │   └── obaf-worker/           # Dedicated background worker and scheduler daemon
 ├── sdk/
-│   └── python/                # Official zero-dependency Python Client SDK (`obaf-sdk`)
+│   ├── python/                # Official zero-dependency Python Client SDK (`obaf-sdk`)
+│   └── typescript/            # Official zero-dependency TypeScript Client SDK (`@obaf/sdk`)
 ├── examples/
 │   └── community_extension/   # Reference module implementation (`ObafExtension`)
 ├── tests/                     # Multi-domain end-to-end Python test suites & benchmarks
@@ -241,7 +248,8 @@ Open-Business-Application-Framework/
 - [x] **Phase 6: Extension Readiness** (`ObafExtension` trait, `ExtensionRegistry`, `LoyaltyRewardsExtension`, CLI scaffolding)
 - [x] **Phase 7: Production Hardening** (Prometheus `/metrics`, security headers, 2,460+ req/s benchmarks, DB backup/restore)
 - [x] **Phase 8: Domain Expansion** (Retail grocery, hotel reservation folio, manufacturing job cards, fleet dispatch)
-- [x] **Phase 9: Advanced Platform Capabilities** (Offline edge sync, dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon, official Python SDK)
+- [x] **Phase 9: Advanced Platform Capabilities** (Offline edge sync, dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon)
+- [x] **Phase 10: Enterprise Commerce & Global Supply Chain** (Purchase orders & procurement lifecycle, promotions & coupons, multi-currency exchange, POS cash drawer shifts, credit notes, official Python & TypeScript SDKs)
 
 ---
 
