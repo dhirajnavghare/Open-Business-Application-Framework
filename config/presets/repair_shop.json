@@ -1,0 +1,37 @@
+{
+  "preset_id": "repair_shop",
+  "name": "Repair Shop & Service Center Ticket System",
+  "version": "1.0.0",
+  "description": "Log electronic or vehicle repair jobs, track spare parts used, technician assignment, and final invoices",
+  "active_modules": [
+    "catalog",
+    "inventory",
+    "orders",
+    "customers",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18% (Labor & Services)", "rate": 0.18 },
+    { "name": "GST 28% (Automotive Parts)", "rate": 0.28 }
+  ],
+  "workflow_states": [
+    "job_created",
+    "diagnosing",
+    "estimate_approved",
+    "waiting_for_parts",
+    "repairing",
+    "quality_check",
+    "ready_for_delivery",
+    "delivered"
+  ],
+  "custom_field_schemas": {
+    "order": {
+      "device_or_vehicle": "string",
+      "model_number": "string",
+      "serial_or_vin": "string",
+      "reported_fault": "string",
+      "assigned_technician": "string"
+    }
+  }
+}

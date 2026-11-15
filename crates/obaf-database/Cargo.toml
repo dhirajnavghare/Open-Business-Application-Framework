@@ -1,0 +1,17 @@
+[package]
+name = "obaf-database"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+obaf-core.workspace = true
+sea-orm.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+rust_decimal.workspace = true

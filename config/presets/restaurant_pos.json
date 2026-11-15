@@ -1,0 +1,26 @@
+{
+  "preset_id": "restaurant_pos",
+  "name": "Restaurant & Bar Point of Sale",
+  "version": "1.0.0",
+  "description": "Real-time table orders, kitchen display/order tickets (KOT), split billing, and daily sales settlements",
+  "active_modules": [
+    "catalog",
+    "orders",
+    "kot",
+    "tables",
+    "billing",
+    "inventory"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 5%", "rate": 0.05 },
+    { "name": "GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "ordered",
+    "sent_to_kitchen",
+    "cooking",
+    "served",
+    "billed",
+    "settled"
+  ]
+}

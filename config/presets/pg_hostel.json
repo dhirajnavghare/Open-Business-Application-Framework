@@ -1,0 +1,33 @@
+{
+  "preset_id": "pg_hostel",
+  "name": "PG & Hostel Rent & Utility Splitter",
+  "version": "1.0.0",
+  "description": "Room allocations, monthly electricity meter readings, split shared bills, and tenant rent receipts",
+  "active_modules": [
+    "customers",
+    "subscriptions",
+    "bookings",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "Exempt (Residential Rent)", "rate": 0.00 }
+  ],
+  "workflow_states": [
+    "allotted",
+    "bill_generated",
+    "paid",
+    "overdue",
+    "vacated"
+  ],
+  "custom_field_schemas": {
+    "subscription": {
+      "room_number": "string",
+      "bed_number": "string",
+      "meter_reading_previous": "number",
+      "meter_reading_current": "number",
+      "electricity_unit_rate": "number",
+      "security_deposit_held": "number"
+    }
+  }
+}

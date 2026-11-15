@@ -1,0 +1,176 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
+use chrono::{DateTime, Utc};
+use obaf_database::entities::customer;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::auth::extractor::{AuthErrorResponse, AuthUser};
+use crate::state::SharedState;
+
+#[derive(Deserialize, ToSchema)]
+pub struct CreateCustomerRequest {
+    pub name: String,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub tax_id: Option<String>,
+    pub address: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CustomerResponse {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub name: String,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub tax_id: Option<String>,
+    pub address: Option<String>,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<customer::Model> for CustomerResponse {
+    fn from(m: customer::Model) -> Self {
+        let meta = serde_json::from_str(&m.metadata).unwrap_or(serde_json::json!({}));
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            name: m.name,
+            phone: m.phone,
+            email: m.email,
+            tax_id: m.tax_id,
+            address: m.address,
+            metadata: meta,
+            created_at: m.created_at,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/customers",
+    tag = "Customers",
+    security(("bearer_auth" = [])),
+    request_body = CreateCustomerRequest,
+    responses(
+        (status = 201, description = "Customer created successfully", body = CustomerResponse),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn create_customer(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Json(payload): Json<CreateCustomerRequest>,
+) -> Result<(StatusCode, Json<CustomerResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    let customer_id = Uuid::new_v4();
+    let now = Utc::now();
+    let meta_str = payload
+        .metadata
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "{}".to_string());
+
+    let new_customer = customer::ActiveModel {
+        id: Set(customer_id),
+        tenant_id: Set(auth.tenant_id.as_uuid()),
+        name: Set(payload.name),
+        phone: Set(payload.phone),
+        email: Set(payload.email),
+        tax_id: Set(payload.tax_id),
+        address: Set(payload.address),
+        metadata: Set(meta_str),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    let inserted = new_customer.insert(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to create customer: {}", e),
+            }),
+        )
+    })?;
+
+    Ok((StatusCode::CREATED, Json(inserted.into())))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/customers",
+    tag = "Customers",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of customers", body = Vec<CustomerResponse>),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn list_customers(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<CustomerResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
+    let customers = customer::Entity::find()
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    let resp = customers.into_iter().map(Into::into).collect();
+    Ok(Json(resp))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/customers/{id}",
+    tag = "Customers",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Customer ID")
+    ),
+    responses(
+        (status = 200, description = "Customer details", body = CustomerResponse),
+        (status = 404, description = "Customer not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_customer(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<CustomerResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let c = customer::Entity::find()
+        .filter(customer::Column::Id.eq(id))
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Customer not found".to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(c.into()))
+}

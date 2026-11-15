@@ -1,0 +1,26 @@
+{
+  "preset_id": "pharmacy",
+  "name": "Pharmacy & Medical Store Inventory",
+  "version": "1.0.0",
+  "description": "Medicine batch tracking, expiry date management, FEFO stock deduction, and GST-compliant invoicing",
+  "active_modules": [
+    "catalog",
+    "inventory",
+    "batches",
+    "expiry_alerts",
+    "billing",
+    "prescriptions"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 0% (Life saving)", "rate": 0.00 },
+    { "name": "GST 12% (Medicines)", "rate": 0.12 },
+    { "name": "GST 18% (Supplements)", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "prescribed",
+    "batched",
+    "billed",
+    "dispensed",
+    "cancelled"
+  ]
+}

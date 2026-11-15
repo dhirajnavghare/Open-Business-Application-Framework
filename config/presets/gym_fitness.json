@@ -1,0 +1,32 @@
+{
+  "preset_id": "gym_fitness",
+  "name": "Gym & Fitness Club Membership Tracker",
+  "version": "1.0.0",
+  "description": "Member subscriptions, daily attendance check-ins, automated renewal reminders, and receipt generation",
+  "active_modules": [
+    "customers",
+    "subscriptions",
+    "bookings",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18% (Fitness Services)", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "active",
+    "renewal_due",
+    "grace_period",
+    "paused",
+    "expired",
+    "cancelled"
+  ],
+  "custom_field_schemas": {
+    "customer": {
+      "emergency_contact": "string",
+      "fitness_goal": "string",
+      "medical_history": "string",
+      "locker_number": "string"
+    }
+  }
+}

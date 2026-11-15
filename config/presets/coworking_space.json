@@ -1,0 +1,24 @@
+{
+  "preset_id": "coworking_space",
+  "name": "Co-Working & Shared Office Space",
+  "version": "1.0.0",
+  "description": "Hot desk & private cabin allocation, conference room hourly booking credits, and monthly recurring memberships",
+  "active_modules": [
+    "customers",
+    "subscriptions",
+    "bookings",
+    "catalog",
+    "billing",
+    "payments"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "active",
+    "renewal_due",
+    "grace_period",
+    "suspended",
+    "terminated"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "preset_id": "field_service",
+  "name": "Field Service & Maintenance Management",
+  "version": "1.0.0",
+  "description": "HVAC, plumbing and appliance service dispatch, technician assignment, spare parts used, and on-site billing",
+  "active_modules": [
+    "customers",
+    "orders",
+    "catalog",
+    "inventory",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "ticket_created",
+    "technician_assigned",
+    "en_route",
+    "diagnosing",
+    "in_progress",
+    "parts_replaced",
+    "customer_verified",
+    "completed"
+  ]
+}

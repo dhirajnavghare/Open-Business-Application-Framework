@@ -1,0 +1,33 @@
+{
+  "preset_id": "cloud_kitchen_tiffin",
+  "name": "Cloud Kitchen & Tiffin Subscription Manager",
+  "version": "1.0.0",
+  "description": "Daily meal plans, pause/resume deliveries for subscribers, monthly bills, and kitchen prep sheets",
+  "active_modules": [
+    "catalog",
+    "subscriptions",
+    "customers",
+    "orders",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 5% (Food & Catering)", "rate": 0.05 }
+  ],
+  "workflow_states": [
+    "active",
+    "paused_by_user",
+    "meal_packed",
+    "out_for_delivery",
+    "delivered",
+    "expired"
+  ],
+  "custom_field_schemas": {
+    "subscription": {
+      "dietary_preference": "string",
+      "meal_slot": "string",
+      "pause_start_date": "string",
+      "pause_end_date": "string",
+      "spice_preference": "string"
+    }
+  }
+}

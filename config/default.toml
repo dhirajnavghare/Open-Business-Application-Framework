@@ -1,0 +1,13 @@
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+# Zero-configuration SQLite for instant local execution.
+# For production PostgreSQL, set:
+# DATABASE_URL=postgres://user:password@localhost:5432/obaf_db
+url = "sqlite://data/obaf.db?mode=rwc"
+
+[security]
+jwt_secret = "dev_secret_please_change_in_production_987654321"
+token_expiry_hours = 24

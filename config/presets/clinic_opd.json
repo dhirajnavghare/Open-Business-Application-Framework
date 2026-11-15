@@ -1,0 +1,26 @@
+{
+  "preset_id": "clinic_opd",
+  "name": "Outpatient Clinic & Doctor Practice",
+  "version": "1.0.0",
+  "description": "Doctor appointments, patient queue tokens, vitals recording, digital prescription notes, and procedure billing",
+  "active_modules": [
+    "customers",
+    "bookings",
+    "catalog",
+    "orders",
+    "billing",
+    "prescriptions"
+  ],
+  "default_tax_slabs": [
+    { "name": "Exempt / Zero Tax", "rate": 0.00 },
+    { "name": "GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "booked",
+    "checked_in",
+    "in_consultation",
+    "prescription_issued",
+    "billed",
+    "completed"
+  ]
+}

@@ -1,0 +1,69 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/obaf-core",
+    "crates/obaf-database",
+    "crates/obaf-api",
+    "binaries/obaf-server",
+    "binaries/obaf-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Open Business Application Framework Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dhirajnavghare/Open-Business-Application-Framework"
+
+[workspace.dependencies]
+# Internal workspace crates
+obaf-core = { path = "crates/obaf-core" }
+obaf-database = { path = "crates/obaf-database" }
+obaf-api = { path = "crates/obaf-api" }
+
+# Async & Web
+tokio = { version = "1.41", features = ["full"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+axum = { version = "0.7", features = ["macros", "ws"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Database & ORM
+sea-orm = { version = "1.1", features = [
+    "sqlx-sqlite",
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-uuid",
+    "with-chrono",
+    "with-rust_decimal",
+    "with-json",
+] }
+
+# OpenAPI & Swagger
+utoipa = { version = "5.2", features = ["axum_extras", "chrono", "uuid", "decimal"] }
+utoipa-swagger-ui = { version = "8.1", features = ["axum", "vendored"] }
+utoipa-scalar = { version = "0.3", features = ["axum"] }
+
+# Serialization & Primitives
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonschema = { version = "0.61", default-features = false }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.36", features = ["serde-with-float"] }
+
+# Errors & Logging
+thiserror = "2.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration & Security
+config = "0.14"
+argon2 = "0.5"
+jsonwebtoken = "9.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"

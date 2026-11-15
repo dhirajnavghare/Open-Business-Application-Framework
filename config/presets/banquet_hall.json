@@ -1,0 +1,34 @@
+{
+  "preset_id": "banquet_hall",
+  "name": "Event & Banquet Hall Booking Manager",
+  "version": "1.0.0",
+  "description": "Venue availability on calendar, catering packages, advance deposits, and settlement invoices",
+  "active_modules": [
+    "bookings",
+    "catalog",
+    "customers",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18% (Venue & Event Services)", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "inquiry",
+    "slot_blocked",
+    "advance_received",
+    "event_in_progress",
+    "billed",
+    "settled",
+    "cancelled"
+  ],
+  "custom_field_schemas": {
+    "booking": {
+      "hall_name": "string",
+      "event_type": "string",
+      "guest_count": "number",
+      "catering_package": "string",
+      "decor_requirements": "string"
+    }
+  }
+}

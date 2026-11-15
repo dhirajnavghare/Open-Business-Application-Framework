@@ -1,0 +1,29 @@
+{
+  "preset_id": "table_waitlist",
+  "name": "Table Reservation & Waitlist Queue System",
+  "version": "1.0.0",
+  "description": "Walk-in queues, table assignments, and guest SMS notifications when table is ready",
+  "active_modules": [
+    "bookings",
+    "customers",
+    "orders"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 5% (Restaurant)", "rate": 0.05 }
+  ],
+  "workflow_states": [
+    "waiting_in_queue",
+    "table_ready_notified",
+    "seated",
+    "cancelled",
+    "no_show"
+  ],
+  "custom_field_schemas": {
+    "booking": {
+      "party_size": "number",
+      "preferred_section": "string",
+      "queue_token_number": "string",
+      "notification_sent": "boolean"
+    }
+  }
+}

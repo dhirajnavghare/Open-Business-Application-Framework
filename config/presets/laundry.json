@@ -1,0 +1,32 @@
+{
+  "preset_id": "laundry",
+  "name": "Laundry & Dry-Cleaning Order Tracker",
+  "version": "1.0.0",
+  "description": "Tag number garment tracking, wash/iron/ready statuses, automated pickup alerts, and thermal receipts",
+  "active_modules": [
+    "catalog",
+    "orders",
+    "customers",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18% (Laundry Services)", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "received",
+    "sorting",
+    "washing",
+    "ironing",
+    "ready_for_pickup",
+    "delivered"
+  ],
+  "custom_field_schemas": {
+    "order": {
+      "tag_number": "string",
+      "garment_count": "number",
+      "express_delivery": "boolean",
+      "hanger_or_fold": "string"
+    }
+  }
+}

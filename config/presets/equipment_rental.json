@@ -1,0 +1,24 @@
+{
+  "preset_id": "equipment_rental",
+  "name": "Equipment, Tool & Vehicle Rental",
+  "version": "1.0.0",
+  "description": "Daily/weekly asset lease contracts, security deposit hold & release, maintenance check, and return inspection",
+  "active_modules": [
+    "customers",
+    "catalog",
+    "bookings",
+    "orders",
+    "payments",
+    "billing"
+  ],
+  "default_tax_slabs": [
+    { "name": "GST 18%", "rate": 0.18 }
+  ],
+  "workflow_states": [
+    "reserved",
+    "dispatched",
+    "active_rental",
+    "returned_pending_inspection",
+    "settled"
+  ]
+}

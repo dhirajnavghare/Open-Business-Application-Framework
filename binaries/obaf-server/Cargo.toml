@@ -1,0 +1,17 @@
+[package]
+name = "obaf-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+obaf-core.workspace = true
+obaf-database.workspace = true
+obaf-api.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+config.workspace = true
+serde.workspace = true
+anyhow.workspace = true

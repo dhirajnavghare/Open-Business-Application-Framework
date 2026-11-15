@@ -1,0 +1,27 @@
+{
+  "preset_id": "visitor_pass",
+  "name": "Visitor & Gate Pass Management System",
+  "version": "1.0.0",
+  "description": "Reception portal for offices or housing societies to log visitors, issue printable passes, and track checkout",
+  "active_modules": [
+    "customers",
+    "bookings",
+    "billing"
+  ],
+  "default_tax_slabs": [],
+  "workflow_states": [
+    "checked_in",
+    "meeting_in_progress",
+    "checked_out",
+    "flagged_security"
+  ],
+  "custom_field_schemas": {
+    "booking": {
+      "host_employee_name": "string",
+      "purpose_of_visit": "string",
+      "vehicle_number": "string",
+      "badge_card_number": "string",
+      "belongings_carried": "string"
+    }
+  }
+}

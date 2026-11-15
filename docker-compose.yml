@@ -1,0 +1,56 @@
+services:
+  # Standalone OBAF Server with zero-dependency SQLite
+  obaf-sqlite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obaf-server
+    ports:
+      - "8080:8080"
+    environment:
+      - OBAF_SERVER__HOST=0.0.0.0
+      - OBAF_SERVER__PORT=8080
+      - DATABASE_URL=sqlite:///app/data/obaf.db?mode=rwc
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # High-Concurrency Profile: OBAF Server with PostgreSQL
+  obaf-postgres:
+    profiles: ["postgres"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obaf-server-pg
+    ports:
+      - "8080:8080"
+    environment:
+      - OBAF_SERVER__HOST=0.0.0.0
+      - OBAF_SERVER__PORT=8080
+      - DATABASE_URL=postgres://obaf:obaf_secret@postgres:5432/obaf_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:17-alpine
+    container_name: obaf-postgres
+    environment:
+      POSTGRES_DB: obaf_db
+      POSTGRES_USER: obaf
+      POSTGRES_PASSWORD: obaf_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U obaf -d obaf_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
