@@ -5,11 +5,15 @@ FROM rust:1.92-bookworm AS builder
 
 WORKDIR /app
 
-# Copy manifests
+# Copy manifests and source code
 COPY Cargo.toml Cargo.lock* ./
 COPY crates ./crates
 COPY binaries ./binaries
 COPY examples ./examples
+COPY config ./config
+
+# Execute automated tests during container build to guarantee zero-defect images
+RUN cargo test --release --workspace
 
 # Build release binaries
 RUN cargo build --release -p obaf-server -p obaf-cli -p obaf-worker

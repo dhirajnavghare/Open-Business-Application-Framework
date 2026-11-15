@@ -58,6 +58,7 @@ A comprehensive [`Makefile`](file:///Users/dhirajnavghare/Developer/Open-Busines
 | Command | Action |
 |---|---|
 | `make setup` | Initialize `.env`, create `data/`, and verify dependencies |
+| `make build` | Run all checks and tests, then build release binaries |
 | `make dev` / `make run` | Run `obaf-server` in development mode |
 | `make worker` | Run the background worker daemon (`obaf-worker`) |
 | `make doctor` | Run `obaf doctor` to verify DB, schema, and preset integrity |
@@ -69,6 +70,7 @@ A comprehensive [`Makefile`](file:///Users/dhirajnavghare/Developer/Open-Busines
 | `make test-all` | Run all unit tests, SDK checks, and end-to-end suites |
 | `make sdk-ts` | Compile and type-check the TypeScript Client SDK |
 | `make sdk-py` | Verify and test the Python Client SDK |
+| `make install-hooks` | Install Git pre-commit automated test hook |
 | `make docker-up` | Start the standalone SQLite Docker Compose profile |
 | `make docker-pg` | Start the clustered PostgreSQL + Worker Docker Compose profile |
 | `make docker-down` | Stop and tear down all running Docker Compose containers |
@@ -161,3 +163,26 @@ To get optimal developer ergonomics in VS Code, install the `rust-analyzer` exte
   ```bash
   PORT=9090 cargo run -p obaf-server
   ```
+
+---
+
+## 8. Build-Time Automated Tests & Quality Gates
+
+OBAF enforces automated quality testing across 4 distinct phases of the build and deployment lifecycle:
+
+1. **Cargo Compile-Time Verification (`build.rs`)**:
+   - Executes during every `cargo build`.
+   - Validates all 22 domain preset JSON schemas in `config/presets/` and validates `config/default.toml`.
+   - Any malformed preset or missing configuration aborts compilation immediately.
+
+2. **Docker Multi-Stage Build Verification (`Dockerfile`)**:
+   - Executes `cargo test --release --workspace` inside the builder container stage before compilation.
+   - Prevents flawed or broken container images from ever being produced or published.
+
+3. **Pre-Build Verification Target (`make build`)**:
+   - Invokes `make check` (formatting + clippy) and `make test` (all 25 workspace test suites) prior to building release binaries.
+
+4. **Git Pre-Commit Hook (`.githooks/pre-commit`)**:
+   - Automatically runs `cargo fmt --check`, `cargo clippy`, and `cargo test` prior to allowing git commits.
+   - Install with: `make install-hooks` (or `git config core.hooksPath .githooks`).
+

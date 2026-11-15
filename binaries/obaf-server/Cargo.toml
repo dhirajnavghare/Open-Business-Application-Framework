@@ -15,3 +15,6 @@ tracing-subscriber.workspace = true
 config.workspace = true
 serde.workspace = true
 anyhow.workspace = true
+
+[build-dependencies]
+serde_json.workspace = true

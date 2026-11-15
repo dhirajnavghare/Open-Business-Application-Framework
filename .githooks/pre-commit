@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# OBAF Pre-Commit Hook: Automated Quality, Linter & Test Verification
+# ==============================================================================
+set -e
+
+echo "🔍 Running automated pre-commit verification..."
+
+# 1. Format check
+echo "• Verifying code formatting (cargo fmt)..."
+cargo fmt --all --check
+
+# 2. Clippy lint check
+echo "• Running static analysis (cargo clippy)..."
+cargo clippy --workspace --all-targets -- -D warnings
+
+# 3. Unit and integration tests
+echo "• Executing test suite (cargo test)..."
+cargo test --workspace --quiet
+
+echo "✅ All automated checks passed. Proceeding with commit."

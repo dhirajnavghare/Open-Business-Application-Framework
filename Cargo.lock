@@ -1921,6 +1921,7 @@ dependencies = [
  "obaf-core",
  "obaf-database",
  "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

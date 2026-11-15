@@ -1,4 +1,4 @@
-.PHONY: help setup dev run worker doctor presets check fmt test test-e2e test-all sdk-ts sdk-py docker-up docker-pg docker-down clean
+.PHONY: help setup dev run worker doctor presets check fmt test test-e2e test-all sdk-ts sdk-py docker-up docker-pg docker-down clean build install-hooks
 
 # Default shell
 SHELL := /bin/bash
@@ -9,6 +9,7 @@ help:
 	@echo "  Open Business Application Framework (OBAF) - Developer Commands"
 	@echo "======================================================================="
 	@echo "  make setup         - Initialize .env, create data/ dir, and check tools"
+	@echo "  make build         - Run all checks and tests, then build release binaries"
 	@echo "  make dev           - Run obaf-server in local development mode"
 	@echo "  make worker        - Run background worker daemon"
 	@echo "  make doctor        - Verify database, migrations, and presets"
@@ -20,6 +21,7 @@ help:
 	@echo "  make test-all      - Run unit tests, SDK checks, and e2e tests"
 	@echo "  make sdk-ts        - Build and type-check TypeScript client SDK"
 	@echo "  make sdk-py        - Test and verify Python client SDK"
+	@echo "  make install-hooks - Install Git pre-commit automated test hook"
 	@echo "  make docker-up     - Start standalone SQLite container stack"
 	@echo "  make docker-pg     - Start clustered PostgreSQL + Worker stack"
 	@echo "  make docker-down   - Stop and tear down all Docker containers"
@@ -35,6 +37,16 @@ setup:
 	fi
 	@cargo --version > /dev/null 2>&1 || (echo "❌ Cargo not found. Please install Rust from https://rustup.rs" && exit 1)
 	@echo "✅ Setup complete. Run 'make doctor' or 'make dev' to begin."
+
+build: check test
+	@echo "📦 Building production release binaries after full test verification..."
+	cargo build --release --workspace
+
+install-hooks:
+	@echo "🔧 Installing Git pre-commit verification hook..."
+	@git config core.hooksPath .githooks
+	@chmod +x .githooks/pre-commit
+	@echo "✅ Pre-commit hook installed. Automated tests will run on every git commit."
 
 dev:
 	cargo run -p obaf-server
