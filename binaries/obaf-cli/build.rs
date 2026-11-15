@@ -72,18 +72,38 @@ fn main() {
                 );
             }
 
-            // Semantic validation: workflow_states must be a non-empty list of strings
+            // Semantic validation: workflow_states must contain at least 2 states
             let states = json["workflow_states"].as_array().unwrap_or_else(|| {
                 panic!(
                     "Build-time test failure: Preset file {} workflow_states must be an array",
                     path.display()
                 )
             });
-            if states.is_empty() {
+            if states.len() < 2 {
                 panic!(
-                    "Build-time test failure: Preset file {} workflow_states cannot be empty",
+                    "Build-time test failure: Preset file {} workflow_states must contain at least 2 states",
                     path.display()
                 );
+            }
+
+            // Semantic validation: tax_rates (if present) must have valid name and 0.0 <= rate <= 1.0
+            if let Some(tax_rates) = json.get("tax_rates").and_then(|t| t.as_array()) {
+                for tax in tax_rates {
+                    let name = tax.get("name").and_then(|n| n.as_str());
+                    let rate = tax.get("rate").and_then(|r| r.as_f64());
+                    if name.is_none() || name.unwrap().trim().is_empty() {
+                        panic!(
+                            "Build-time test failure: Preset file {} has tax_rate with invalid name",
+                            path.display()
+                        );
+                    }
+                    if rate.is_none() || rate.unwrap() < 0.0 || rate.unwrap() > 1.0 {
+                        panic!(
+                            "Build-time test failure: Preset file {} has tax_rate with invalid rate (must be 0.0 to 1.0)",
+                            path.display()
+                        );
+                    }
+                }
             }
 
             preset_count += 1;

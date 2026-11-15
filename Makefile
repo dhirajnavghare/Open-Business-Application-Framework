@@ -44,6 +44,7 @@ build: check test sdk-ts sdk-py
 	@echo "🧪 Running post-build release binary smoke tests..."
 	./target/release/obaf-cli doctor --database-url "sqlite:///tmp/build_smoke.db?mode=rwc"
 	./target/release/obaf-cli presets > /dev/null
+	./target/release/obaf-cli token --role admin > /dev/null
 	./target/release/obaf-worker --database-url "sqlite:///tmp/build_smoke.db?mode=rwc" --once
 	@rm -f /tmp/build_smoke.db*
 	@echo "✅ Build completed and all automated build-time tests passed!"

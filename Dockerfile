@@ -21,6 +21,7 @@ RUN cargo build --release -p obaf-server -p obaf-cli -p obaf-worker
 # Run automated release binary smoke tests to verify runtime linking, migration integrity & presets
 RUN /app/target/release/obaf-cli doctor --database-url "sqlite:///tmp/build_smoke.db?mode=rwc" \
     && /app/target/release/obaf-cli presets \
+    && /app/target/release/obaf-cli token --role admin > /dev/null \
     && /app/target/release/obaf-worker --database-url "sqlite:///tmp/build_smoke.db?mode=rwc" --once \
     && rm -f /tmp/build_smoke.db*
 
