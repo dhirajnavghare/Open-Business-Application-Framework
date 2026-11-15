@@ -9,6 +9,16 @@ struct CacheEntry<V> {
 }
 
 /// Thread-safe in-memory Cache-Aside store with TTL expiration (System Design Primer pattern).
+///
+/// # Example
+/// ```
+/// use obaf_core::cache::TtlCache;
+/// use std::time::Duration;
+///
+/// let cache = TtlCache::new(Duration::from_secs(60), 100);
+/// cache.insert("user:1".to_string(), "Alice".to_string());
+/// assert_eq!(cache.get(&"user:1".to_string()), Some("Alice".to_string()));
+/// ```
 #[derive(Clone)]
 pub struct TtlCache<K, V> {
     entries: Arc<RwLock<HashMap<K, CacheEntry<V>>>>,

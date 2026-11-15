@@ -17,6 +17,17 @@ struct BreakerInternal {
 
 /// Circuit Breaker Pattern (System Design Primer)
 /// Prevents cascading failures and resource exhaustion by failing fast when downstream services are unstable.
+///
+/// # Example
+/// ```
+/// use obaf_core::circuit_breaker::{CircuitBreaker, CircuitState};
+/// use std::time::Duration;
+///
+/// let breaker = CircuitBreaker::new(3, Duration::from_secs(5), 2);
+/// assert_eq!(breaker.state(), CircuitState::Closed);
+/// let res = breaker.call(|| Ok::<_, &'static str>(42));
+/// assert_eq!(res, Ok(42));
+/// ```
 #[derive(Clone)]
 pub struct CircuitBreaker {
     internal: Arc<RwLock<BreakerInternal>>,

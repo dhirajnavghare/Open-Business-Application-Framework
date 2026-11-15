@@ -15,6 +15,17 @@ pub enum RateLimitResult {
 
 /// High-performance thread-safe Token Bucket Rate Limiter
 /// Engineered following the System Design Primer pattern for traffic shaping and DoS mitigation.
+///
+/// # Example
+/// ```
+/// use obaf_core::rate_limiter::{TokenBucketRateLimiter, RateLimitResult};
+///
+/// let limiter = TokenBucketRateLimiter::new(10.0, 2.0);
+/// match limiter.check_and_consume("tenant_alpha", 1.0) {
+///     RateLimitResult::Allowed { remaining } => assert!(remaining >= 8.9),
+///     RateLimitResult::Rejected { .. } => panic!("Request should be allowed"),
+/// }
+/// ```
 #[derive(Clone)]
 pub struct TokenBucketRateLimiter {
     buckets: Arc<RwLock<HashMap<String, BucketState>>>,

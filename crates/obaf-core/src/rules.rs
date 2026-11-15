@@ -56,6 +56,23 @@ pub struct RuleEvaluationResult {
 }
 
 /// Evaluates a list of business rules against a subtotal and optional promo code.
+///
+/// # Example
+/// ```
+/// use obaf_core::rules::{evaluate_pricing_rules, PricingRule, RuleCondition, RuleAction};
+/// use rust_decimal::Decimal;
+///
+/// let rules = vec![
+///     PricingRule {
+///         id: "save10".into(),
+///         name: "10% off".into(),
+///         condition: RuleCondition::MinSubtotal(Decimal::from(50)),
+///         action: RuleAction::PercentageDiscount(Decimal::new(1, 1)), // 0.10
+///     }
+/// ];
+/// let result = evaluate_pricing_rules(&rules, Decimal::from(100), None);
+/// assert_eq!(result.adjusted_subtotal, Decimal::from(90));
+/// ```
 pub fn evaluate_pricing_rules(
     rules: &[PricingRule],
     subtotal: Decimal,

@@ -42,6 +42,15 @@ impl fmt::Display for Currency {
 }
 
 /// Precision-safe monetary value, preventing floating-point rounding errors.
+///
+/// # Example
+/// ```
+/// use obaf_core::money::Money;
+/// use rust_decimal::Decimal;
+///
+/// let price = Money::from_i64(100);
+/// assert_eq!(price.amount, Decimal::from(100));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Money {
     #[schema(value_type = String, example = "199.50")]
