@@ -187,6 +187,38 @@ docker compose --profile postgres --profile worker up -d
 docker compose logs -f
 ```
 
+### 4.3 OS-Independence & Multi-Architecture Support
+
+Deployment via Docker is **100% OS-independent**. Because OBAF's application binaries, runtime libraries (glibc/musl, OpenSSL, CA certificates), timezone databases, and configurations are encapsulated inside the OCI-compliant container image (`debian:bookworm-slim`), the host operating system is completely decoupled from the runtime execution:
+
+| Host Operating System | Container Engine | Runtime Layer | Supported Architectures |
+|---|---|---|---|
+| **Linux** (Ubuntu, Debian, RHEL, Rocky, Alpine, Arch, Amazon Linux) | Docker Engine / Podman / containerd | Native Linux Kernel cgroups & namespaces | `linux/amd64`, `linux/arm64` |
+| **macOS** (Apple Silicon M1/M2/M3/M4 & Intel Core) | Docker Desktop / OrbStack / Colima | Lightweight Virtualized Linux Hypervisor | `linux/arm64` (Native), `linux/amd64` (Rosetta 2) |
+| **Windows** (Windows 10 / 11 / Windows Server) | Docker Desktop / Rancher Desktop | WSL2 (Windows Subsystem for Linux 2) | `linux/amd64`, `linux/arm64` |
+| **Cloud Managed Containers** (AWS ECS/Fargate, GCP Cloud Run, Azure Container Apps, DigitalOcean) | Managed Container Runtime | Firecracker microVM / OCI Container Engine | `linux/amd64`, `linux/arm64` |
+
+#### Multi-Architecture Production Builds with Docker Buildx:
+To build and push multi-architecture images targeting both standard x86_64 servers (AWS EC2, GCP Compute Engine, Intel/AMD data centers) and ARM64 servers (AWS Graviton 3/4, Ampere Altra, Apple Silicon, Raspberry Pi edge devices):
+
+```bash
+# 1. Create and initialize a multi-platform buildx builder instance:
+docker buildx create --name obaf-builder --use
+docker buildx inspect --bootstrap
+
+# 2. Build and publish multi-arch images simultaneously:
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/your-org/obaf:latest \
+  -t ghcr.io/your-org/obaf:0.1.0 \
+  --push .
+```
+
+#### Cross-Platform Volume Mounting Considerations:
+* **Linux**: Local bind mounts (`./data:/app/data`) inherit the host system's file permissions. Named volumes (`obaf-data:/app/data`) are recommended for multi-tenant production to prevent UID/GID mismatches.
+* **macOS & Windows**: Docker Desktop automatically handles file path translation (`/` vs `\`) and UID translation between the host filesystem and the container's unprivileged `obaf` user (UID 999). No host changes are necessary.
+
+
 ---
 
 ## 5. Kubernetes (K8s) Production Orchestration
