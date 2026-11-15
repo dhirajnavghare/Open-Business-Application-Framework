@@ -11,8 +11,8 @@ COPY crates ./crates
 COPY binaries ./binaries
 COPY examples ./examples
 
-# Build release binary
-RUN cargo build --release -p obaf-server
+# Build release binaries
+RUN cargo build --release -p obaf-server -p obaf-cli -p obaf-worker
 
 # ========================================================
 # Stage 2: Minimal runtime image (~25MB)
@@ -26,8 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/target/release/obaf-server /app/obaf-server
+COPY --from=builder /app/target/release/obaf-cli /app/obaf-cli
+COPY --from=builder /app/target/release/obaf-worker /app/obaf-worker
 
 # Copy default config and presets
 COPY config /app/config

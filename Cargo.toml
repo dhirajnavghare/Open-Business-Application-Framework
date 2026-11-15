@@ -6,6 +6,7 @@ members = [
     "crates/obaf-api",
     "binaries/obaf-server",
     "binaries/obaf-cli",
+    "binaries/obaf-worker",
     "examples/community_extension",
 ]
 

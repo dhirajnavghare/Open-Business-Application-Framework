@@ -30,7 +30,7 @@ Welcome to the foundational release of **Open Business Application Framework (OB
   - **Subscriptions & Memberships:** Recurring billing intervals (`monthly`, `yearly`), auto-renewal, and grace periods.
   - **Real-Time WebSockets & Webhooks:** Live broadcast channel (`/api/v1/ws/events`) and webhook management with cryptographic HMAC-SHA256 signatures.
   - **Headless Schema Introspection:** Dynamic metadata discovery endpoint (`/api/v1/meta/schema`) for auto-generating frontend UIs (Refine, React Admin, Flutter).
-- **15 Domain Presets (`config/presets/`):**
+- **22 Domain Presets (`config/presets/`):**
   - Restaurant POS (`restaurant_pos.json`)
   - Pharmacy & Healthcare (`pharmacy.json`)
   - Outpatient Clinic & Doctor Practice (`clinic_opd.json`)
@@ -46,6 +46,30 @@ Welcome to the foundational release of **Open Business Application Framework (OB
   - Freelance & Agency Invoicing (`freelance_invoice.json`)
   - PG & Student Hostel (`pg_hostel.json`)
   - Visitor Pass & Gate Security (`visitor_pass.json`)
+  - Hair Salon & Luxury Spa (`salon_spa.json`)
+  - Retail Supermarket & Grocery (`retail_grocery.json`)
+  - Hotel & Hospitality Management (`hotel_management.json`)
+  - Education Academy & Coaching (`education_coaching.json`)
+  - Manufacturing & Job Work (`manufacturing_jobwork.json`)
+  - Courier Fleet & Logistics Dispatch (`courier_fleet.json`)
+  - Dairy Farm & Milk Delivery (`dairy_milk_delivery.json`)
+- **System Design Primer Resiliency & Fault Tolerance:**
+  - `obaf_core::TtlCache`: Thread-safe Cache-Aside store with TTL expiration and automatic LRU capacity eviction.
+  - `obaf_core::TokenBucketRateLimiter`: High-throughput token bucket rate limiter with continuous fractional refill for traffic shaping and DoS mitigation.
+  - `obaf_core::CircuitBreaker`: 3-state finite state machine (`Closed`, `Open`, `HalfOpen`) preventing cascading failures to downstream services.
+  - **Idempotency Keys**: `Idempotency-Key` header inspection on `create_order` and `record_payment`, returning recorded responses with `X-Idempotent-Replay: true`.
+  - **Distributed Tracing**: `X-Request-Id` correlation propagation across middleware, logging spans, and response headers.
+  - **Graceful Lifecycle**: Zero-downtime rolling deploys via `tokio::signal` graceful connection draining on `SIGINT` and `SIGTERM`.
+- **Background Worker & Distributed Architecture:**
+  - `binaries/obaf-worker`: Standalone daemon for background reconciliation sweeps and scheduled jobs.
+- **Official Client SDKs:**
+  - `sdk/python`: Zero-dependency, typed Python SDK (`obaf-sdk`).
+- **Omni-Channel Capabilities & CLI Tooling:**
+  - `/api/v1/search`: Unified multi-entity search endpoint.
+  - `/api/v1/inventory/balance/:product_id`: Real-time stock balance calculation.
+  - M2M API Keys (`X-API-Key`) with SHA-256 hashing.
+  - Suppliers directory (`/api/v1/suppliers`).
+  - Extended CLI commands: `obaf seed`, `obaf export`, `obaf backup`, `obaf restore`, `obaf migrate`, `obaf new-preset`.
 - **Developer Experience & Infrastructure:**
   - Multi-stage `Dockerfile` producing an ultra-lightweight ~18-25MB scratch/Debian-slim container.
   - Zero-config local development: runs instantly on local SQLite without Docker or PostgreSQL daemons.

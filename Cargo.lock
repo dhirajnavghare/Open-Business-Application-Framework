@@ -1927,6 +1927,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "obaf-worker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "obaf-api",
+ "obaf-core",
+ "obaf-database",
+ "sea-orm",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "object"
 version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -52,5 +52,20 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Background Worker & Scheduler Daemon
+  obaf-worker:
+    profiles: ["worker"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: obaf-worker
+    entrypoint: ["/app/obaf-worker"]
+    environment:
+      - DATABASE_URL=sqlite:///app/data/obaf.db?mode=rwc
+      - OBAF_WORKER_INTERVAL_SECS=30
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
 volumes:
   pgdata:

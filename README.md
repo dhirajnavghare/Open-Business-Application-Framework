@@ -92,11 +92,24 @@ OBAF includes a standalone CLI binary for instant setup, database health checks,
 # Verify environment, database connectivity, and migrations
 cargo run -p obaf-cli -- doctor
 
-# Inspect all 15 out-of-the-box business presets
+# Inspect all 22 out-of-the-box business domain presets
 cargo run -p obaf-cli -- presets
+
+# Scaffold a new custom domain preset
+cargo run -p obaf-cli -- new-preset dental_clinic
+
+# Seed an instant demo tenant with products, customers, and admin token
+cargo run -p obaf-cli -- seed restaurant_pos
+
+# Export tenant data to formatted JSON
+cargo run -p obaf-cli -- export products
 
 # Generate a signed admin JWT token for terminal/curl debugging
 cargo run -p obaf-cli -- token --role admin
+
+# Backup and restore database
+cargo run -p obaf-cli -- backup
+cargo run -p obaf-cli -- restore --source data/backup_20261115.db
 ```
 
 ---
@@ -150,14 +163,18 @@ npx @hey-api/openapi-ts -i http://localhost:8080/api/v1/openapi.json -o ./client
 | **Authentication & RBAC** | `/api/v1/auth` | Argon2id password hashing, JWT bearer tokens, role checks |
 | **Customers & Parties** | `/api/v1/customers` | Patient/member/client profiles, GSTIN/tax IDs, addresses |
 | **Catalog & Products** | `/api/v1/catalog` | Dynamic custom metadata, exact decimal pricing, categories |
-| **Inventory & Batches** | `/api/v1/inventory` | Double-entry stock ledger, batch numbers, FEFO expiry tracking |
-| **Orders & Workflows** | `/api/v1/orders` | Multi-item state machine (`CONFIRMED → COOKING → READY`) |
-| **Payments & Settlements**| `/api/v1/payments` | Cash/Card/UPI transactions, End-of-Day revenue reconciliation |
-| **Bookings & Slots** | `/api/v1/bookings` | Table/room reservations, appointments, hall scheduling |
-| **Subscriptions** | `/api/v1/subscriptions`| Gym/tiffin/coworking recurring plans, pause/resume/cancel |
-| **Billing & Taxes** | `/api/v1/billing` | GST (CGST/SGST/IGST) & VAT, split bills, thermal receipts, printable HTML invoices |
+| **Inventory & Batches** | `/api/v1/inventory` | Double-entry stock ledger, live balance calculation, FEFO expiry tracking |
+| **Suppliers & Vendors** | `/api/v1/suppliers` | Vendor directory, procurement contact persons, tax IDs |
+| **Orders & Workflows** | `/api/v1/orders` | Multi-item state machine with `Idempotency-Key` deduplication |
+| **Payments & Settlements**| `/api/v1/payments` | Cash/Card/UPI transactions, refunds, idempotency, EOD settlement |
+| **Bookings & Slots** | `/api/v1/bookings` | Table/room reservations, appointments, hall scheduling, check-in |
+| **Subscriptions** | `/api/v1/subscriptions`| Recurring plans, pause/resume/cancel, attendance check-in |
+| **Billing & Rules** | `/api/v1/billing` | GST & VAT, split bills, thermal receipts, HTML invoices, dynamic pricing rules |
+| **Omni-Channel Search**| `/api/v1/search` | Fast unified search across products, orders, customers, and bookings |
+| **Edge Offline Sync** | `/api/v1/sync` | Offline POS batch synchronization with monotonic versioning |
 | **Webhooks Engine** | `/api/v1/webhooks` | Automated HTTP dispatch with HMAC-SHA256 signatures (`X-OBAF-Signature`) |
 | **Real-time Event Hub** | `/api/v1/ws/events` | Axum WebSockets for live Kitchen Display (KDS) & cashier sync |
+| **SaaS Multi-Tenancy** | `/api/v1/admin/tenants`| Organization quota metering, tenant database routing (`TenantPoolRouter`) |
 
 ---
 
@@ -166,11 +183,11 @@ npx @hey-api/openapi-ts -i http://localhost:8080/api/v1/openapi.json -o ./client
 ```text
 Open-Business-Application-Framework/
 ├── Cargo.toml                 # Cargo workspace definition
-├── Dockerfile                 # Multi-stage distroless/alpine build (~18MB)
-├── docker-compose.yml         # SQLite and PostgreSQL profiles
+├── Dockerfile                 # Multi-stage release build (~25MB)
+├── docker-compose.yml         # SQLite, PostgreSQL, and Worker profiles
 ├── config/
 │   ├── default.toml           # Baseline config (host, port, DB URL)
-│   └── presets/               # 15 industry domain setup seed templates
+│   └── presets/               # 22 industry domain setup seed templates
 │       ├── restaurant_pos.json
 │       ├── pharmacy.json
 │       ├── clinic_opd.json
@@ -185,15 +202,28 @@ Open-Business-Application-Framework/
 │       ├── table_waitlist.json
 │       ├── freelance_invoice.json
 │       ├── pg_hostel.json
-│       └── visitor_pass.json
+│       ├── visitor_pass.json
+│       ├── salon_spa.json
+│       ├── retail_grocery.json
+│       ├── hotel_management.json
+│       ├── education_coaching.json
+│       ├── manufacturing_jobwork.json
+│       ├── courier_fleet.json
+│       └── dairy_milk_delivery.json
 ├── crates/
-│   ├── obaf-core/             # Platform types (TenantId, Money, Precision Decimal, Errors, Audit)
-│   ├── obaf-database/         # SeaORM multi-DB abstraction & automatic schema migrations
-│   └── obaf-api/              # Axum HTTP routes, Webhooks, Swagger UI, Admin introspection APIs
+│   ├── obaf-core/             # Platform types, TtlCache, TokenBucket, CircuitBreaker, Decimal Money
+│   ├── obaf-database/         # SeaORM multi-DB abstraction, migrations & TenantPoolRouter
+│   └── obaf-api/              # Axum HTTP routes, Webhooks, Idempotency, Swagger UI, Admin APIs
 ├── binaries/
-│   ├── obaf-server/           # Standalone server daemon
-│   └── obaf-cli/              # Developer companion CLI (`doctor`, `presets`, `token`)
-├── tests/                     # Multi-domain end-to-end Python test suites
+│   ├── obaf-server/           # Production API daemon with graceful SIGINT/SIGTERM shutdown
+│   ├── obaf-cli/              # CLI tooling (`doctor`, `presets`, `seed`, `export`, `backup`)
+│   └── obaf-worker/           # Dedicated background worker and scheduler daemon
+├── sdk/
+│   └── python/                # Official zero-dependency Python Client SDK (`obaf-sdk`)
+├── examples/
+│   └── community_extension/   # Reference module implementation (`ObafExtension`)
+├── tests/                     # Multi-domain end-to-end Python test suites & benchmarks
+├── docs/                      # Architectural specifications, ADRs & System Design Primer alignment
 ├── CONTRIBUTING.md            # Contributor guidelines, testing standards, and preset guidelines
 ├── SECURITY.md                # Vulnerability disclosure and multi-tenant security model
 └── CHANGELOG.md               # Version history and milestone documentation
@@ -201,13 +231,17 @@ Open-Business-Application-Framework/
 
 ---
 
-## 🗺️ Roadmap & Implemented Engines
+## 🗺️ Roadmap & Implemented Phases
+- [x] **Phase 0: Project Definition** (Dual MIT/Apache-2.0 licensing, pinned `rust-toolchain.toml`, ADRs)
 - [x] **Phase 1: Foundation** (Cargo Workspace, SeaORM Multi-DB, SQLite/Postgres pooling, Swagger UI, Preset bootstrap API)
 - [x] **Phase 2: Platform Kernel** (JWT Authentication, Argon2id, Role-Based Access Control, Tenant Isolation Middleware)
-- [x] **Phase 3: Core Business Engines** (Catalog & Dynamic Schemas, Inventory Stock Ledger, Order State Machine, Invoicing & GST/VAT Tax Engine)
-- [x] **Phase 4: Domain Validation** (Validated with live tests for all 11 business domain presets)
-- [x] **Phase 5: Real-Time Event Hub** (Axum WebSockets on `/api/v1/ws/events` for live KDS & cashier sync)
-- [x] **Phase 6: Webhooks & Tooling** (Asynchronous HTTP Webhook dispatcher with HMAC-SHA256 signatures, `obaf-cli` doctor & presets tool, native tenant data isolation test suite)
+- [x] **Phase 3: Core Business Engines** (Catalog, Inventory Stock Ledger, Order State Machine, Invoicing & GST/VAT Tax Engine)
+- [x] **Phase 4: Financial & Operations** (Payments, refunds, split billing, subscriptions, resource bookings, audit logs)
+- [x] **Phase 5: Domain Validation** (Validated with live tests for all 22 business domain presets)
+- [x] **Phase 6: Extension Readiness** (`ObafExtension` trait, `ExtensionRegistry`, `LoyaltyRewardsExtension`, CLI scaffolding)
+- [x] **Phase 7: Production Hardening** (Prometheus `/metrics`, security headers, 2,460+ req/s benchmarks, DB backup/restore)
+- [x] **Phase 8: Domain Expansion** (Retail grocery, hotel reservation folio, manufacturing job cards, fleet dispatch)
+- [x] **Phase 9: Advanced Platform Capabilities** (Offline edge sync, dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon, official Python SDK)
 
 ---
 
