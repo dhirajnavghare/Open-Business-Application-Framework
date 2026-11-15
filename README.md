@@ -114,17 +114,35 @@ cargo run -p obaf-cli -- restore --source data/backup_20261115.db
 
 ---
 
-## 📦 Docker Deployment
+## 📦 Deployment Options
 
-### Run with SQLite (Zero-Dependency)
-```bash
-docker compose up obaf-sqlite
-```
+OBAF offers two fully documented, production-ready deployment topologies:
 
-### Run with PostgreSQL (High-Concurrency Profile)
-```bash
-docker compose --profile postgres up
-```
+### Option 1: Single Deployment (Edge, Kiosk, or Standalone VPS)
+Ideal for edge POS systems, branch stores, single-server VPS ($5 droplets), and embedded IoT appliances:
+* **Architecture:** Single static binary or lightweight Docker container (~25MB, < 35MB RAM).
+* **Storage:** Zero-dependency embedded SQLite with WAL (`Write-Ahead Logging`) mode.
+* **Launch:**
+  ```bash
+  # Via Docker Compose (Recommended)
+  docker compose up -d obaf-sqlite
+
+  # Or via standard Docker run:
+  docker run -d --name obaf-server -p 8080:8080 -v $(pwd)/data:/app/data ghcr.io/your-org/obaf:latest
+  ```
+
+### Option 2: Scalable Deployment (High-Availability Clustered Cloud)
+Designed for high-throughput multi-tenant SaaS, enterprise retail chains, and high-concurrency billing engines:
+* **Architecture:** Horizontally scaled stateless API pods behind L7 Load Balancer + Clustered PostgreSQL 16+ with connection pooling + Dedicated `obaf-worker` background daemons.
+* **Auto-Scaling:** Kubernetes Horizontal Pod Autoscaler (HPA) and Pod Disruption Budgets (PDB).
+* **Launch with Docker Compose:**
+  ```bash
+  # Launch Clustered PostgreSQL + Stateless API + Background Worker
+  docker compose --profile postgres --profile worker up -d
+  ```
+* **Production Kubernetes (K8s):** Ready-to-apply manifests for `Deployment`, `Service`, `HPA`, `PDB`, `ConfigMap`, and `Secret` are provided in the [Production Deployment Runbook](docs/DEPLOYMENT_RUNBOOK.md).
+
+For full details on PostgreSQL tuning, connection pool math, NGINX reverse proxying, Prometheus alerting, and disaster recovery, see [`docs/DEPLOYMENT_RUNBOOK.md`](docs/DEPLOYMENT_RUNBOOK.md).
 
 ---
 
