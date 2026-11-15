@@ -1,0 +1,15 @@
+target
+.git
+.github
+.githooks
+.devcontainer
+data/*.db
+data/*.db-wal
+data/*.db-shm
+sdk/typescript/node_modules
+sdk/typescript/dist
+sdk/python/*.egg-info
+sdk/python/build
+sdk/python/dist
+__pycache__
+*.pyc

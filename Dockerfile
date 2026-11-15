@@ -11,6 +11,7 @@ COPY crates ./crates
 COPY binaries ./binaries
 COPY examples ./examples
 COPY config ./config
+COPY llms.txt README.md LICENSE NOTICE ./
 
 # Execute automated tests during container build to guarantee zero-defect images
 RUN cargo test --release --workspace
@@ -47,6 +48,11 @@ COPY --from=builder /app/target/release/obaf-worker /app/obaf-worker
 
 # Copy default config and presets
 COPY config /app/config
+
+# Copy license, attribution, and AI documentation
+COPY --from=builder /app/LICENSE /app/LICENSE
+COPY --from=builder /app/NOTICE /app/NOTICE
+COPY --from=builder /app/llms.txt /app/llms.txt
 
 # Create data directory for SQLite and ensure ownership
 RUN mkdir -p /app/data && chown -R obaf:obaf /app
