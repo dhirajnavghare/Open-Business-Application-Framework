@@ -20,6 +20,14 @@ pub struct CreateWebhookRequest {
     pub event_types: Vec<String>, // e.g. ["order.created", "stock.low", "payment.received"]
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateWebhookRequest {
+    pub url: Option<String>,
+    pub secret: Option<String>,
+    pub event_types: Option<Vec<String>>,
+    pub is_active: Option<bool>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct WebhookResponse {
     pub id: Uuid,
@@ -172,5 +180,178 @@ pub async fn test_webhook(
         "status": "ping_dispatched",
         "webhook_id": hook.id,
         "target_url": hook.url
+    })))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/webhooks/{id}",
+    tag = "Webhooks",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Webhook ID")
+    ),
+    responses(
+        (status = 200, description = "Webhook details", body = WebhookResponse),
+        (status = 404, description = "Webhook not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn get_webhook(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<WebhookResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    let hook = webhook::Entity::find()
+        .filter(webhook::Column::Id.eq(id))
+        .filter(webhook::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Webhook not found".to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(hook.into()))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/webhooks/{id}",
+    tag = "Webhooks",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Webhook ID")
+    ),
+    request_body = UpdateWebhookRequest,
+    responses(
+        (status = 200, description = "Webhook updated successfully", body = WebhookResponse),
+        (status = 404, description = "Webhook not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn update_webhook(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateWebhookRequest>,
+) -> Result<Json<WebhookResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin"])?;
+
+    let hook = webhook::Entity::find()
+        .filter(webhook::Column::Id.eq(id))
+        .filter(webhook::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Webhook not found".to_string(),
+                }),
+            )
+        })?;
+
+    let mut active: webhook::ActiveModel = hook.into();
+
+    if let Some(url) = payload.url {
+        active.url = Set(url);
+    }
+    if let Some(secret) = payload.secret {
+        active.secret = Set(secret);
+    }
+    if let Some(events) = payload.event_types {
+        let events_json = serde_json::to_string(&events).unwrap_or_default();
+        active.event_types = Set(events_json);
+    }
+    if let Some(is_active) = payload.is_active {
+        active.is_active = Set(is_active);
+    }
+
+    let updated = active.update(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to update webhook: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(updated.into()))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/webhooks/{id}",
+    tag = "Webhooks",
+    security(("bearer_auth" = [])),
+    params(
+        ("id" = Uuid, Path, description = "Webhook ID")
+    ),
+    responses(
+        (status = 200, description = "Webhook deleted successfully"),
+        (status = 404, description = "Webhook not found", body = AuthErrorResponse)
+    )
+)]
+pub async fn delete_webhook(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin"])?;
+
+    let hook = webhook::Entity::find()
+        .filter(webhook::Column::Id.eq(id))
+        .filter(webhook::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(AuthErrorResponse {
+                    error: "Webhook not found".to_string(),
+                }),
+            )
+        })?;
+
+    let active: webhook::ActiveModel = hook.into();
+    active.delete(&state.db).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthErrorResponse {
+                error: format!("Failed to delete webhook: {}", e),
+            }),
+        )
+    })?;
+
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "webhook_id": id
     })))
 }

@@ -71,6 +71,9 @@ use utoipa::{
         // Webhooks
         crate::webhooks::handlers::register_webhook,
         crate::webhooks::handlers::list_webhooks,
+        crate::webhooks::handlers::get_webhook,
+        crate::webhooks::handlers::update_webhook,
+        crate::webhooks::handlers::delete_webhook,
         crate::webhooks::handlers::test_webhook,
         // Reports
         crate::reports::handlers::get_dashboard_metrics,
@@ -155,6 +158,7 @@ use utoipa::{
             crate::subscriptions::handlers::SubscriptionResponse,
             crate::subscriptions::handlers::UpdateSubscriptionStatusRequest,
             crate::webhooks::handlers::CreateWebhookRequest,
+            crate::webhooks::handlers::UpdateWebhookRequest,
             crate::webhooks::handlers::WebhookResponse,
             crate::billing::handlers::TaxCalculationRequest,
             crate::billing::handlers::TaxCalculationResponse,

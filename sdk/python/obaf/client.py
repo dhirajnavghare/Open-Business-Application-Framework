@@ -465,3 +465,143 @@ class ObafClient:
         }
         return self._request("POST", "/api/v1/billing/convert-currency", payload=payload)
 
+    # --- Webhooks Management ---
+    def create_webhook(
+        self,
+        url: str,
+        event_types: List[str],
+        secret: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Register a new event webhook endpoint."""
+        payload = {
+            "url": url,
+            "event_types": event_types,
+            "secret": secret,
+        }
+        return self._request("POST", "/api/v1/webhooks", payload=payload)
+
+    def list_webhooks(self) -> List[Dict[str, Any]]:
+        """List registered webhooks for the tenant."""
+        return self._request("GET", "/api/v1/webhooks")
+
+    def get_webhook(self, webhook_id: str) -> Dict[str, Any]:
+        """Get details of a specific webhook."""
+        return self._request("GET", f"/api/v1/webhooks/{webhook_id}")
+
+    def update_webhook(
+        self,
+        webhook_id: str,
+        url: Optional[str] = None,
+        event_types: Optional[List[str]] = None,
+        secret: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update a webhook's configuration or active state."""
+        payload = {}
+        if url is not None:
+            payload["url"] = url
+        if event_types is not None:
+            payload["event_types"] = event_types
+        if secret is not None:
+            payload["secret"] = secret
+        if is_active is not None:
+            payload["is_active"] = is_active
+        return self._request("PATCH", f"/api/v1/webhooks/{webhook_id}", payload=payload)
+
+    def delete_webhook(self, webhook_id: str) -> Dict[str, Any]:
+        """Delete a registered webhook."""
+        return self._request("DELETE", f"/api/v1/webhooks/{webhook_id}")
+
+    def test_webhook(self, webhook_id: str) -> Dict[str, Any]:
+        """Dispatch a test ping payload to a registered webhook."""
+        return self._request("POST", f"/api/v1/webhooks/{webhook_id}/test")
+
+    # --- Bookings & Scheduling ---
+    def create_booking(
+        self,
+        resource_id: str,
+        start_time: str,
+        end_time: str,
+        booking_type: str,
+        customer_id: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a resource or appointment reservation."""
+        payload = {
+            "resource_id": resource_id,
+            "start_time": start_time,
+            "end_time": end_time,
+            "booking_type": booking_type,
+            "customer_id": customer_id,
+            "notes": notes,
+        }
+        return self._request("POST", "/api/v1/bookings", payload=payload)
+
+    def list_bookings(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List reservations with optional status filter."""
+        query_str = f"?status={status}" if status else ""
+        return self._request("GET", f"/api/v1/bookings{query_str}")
+
+    def get_booking(self, booking_id: str) -> Dict[str, Any]:
+        """Get booking details by ID."""
+        return self._request("GET", f"/api/v1/bookings/{booking_id}")
+
+    def update_booking_status(self, booking_id: str, status: str) -> Dict[str, Any]:
+        """Update reservation state (e.g. CONFIRMED, CHECKED_IN, COMPLETED, CANCELLED)."""
+        payload = {"status": status}
+        return self._request("PATCH", f"/api/v1/bookings/{booking_id}/status", payload=payload)
+
+    # --- Subscriptions & Memberships ---
+    def create_subscription(
+        self,
+        customer_id: str,
+        plan_name: str,
+        amount: str,
+        billing_interval: str = "monthly",
+        start_date: Optional[str] = None,
+        renewal_date: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a recurring customer membership subscription."""
+        payload = {
+            "customer_id": customer_id,
+            "plan_name": plan_name,
+            "amount": amount,
+            "billing_interval": billing_interval,
+            "start_date": start_date,
+            "renewal_date": renewal_date,
+        }
+        return self._request("POST", "/api/v1/subscriptions", payload=payload)
+
+    def list_subscriptions(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List customer subscriptions with optional status filter."""
+        query_str = f"?status={status}" if status else ""
+        return self._request("GET", f"/api/v1/subscriptions{query_str}")
+
+    def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
+        """Get subscription details by ID."""
+        return self._request("GET", f"/api/v1/subscriptions/{subscription_id}")
+
+    def update_subscription_status(self, subscription_id: str, status: str) -> Dict[str, Any]:
+        """Update subscription status (e.g. ACTIVE, PAUSED, CANCELLED)."""
+        payload = {"status": status}
+        return self._request("PATCH", f"/api/v1/subscriptions/{subscription_id}/status", payload=payload)
+
+    def check_in_member(self, subscription_id: str, notes: Optional[str] = None) -> Dict[str, Any]:
+        """Record member physical attendance check-in against active subscription."""
+        payload = {"notes": notes}
+        return self._request("POST", f"/api/v1/subscriptions/{subscription_id}/checkin", payload=payload)
+
+    # --- Reports & Analytics ---
+    def get_dashboard_metrics(self) -> Dict[str, Any]:
+        """Retrieve high-level operational metrics and revenue summary."""
+        return self._request("GET", "/api/v1/reports/dashboard")
+
+    def get_kitchen_prep_sheet(self) -> Dict[str, Any]:
+        """Retrieve active kitchen prep sheet aggregating open pending order quantities."""
+        return self._request("GET", "/api/v1/reports/kitchen-prep")
+
+    def get_sales_by_payment_method(self) -> Dict[str, Any]:
+        """Retrieve aggregated sales volume broken down by payment tender."""
+        return self._request("GET", "/api/v1/reports/sales-by-payment-method")
+
+

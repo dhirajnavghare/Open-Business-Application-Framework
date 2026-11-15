@@ -327,4 +327,108 @@ export class ObafClient {
   }): Promise<any> {
     return this.request("POST", "/api/v1/billing/convert-currency", payload);
   }
+
+  // --- Webhooks Management ---
+  async createWebhook(payload: {
+    url: string;
+    event_types: string[];
+    secret?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/webhooks", payload);
+  }
+
+  async listWebhooks(): Promise<any[]> {
+    return this.request("GET", "/api/v1/webhooks");
+  }
+
+  async getWebhook(webhookId: string): Promise<any> {
+    return this.request("GET", `/api/v1/webhooks/${webhookId}`);
+  }
+
+  async updateWebhook(
+    webhookId: string,
+    payload: {
+      url?: string;
+      event_types?: string[];
+      secret?: string;
+      is_active?: boolean;
+    }
+  ): Promise<any> {
+    return this.request("PATCH", `/api/v1/webhooks/${webhookId}`, payload);
+  }
+
+  async deleteWebhook(webhookId: string): Promise<any> {
+    return this.request("DELETE", `/api/v1/webhooks/${webhookId}`);
+  }
+
+  async testWebhook(webhookId: string): Promise<any> {
+    return this.request("POST", `/api/v1/webhooks/${webhookId}/test`);
+  }
+
+  // --- Bookings & Scheduling ---
+  async createBooking(payload: {
+    resource_id: string;
+    start_time: string;
+    end_time: string;
+    booking_type: string;
+    customer_id?: string;
+    notes?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/bookings", payload);
+  }
+
+  async listBookings(status?: string): Promise<any[]> {
+    const qs = status ? `?status=${status}` : "";
+    return this.request("GET", `/api/v1/bookings${qs}`);
+  }
+
+  async getBooking(bookingId: string): Promise<any> {
+    return this.request("GET", `/api/v1/bookings/${bookingId}`);
+  }
+
+  async updateBookingStatus(bookingId: string, status: string): Promise<any> {
+    return this.request("PATCH", `/api/v1/bookings/${bookingId}/status`, { status });
+  }
+
+  // --- Subscriptions & Memberships ---
+  async createSubscription(payload: {
+    customer_id: string;
+    plan_name: string;
+    amount: string;
+    billing_interval?: string;
+    start_date?: string;
+    renewal_date?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/subscriptions", payload);
+  }
+
+  async listSubscriptions(status?: string): Promise<any[]> {
+    const qs = status ? `?status=${status}` : "";
+    return this.request("GET", `/api/v1/subscriptions${qs}`);
+  }
+
+  async getSubscription(subscriptionId: string): Promise<any> {
+    return this.request("GET", `/api/v1/subscriptions/${subscriptionId}`);
+  }
+
+  async updateSubscriptionStatus(subscriptionId: string, status: string): Promise<any> {
+    return this.request("PATCH", `/api/v1/subscriptions/${subscriptionId}/status`, { status });
+  }
+
+  async checkInMember(subscriptionId: string, notes?: string): Promise<any> {
+    return this.request("POST", `/api/v1/subscriptions/${subscriptionId}/checkin`, { notes });
+  }
+
+  // --- Reports & Analytics ---
+  async getDashboardMetrics(): Promise<any> {
+    return this.request("GET", "/api/v1/reports/dashboard");
+  }
+
+  async getKitchenPrepSheet(): Promise<any> {
+    return this.request("GET", "/api/v1/reports/kitchen-prep");
+  }
+
+  async getSalesByPaymentMethod(): Promise<any> {
+    return this.request("GET", "/api/v1/reports/sales-by-payment-method");
+  }
 }
