@@ -228,4 +228,103 @@ export class ObafClient {
       items,
     });
   }
+
+  // --- Procurement & Purchase Orders ---
+  async createPurchaseOrder(payload: {
+    supplier_id: string;
+    items: Array<{
+      product_id: string;
+      item_name: string;
+      quantity_ordered: string;
+      unit_cost: string;
+    }>;
+    expected_delivery_date?: string;
+    currency?: string;
+    tax_rate?: string;
+    notes?: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/procurement/purchase-orders", payload);
+  }
+
+  async listPurchaseOrders(query?: { status?: string; supplier_id?: string }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (query?.status) params.append("status", query.status);
+    if (query?.supplier_id) params.append("supplier_id", query.supplier_id);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return this.request("GET", `/api/v1/procurement/purchase-orders${qs}`);
+  }
+
+  async getPurchaseOrder(id: string): Promise<any> {
+    return this.request("GET", `/api/v1/procurement/purchase-orders/${id}`);
+  }
+
+  async receivePurchaseOrder(
+    id: string,
+    items: Array<{
+      item_id: string;
+      quantity_received: string;
+      batch_number?: string;
+      expiry_date?: string;
+    }>
+  ): Promise<any> {
+    return this.request("POST", `/api/v1/procurement/purchase-orders/${id}/receive`, { items });
+  }
+
+  async cancelPurchaseOrder(id: string): Promise<any> {
+    return this.request("POST", `/api/v1/procurement/purchase-orders/${id}/cancel`);
+  }
+
+  // --- Promotions & Coupons ---
+  async createCoupon(payload: {
+    code: string;
+    discount_type: "PERCENTAGE" | "FIXED_AMOUNT";
+    discount_value: string;
+    min_order_amount?: string;
+    max_discount_amount?: string;
+    usage_limit?: number;
+    valid_from?: string;
+    valid_until?: string;
+    is_active?: boolean;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/promotions/coupons", payload);
+  }
+
+  async listCoupons(activeOnly?: boolean): Promise<any[]> {
+    const qs = activeOnly ? "?active_only=true" : "";
+    return this.request("GET", `/api/v1/promotions/coupons${qs}`);
+  }
+
+  async validateCoupon(code: string, subtotal: string): Promise<any> {
+    return this.request("POST", "/api/v1/promotions/coupons/validate", {
+      code,
+      subtotal,
+    });
+  }
+
+  async redeemCoupon(code: string, subtotal: string): Promise<any> {
+    return this.request("POST", `/api/v1/promotions/coupons/${code}/redeem`, {
+      subtotal,
+    });
+  }
+
+  // --- Multi-Currency Exchange Rates & Conversion ---
+  async setExchangeRate(payload: {
+    from_currency: string;
+    to_currency: string;
+    rate: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/billing/exchange-rates", payload);
+  }
+
+  async listExchangeRates(): Promise<any[]> {
+    return this.request("GET", "/api/v1/billing/exchange-rates");
+  }
+
+  async convertCurrency(payload: {
+    amount: string;
+    from_currency: string;
+    to_currency: string;
+  }): Promise<any> {
+    return this.request("POST", "/api/v1/billing/convert-currency", payload);
+  }
 }

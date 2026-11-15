@@ -24,6 +24,8 @@ use crate::meta::{engine_info, schema_discovery};
 use crate::orders::order_routes;
 use crate::payments::payment_routes;
 use crate::pos::pos_routes;
+use crate::procurement::procurement_routes;
+use crate::promotions::promotion_routes;
 use crate::reports::report_routes;
 use crate::search::search_routes;
 use crate::state::SharedState;
@@ -62,6 +64,8 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/subscriptions", subscription_routes())
         .nest("/api/v1/billing", billing_routes())
         .nest("/api/v1/pos", pos_routes())
+        .nest("/api/v1/procurement", procurement_routes())
+        .nest("/api/v1/promotions", promotion_routes())
         .nest("/api/v1/reports", report_routes())
         .nest("/api/v1/webhooks", webhook_routes())
         .nest("/api/v1/ws", event_routes())

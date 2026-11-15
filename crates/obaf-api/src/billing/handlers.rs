@@ -617,3 +617,273 @@ pub async fn get_credit_note(
 
     Ok(Json(item.into()))
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct SetExchangeRateRequest {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: Decimal,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExchangeRateResponse {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: Decimal,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<obaf_database::entities::currency_exchange_rate::Model> for ExchangeRateResponse {
+    fn from(m: obaf_database::entities::currency_exchange_rate::Model) -> Self {
+        Self {
+            id: m.id,
+            tenant_id: m.tenant_id,
+            from_currency: m.from_currency,
+            to_currency: m.to_currency,
+            rate: m.rate,
+            updated_at: m.updated_at,
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/exchange-rates",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    request_body = SetExchangeRateRequest,
+    responses(
+        (status = 200, description = "Exchange rate set successfully", body = ExchangeRateResponse),
+        (status = 400, description = "Invalid exchange rate parameters", body = AuthErrorResponse)
+    )
+)]
+pub async fn set_exchange_rate(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Json(payload): Json<SetExchangeRateRequest>,
+) -> Result<Json<ExchangeRateResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::currency_exchange_rate;
+    use sea_orm::{ActiveModelTrait, Set};
+
+    let from = payload.from_currency.trim().to_uppercase();
+    let to = payload.to_currency.trim().to_uppercase();
+
+    if from.is_empty() || to.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Currency codes cannot be empty".to_string(),
+            }),
+        ));
+    }
+
+    if payload.rate <= Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Exchange rate must be greater than zero".to_string(),
+            }),
+        ));
+    }
+
+    let tenant_id = auth.tenant_id.as_uuid();
+    let now = chrono::Utc::now();
+
+    let existing = currency_exchange_rate::Entity::find()
+        .filter(currency_exchange_rate::Column::TenantId.eq(tenant_id))
+        .filter(currency_exchange_rate::Column::FromCurrency.eq(&from))
+        .filter(currency_exchange_rate::Column::ToCurrency.eq(&to))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    let model = match existing {
+        Some(item) => {
+            let mut active: currency_exchange_rate::ActiveModel = item.into();
+            active.rate = Set(payload.rate);
+            active.updated_at = Set(now);
+            active.update(&state.db).await.map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: e.to_string(),
+                    }),
+                )
+            })?
+        }
+        None => currency_exchange_rate::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            tenant_id: Set(tenant_id),
+            from_currency: Set(from),
+            to_currency: Set(to),
+            rate: Set(payload.rate),
+            updated_at: Set(now),
+        }
+        .insert(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?,
+    };
+
+    Ok(Json(model.into()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/exchange-rates",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of configured exchange rates", body = Vec<ExchangeRateResponse>)
+    )
+)]
+pub async fn list_exchange_rates(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<ExchangeRateResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::currency_exchange_rate;
+
+    let items = currency_exchange_rate::Entity::find()
+        .filter(currency_exchange_rate::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .all(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(items.into_iter().map(Into::into).collect()))
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ConvertCurrencyRequest {
+    pub amount: Decimal,
+    pub from_currency: String,
+    pub to_currency: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ConvertCurrencyResponse {
+    pub original_amount: Decimal,
+    pub from_currency: String,
+    pub to_currency: String,
+    pub exchange_rate: Decimal,
+    pub converted_amount: Decimal,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/billing/convert-currency",
+    tag = "Billing",
+    security(("bearer_auth" = [])),
+    request_body = ConvertCurrencyRequest,
+    responses(
+        (status = 200, description = "Currency conversion result", body = ConvertCurrencyResponse),
+        (status = 400, description = "Exchange rate not found or invalid", body = AuthErrorResponse)
+    )
+)]
+pub async fn convert_currency(
+    State(state): State<SharedState>,
+    auth: AuthUser,
+    Json(payload): Json<ConvertCurrencyRequest>,
+) -> Result<Json<ConvertCurrencyResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    use obaf_database::entities::currency_exchange_rate;
+
+    let from = payload.from_currency.trim().to_uppercase();
+    let to = payload.to_currency.trim().to_uppercase();
+
+    if from == to {
+        return Ok(Json(ConvertCurrencyResponse {
+            original_amount: payload.amount,
+            from_currency: from,
+            to_currency: to,
+            exchange_rate: Decimal::ONE,
+            converted_amount: payload.amount,
+        }));
+    }
+
+    let tenant_id = auth.tenant_id.as_uuid();
+
+    // Check direct rate
+    let direct = currency_exchange_rate::Entity::find()
+        .filter(currency_exchange_rate::Column::TenantId.eq(tenant_id))
+        .filter(currency_exchange_rate::Column::FromCurrency.eq(&from))
+        .filter(currency_exchange_rate::Column::ToCurrency.eq(&to))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    if let Some(r) = direct {
+        let converted = (payload.amount * r.rate).round_dp(2);
+        return Ok(Json(ConvertCurrencyResponse {
+            original_amount: payload.amount,
+            from_currency: from,
+            to_currency: to,
+            exchange_rate: r.rate,
+            converted_amount: converted,
+        }));
+    }
+
+    // Check inverse rate
+    let inverse = currency_exchange_rate::Entity::find()
+        .filter(currency_exchange_rate::Column::TenantId.eq(tenant_id))
+        .filter(currency_exchange_rate::Column::FromCurrency.eq(&to))
+        .filter(currency_exchange_rate::Column::ToCurrency.eq(&from))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    if let Some(r) = inverse {
+        if r.rate > Decimal::ZERO {
+            let inv_rate = (Decimal::ONE / r.rate).round_dp(6);
+            let converted = (payload.amount / r.rate).round_dp(2);
+            return Ok(Json(ConvertCurrencyResponse {
+                original_amount: payload.amount,
+                from_currency: from,
+                to_currency: to,
+                exchange_rate: inv_rate,
+                converted_amount: converted,
+            }));
+        }
+    }
+
+    Err((
+        StatusCode::BAD_REQUEST,
+        Json(AuthErrorResponse {
+            error: format!("No exchange rate configured between {} and {}", from, to),
+        }),
+    ))
+}

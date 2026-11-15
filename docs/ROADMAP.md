@@ -17,7 +17,8 @@ This document details the milestone ordering, acceptance criteria, and delivered
 | **6** | **Extension Readiness** | `ObafExtension` trait, `ExtensionRegistry`, `examples/community_extension`, `docs/COMPATIBILITY.md`, contract test suite | ✅ Completed |
 | **7** | **Production Hardening** | Prometheus `/metrics`, security headers middleware, cross-DB portability tests, CLI backup/restore, 2,460+ req/s concurrency benchmark | ✅ Completed |
 | **8** | **Domain Expansion** | 22 comprehensive industry presets (Retail Grocery, Hotel Management, Manufacturing Jobwork, Courier Fleet, Clinic OPD, etc.) | ✅ Completed |
-| **9** | **Advanced Platform Capabilities** | Offline edge batch sync (`/api/v1/sync`), dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon, Python SDK | ✅ Completed |
+| **9** | **Advanced Platform Capabilities** | Offline edge batch sync (`/api/v1/sync`), dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon | ✅ Completed |
+| **10** | **Enterprise Commerce & Supply Chain** | Procurement (PO lifecycle), Persistent Coupons, Multi-Currency Exchange, POS Cash Drawer Shifts, Multi-Location Warehouses, Credit Notes, Polyglot SDKs | ✅ Completed |
 
 ---
 
@@ -84,4 +85,12 @@ This document details the milestone ordering, acceptance criteria, and delivered
 - [x] **SaaS Multi-Tenancy & Quotas**: Organization provisioning with plan limit metering (`products_limit`, `orders_limit`).
 - [x] **Dedicated Tenant Routing**: `TenantPoolRouter` providing dedicated database connection pools for enterprise tiers.
 - [x] **Separated Worker Daemon**: Standalone `obaf-worker` background task and scheduler binary.
-- [x] **Official Client SDK**: Zero-dependency Python SDK in `sdk/python/obaf`.
+
+### Phase 10: Enterprise Commerce & Global Supply Chain
+- [x] **Procurement & PO Lifecycle**: Formal purchase orders (`purchase_order`, `purchase_order_item`), automatic inbound stock receipts, and cancellation safeguards.
+- [x] **Persistent Promotions & Coupon Engine**: Coupon codes (`coupon`) with percentage/fixed discounts, minimum subtotal gates, maximum discount caps, usage allowances, and atomic redemption.
+- [x] **Multi-Currency Precision Exchange**: Configurable exchange rates (`currency_exchange_rate`) supporting direct and reciprocal 128-bit decimal currency conversions.
+- [x] **Multi-Location Warehouses**: Physical stock locations and fulfillment centers (`stock_location`).
+- [x] **POS Cash Drawer Shifts**: Cashier shift management (`pos_shift`) with opening float, cash sales, refunds, expected cash, and variance reconciliation.
+- [x] **Immutable Credit Notes Engine**: Formal financial credit note issuance (`credit_note`) for returns and adjustments.
+- [x] **Polyglot Client SDKs**: Official zero-dependency Python SDK (`sdk/python`) and TypeScript SDK (`sdk/typescript`) supporting all operational endpoints.

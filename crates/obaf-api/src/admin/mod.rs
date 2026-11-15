@@ -10,6 +10,7 @@ use axum::{
 
 pub fn admin_routes() -> Router<SharedState> {
     Router::new()
+        .route("/setup", post(setup::bootstrap_preset))
         .route("/setup/preset", post(setup::bootstrap_preset))
         .route("/audit-logs", get(audit::list_audit_logs))
         .route(
