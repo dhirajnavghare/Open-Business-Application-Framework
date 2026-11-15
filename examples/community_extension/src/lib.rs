@@ -57,6 +57,10 @@ mod tests {
     use super::*;
     use obaf_core::TenantId;
     use serde_json::json;
+    use static_assertions::assert_impl_all;
+
+    // Compile-time static assertions ensuring extension implements ObafExtension and is thread-safe
+    assert_impl_all!(LoyaltyRewardsExtension: ObafExtension, Send, Sync);
 
     #[test]
     fn test_loyalty_extension_contract() {

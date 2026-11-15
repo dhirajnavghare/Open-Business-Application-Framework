@@ -1894,6 +1894,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "static_assertions",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -1908,6 +1909,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "static_assertions",
  "tracing",
  "uuid",
 ]

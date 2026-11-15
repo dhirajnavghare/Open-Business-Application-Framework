@@ -11,3 +11,4 @@ serde_json.workspace = true
 uuid.workspace = true
 rust_decimal.workspace = true
 tracing.workspace = true
+static_assertions.workspace = true
