@@ -30,15 +30,15 @@ Most legacy business and ERP platforms (Odoo, ERPNext, MedusaJS) require heavy r
 
 OBAF delivers a **single, high-performance compiled binary** that operates with microsecond latency:
 
-| Dimension / Metric | Odoo (Python) | ERPNext (Frappe) | MedusaJS (Node) | **OBAF (Rust)** |
-| :--- | :--- | :--- | :--- | :--- |
-| **Idle Memory Footprint** | ~800MB – 1.5GB | ~600MB – 1.2GB | ~250MB – 400MB | **~15MB – 25MB** |
-| **Request Latency (p99)** | 120ms – 250ms | 90ms – 180ms | 35ms – 70ms | **< 2.5ms** |
-| **Financial Arithmetic** | Float / Decimal mix | Float / Decimal mix | Integer cents | **Strict 128-bit Decimal + Penny Reconciliation** |
-| **Storage Engine** | Mandatory Postgres | Mandatory MariaDB | Mandatory Postgres/Redis | **Zero-Config SQLite OR Clustered Postgres/MySQL** |
-| **Edge / Kiosk / IoT** | Infeasible on \$35 Pi | Infeasible on \$35 Pi | Sluggish | **100% Native on ARM64 / Raspberry Pi** |
-| **Domain Presets** | App Store (Lock-in) | App repository | E-commerce only | **22 Turnkey Presets Out of the Box** |
-| **Compilation Safety** | None (Dynamic) | None (Dynamic) | None (Transpiled) | **Compile-time static_assertions + build.rs** |
+| Dimension / Metric  | **OBAF (Rust)** |
+| :---  | :--- |
+| **Idle Memory Footprint** | **~15MB – 25MB** |
+| **Request Latency (p99)** | **< 2.5ms** |
+| **Financial Arithmetic** | **Strict 128-bit Decimal + Penny Reconciliation** |
+| **Storage Engine** | **Zero-Config SQLite OR Clustered Postgres/MySQL** |
+| **Edge / Kiosk / IoT** | **100% Native on ARM64 / Raspberry Pi** |
+| **Domain Presets** | **22 Turnkey Presets Out of the Box** |
+| **Compilation Safety** | **Compile-time static_assertions + build.rs** |
 
 ---
 
