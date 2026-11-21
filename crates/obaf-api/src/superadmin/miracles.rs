@@ -344,6 +344,17 @@ pub async fn set_emergency_lockdown(
 
 /// 💾 Miracle 4: Instant 1-Click Database Snapshot Backup
 /// Generates and streams an instantaneous JSON export of the entire platform state.
+#[utoipa::path(
+    get,
+    path = "/api/v1/superadmin/database/backup",
+    tag = "SuperAdmin",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Platform database JSON snapshot backup", content_type = "application/json"),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse),
+        (status = 403, description = "Forbidden: requires superadmin role", body = AuthErrorResponse)
+    )
+)]
 pub async fn download_database_backup(
     auth: AuthUser,
     State(state): State<SharedState>,

@@ -39,3 +39,31 @@ Cross-tenant access attempts immediately fail with empty results or `404 Not Fou
 For enterprise tenants requiring dedicated databases or physical data residency compliance:
 - `TenantPoolRouter` maps `TenantId` to an isolated database connection pool.
 - Standard tenants share the primary database cluster with table-level tenant isolation.
+
+---
+
+## 4. Platform Root Super Administrator
+
+The platform has exactly one top-level Platform Super Administrator configured strictly via environment variables:
+- **Identifier:** Well-known static UUID `SUPERADMIN_USER_ID = 00000000-0000-0000-0000-000000000001` with `TenantId(Uuid::nil())`.
+- **Role:** `"superadmin"`
+- **Universal Bypass:** Bypasses tenant isolation and module gating to manage all organizations, inspect system metrics, download database backups, and manage SSL certificates.
+- **Dedicated Scope:** Restricts access to `/api/v1/superadmin/*` routes; standard tenant endpoints require tenant administrative credentials.
+
+---
+
+## 5. Dynamic API Module Gating
+
+Super Admins can granularly select which of the 15 API engines each tenant organization can access (e.g. enabling `catalog` and `orders`, while disabling `bookings` or `pos`):
+- **Storage:** Persisted as a JSON array of strings in the `active_modules` column of the `organization` table.
+- **Middleware:** `module_gating_middleware` extracts the caller's `organization_id`, inspects the target URL namespace, and returns `403 Forbidden` (`{"code": "MODULE_DISABLED", "error": "Module Disabled"}`) if the organization has not been granted access to that module.
+- **Instant Effect:** Module toggles take effect immediately across all nodes via in-memory TTL caching.
+
+---
+
+## 6. Real-Time Token Revocation & Session Blacklisting
+
+- Both tenant users and Super Admins can invalidate active sessions via `POST /api/v1/auth/logout` and `POST /api/v1/superadmin/logout`.
+- Revoked tokens are fingerprinted with SHA-256 and blacklisted in a high-performance in-memory `TtlCache<String, ()>` with a 24-hour expiration window.
+- The `AuthUser` extractor checks each request against the blacklist, rejecting revoked tokens with `401 Unauthorized`.
+

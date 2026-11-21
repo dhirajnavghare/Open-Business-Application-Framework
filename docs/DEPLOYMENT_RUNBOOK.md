@@ -80,7 +80,29 @@ OBAF evaluates configuration using a deterministic priority cascade:
 | `OBAF_SECURITY_TOKEN_EXPIRY_HOURS` | `security.token_expiry_hours` | `u64` | `24` | Default validity window in hours for generated auth tokens |
 | `OBAF_WORKER_INTERVAL_SECS` | N/A | `u64` | `30` | Interval in seconds between reconciliation sweeps in `obaf-worker` |
 | `OBAF_CONFIG_PATH` | N/A | `string` | `config/default.toml` | Explicit filesystem path to TOML configuration file |
+| `SUPERADMIN_EMAIL` / `OBAF_SUPERADMIN_EMAIL` | N/A | `string` | `admin@obaf.local` | Platform Root Super Administrator email |
+| `SUPERADMIN_PASSWORD` / `OBAF_SUPERADMIN_PASSWORD` | N/A | `string` | `admin123` | Platform Root Super Administrator password (raw or Argon2 hash) |
+| `GOOGLE_CLIENT_ID` / `OBAF_GOOGLE_CLIENT_ID` | N/A | `string` | `None` | Google Identity Services OAuth Client ID for Super Admin Google SSO |
+| `OBAF_ENV` / `APP_ENV` | N/A | `string` | `development` | Environment mode (`production` triggers fatal startup check if default password is used) |
+| `OBAF_CORS_ALLOWED_ORIGINS` / `CORS_ALLOWED_ORIGINS` | N/A | `string` | `*` | Comma-separated list of allowed CORS origins (e.g. `https://admin.example.com,https://pos.example.com`) |
 | `RUST_LOG` | N/A | `string` | `info` | Tracing log filter expression (e.g. `info,obaf_api=debug`) |
+
+---
+
+## 2.1 Single-Server 3-Variable Zero-Maintenance Deployment
+
+For deploying on single-instance cloud VPS (Hostinger, Hetzner, DigitalOcean, Linode) or edge appliances, OBAF is designed to require **only 3 environment variables**:
+
+```bash
+DATABASE_URL="sqlite:///app/data/obaf.db?mode=rwc"
+SUPERADMIN_EMAIL="superadmin@yourdomain.com"
+SUPERADMIN_PASSWORD="YourStrongSecurePassword123!"
+```
+
+Everything else is self-managing:
+1. **JWT Secret Persistence:** Cryptographic signing secrets are automatically generated and stored in the database if not explicitly set.
+2. **Automated Let's Encrypt SSL:** Point your domain DNS `A` record to your server IP, enter the domain in the Super Admin UI (`/admin`), and OBAF provisions and automatically renews SSL certificates via background workers every 12 hours.
+3. **Tenant & API Module Management:** Organizations, industry presets, enabled API modules, and platform settings are managed directly in the browser at `/admin`.
 
 ---
 

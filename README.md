@@ -145,6 +145,18 @@ To deploy OBAF on any single server, VPS (e.g. Hostinger, Hetzner, DigitalOcean)
   - Gated modules return `403 Forbidden` (`{"code": "MODULE_DISABLED", "error": "Module Disabled"}`) to tenant callers if disabled.
   - Toggling supported APIs in the Super Admin UI takes effect immediately across all endpoints with zero server downtime via in-memory TTL cache invalidation.
   - Platform Super Administrator possesses universal bypass across all modules.
+- **Let's Encrypt Automated SSL & Custom Domains**: Configure custom domains pointing to the server's IP, perform pre-flight DNS A-record resolution checks, automatically provision TLS certificates via Let's Encrypt ACME HTTP-01 challenge responder, and auto-renew every 12 hours with zero maintenance.
+- **Super Admin Miracle Power Tools**:
+  - **Tenant Impersonation**: Jump directly into any tenant organization's administration workspace with 1 click.
+  - **Scheduled Maintenance Mode**: Gracefully pause platform operations with custom downtime messaging (HTTP 503).
+  - **Emergency Mutation Lockdown**: Instantly freeze all write/mutate endpoints (HTTP 423) in case of an ongoing security incident.
+  - **Instant 1-Click Backup**: Download an instantaneous JSON snapshot export of all organizations, users, catalog items, orders, and audit logs.
+  - **Live Storage Optimizer**: Execute database VACUUM, analyze indexes, and checkpoint write-ahead logs with live status reporting.
+- **Bank-Grade Defense-in-Depth Hardening**:
+  - **Real-Time Token Revocation**: Instant cryptographic SHA-256 session blacklisting upon logout (`/api/v1/auth/logout` and `/api/v1/superadmin/logout`).
+  - **Anti-Brute Force & Anti-Enumeration**: Progressive 15-minute account lockout after 5 consecutive failed logins, with dummy Argon2id hash timing equalization to eliminate user enumeration side-channels.
+  - **Financial Math Bounds**: Strict non-negative constraints on pricing and strictly positive constraints on order quantities and payments.
+  - **Production Credential Guard**: Refuses to launch in production (`OBAF_ENV=production`) with default credentials (`admin123`).
 
 ---
 

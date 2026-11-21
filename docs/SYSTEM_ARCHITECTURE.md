@@ -44,14 +44,21 @@ OBAF follows strict inward-pointing dependencies to ensure compile-time boundary
 
 3. **`crates/obaf-api`**:
    - Axum 0.7 HTTP and WebSocket router.
-   - Security headers middleware (`nosniff`, `DENY`, `HSTS`, `XSS`).
+   - Embedded Super Admin Single-Page Application (`/admin`, `/superadmin`).
+   - Dynamic API Module Gating middleware (`module_gating_middleware`).
+   - Hardened defense-in-depth security headers (`nosniff`, `DENY`, `HSTS`, `CSP`, `CORP`, `COOP`, `Permissions-Policy`).
+   - Let's Encrypt automated ACME HTTP-01 challenge responder (`/.well-known/acme-challenge/:token`).
    - Interactive OpenAPI/Swagger documentation (`ApiDoc`).
-   - Background HMAC-SHA256 webhook dispatcher.
+   - Background HMAC-SHA256 webhook dispatcher with private IPv4 SSRF blocking.
    - Offline edge synchronization engine (`/api/v1/sync`).
+   - Real-time SHA-256 cryptographic JWT token revocation store (`token_blacklist`).
 
 4. **`binaries/obaf-server`**:
    - Production HTTP and WebSocket daemon.
    - Hierarchical configuration loader (`config/default.toml`, environment variables, `DATABASE_URL`).
+   - Single-Root Super Administrator authentication with dual Google SSO and Argon2id password verification.
+   - Production Credential Guard: Fatal startup abort in production mode if default password is in use.
+   - Background Let's Encrypt automated SSL supervisor daemon (12-hour renewal interval).
 
 5. **`binaries/obaf-cli`**:
    - Operational CLI tool (`obaf doctor`, `obaf presets`, `obaf token`, `obaf backup`, `obaf restore`, `obaf new-preset`, `obaf worker`).

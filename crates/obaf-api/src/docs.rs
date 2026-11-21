@@ -161,6 +161,7 @@ use utoipa::{
         crate::superadmin::miracles::get_maintenance_status,
         crate::superadmin::miracles::set_maintenance_mode,
         crate::superadmin::miracles::set_emergency_lockdown,
+        crate::superadmin::miracles::download_database_backup,
         crate::superadmin::miracles::optimize_database,
         crate::superadmin::miracles::flush_system_cache,
         crate::superadmin::miracles::get_global_announcement,
