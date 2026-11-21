@@ -87,6 +87,21 @@ Every HTTP response from `obaf-server` is hardened with security headers:
 ## 6. Cryptographic Standards
 
 - **Password Hashing**: `Argon2id` (v19) via `argon2` Rust crate with memory cost: 19,456 KiB, time cost: 2 iterations, parallelism: 1 lane.
-- **JWT Signing**: `jsonwebtoken` with HS256 HMAC-SHA256 signatures. Cryptographic signing secrets are automatically generated and persisted in the database on first boot if not explicitly provided.
+- **JWT Signing & Algorithm Locking**: `jsonwebtoken` explicitly locked to `Algorithm::HS256` for both signing and verification. Algorithms such as `none`, `HS384`, `HS512`, or asymmetric algorithms are cryptographically rejected to prevent JWT Algorithm Confusion attacks. Cryptographic signing secrets are automatically generated and persisted in the database on first boot if not explicitly provided.
+- **Constant-Time Comparison**: All sensitive comparisons (backup recovery codes, API key hashes, and webhook signatures) use constant-time byte-by-byte XOR comparison (`constant_time_compare`) to eliminate side-channel timing analysis.
 - **Webhook Signatures**: Outgoing webhooks include an `X-OBAF-Signature` header computed as `HMAC-SHA256(payload, webhook_secret)`.
 - **API Keys**: Stored as SHA-256 hex digests; plaintext keys are displayed to users only once upon creation.
+
+---
+
+## 7. Resilience, Anti-Tampering & Denial-of-Service Defense
+
+- **Host Header Injection / Poisoning Defense**: The HTTP middleware strictly validates `Host` and `X-Forwarded-Host` headers against allowable RFC character sets (`[a-zA-Z0-9.:\-\[\]]`) with length limits ($\le 255$ chars), rejecting malformed headers, CRLF injection, and cache poisoning attempts with `400 Bad Request`.
+- **Panic Resilience Shield (`CatchPanicLayer`)**: The Axum HTTP pipeline is protected by Tower's `CatchPanicLayer`, which intercepts unhandled panics, unwinds gracefully, logs the event internally, and returns a sanitized HTTP 500 status rather than crashing worker threads or aborting connections.
+- **Database Error Masking & Information Disclosure Prevention**: Database driver errors and constraint violations are logged internally via `tracing::error!` and masked into generic error messages for client responses, preventing internal SQL schemas, database versions, and table structures from being leaked to attackers.
+- **Bounded Resource Ceilings**:
+  - `TokenBucketRateLimiter`: Max 50,000 buckets with automatic LRU and idle eviction.
+  - `TtlCache`: Hard maximum capacity enforcement to eliminate unbounded memory growth.
+  - Request Body Limits: 2MB hard ceiling via `DefaultBodyLimit::max(2 * 1024 * 1024)`.
+  - Query Pagination Clamping: All list endpoints clamp user-requested limits to a maximum of 200 records.
+  - WebSocket Lifecycles: 64KB max message size and active disconnect monitoring.

@@ -18,14 +18,7 @@ pub fn compute_hmac_signature(secret: &str, body: &str) -> String {
 /// Constant-time verification of HMAC-SHA256 signature to mitigate timing attacks.
 pub fn verify_hmac_signature(secret: &str, body: &str, provided_sig: &str) -> bool {
     let expected = compute_hmac_signature(secret, body);
-    if expected.len() != provided_sig.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (a, b) in expected.bytes().zip(provided_sig.bytes()) {
-        diff |= a ^ b;
-    }
-    diff == 0
+    obaf_core::constant_time_compare(&expected, provided_sig)
 }
 
 /// Dispatches an event asynchronously to registered webhooks matching the event type and tenant.

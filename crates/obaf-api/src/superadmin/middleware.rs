@@ -83,7 +83,7 @@ pub async fn module_gating_middleware(
     {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             if let Ok(claims) = verify_token(token, &state.jwt_secret) {
-                claims.role == "superadmin"
+                claims.role == "superadmin" && !state.is_token_revoked(token)
             } else {
                 false
             }
@@ -170,6 +170,16 @@ pub async fn module_gating_middleware(
     {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             if let Ok(claims) = verify_token(token, &state.jwt_secret) {
+                if state.is_token_revoked(token) {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(serde_json::json!({
+                            "error": "UNAUTHORIZED",
+                            "message": "Authentication token has been revoked."
+                        })),
+                    )
+                        .into_response();
+                }
                 // Platform Super Admin possesses universal bypass
                 if claims.role == "superadmin" {
                     return next.run(request).await;

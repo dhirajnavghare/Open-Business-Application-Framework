@@ -361,6 +361,15 @@ pub async fn superadmin_mfa_verify(
         )
     })?;
 
+    if state.is_token_revoked(&payload.temp_token) {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorMessage {
+                error: "MFA session token has been revoked.".to_string(),
+            }),
+        ));
+    }
+
     if claims.role != "superadmin_mfa_pending" {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -389,15 +398,22 @@ pub async fn superadmin_mfa_verify(
 
     let mut used_recovery_code = false;
     if !is_totp_valid {
-        // Check emergency backup recovery codes
+        // Check emergency backup recovery codes using constant-time comparison
         if let Ok(Some(recovery_json)) =
             obaf_database::get_system_setting(&state.db, "superadmin_recovery_codes").await
         {
             if let Ok(mut codes) = serde_json::from_str::<Vec<String>>(&recovery_json) {
-                if let Some(pos) = codes
-                    .iter()
-                    .position(|c| c.eq_ignore_ascii_case(clean_code))
-                {
+                let mut matched_index = None;
+                for (idx, c) in codes.iter().enumerate() {
+                    if obaf_core::constant_time_compare(
+                        &c.trim().to_ascii_lowercase(),
+                        &clean_code.to_ascii_lowercase(),
+                    ) {
+                        matched_index = Some(idx);
+                        break;
+                    }
+                }
+                if let Some(pos) = matched_index {
                     codes.remove(pos);
                     let _ = obaf_database::set_system_setting(
                         &state.db,

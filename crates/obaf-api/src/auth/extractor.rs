@@ -89,10 +89,12 @@ impl FromRequestParts<SharedState> for AuthUser {
                 .one(&state.db)
                 .await
                 .map_err(|e| {
+                    tracing::error!("Database query error verifying API key: {:?}", e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(AuthErrorResponse {
-                            error: e.to_string(),
+                            error: "A database error occurred while verifying credentials"
+                                .to_string(),
                         }),
                     )
                 })?;

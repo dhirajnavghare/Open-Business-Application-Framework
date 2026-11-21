@@ -7,6 +7,7 @@ use axum::{
     Json, Router,
 };
 use obaf_core::RateLimitResult;
+use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -133,6 +134,7 @@ pub fn create_router(state: SharedState) -> Router {
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
         .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
         .layer(cors)
+        .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -254,6 +256,53 @@ async fn request_id_and_security_middleware(
     request: axum::extract::Request,
     next: Next,
 ) -> Response {
+    // 1. Host Header Injection & Poisoning Defense
+    if let Some(host_val) = request.headers().get(header::HOST) {
+        if let Ok(host_str) = host_val.to_str() {
+            let host_trimmed = host_str.trim();
+            if host_trimmed.is_empty()
+                || host_trimmed.len() > 255
+                || host_trimmed.chars().any(|c| {
+                    !c.is_ascii_alphanumeric()
+                        && c != '.'
+                        && c != '-'
+                        && c != ':'
+                        && c != '['
+                        && c != ']'
+                })
+            {
+                let mut res = Response::new(axum::body::Body::from("Invalid Host header"));
+                *res.status_mut() = StatusCode::BAD_REQUEST;
+                return res;
+            }
+        } else {
+            let mut res = Response::new(axum::body::Body::from("Malformed Host header"));
+            *res.status_mut() = StatusCode::BAD_REQUEST;
+            return res;
+        }
+    }
+    if let Some(fwd_host) = request.headers().get("x-forwarded-host") {
+        if let Ok(host_str) = fwd_host.to_str() {
+            let host_trimmed = host_str.trim();
+            if host_trimmed.is_empty()
+                || host_trimmed.len() > 255
+                || host_trimmed.chars().any(|c| {
+                    !c.is_ascii_alphanumeric()
+                        && c != '.'
+                        && c != '-'
+                        && c != ':'
+                        && c != '['
+                        && c != ']'
+                })
+            {
+                let mut res =
+                    Response::new(axum::body::Body::from("Invalid X-Forwarded-Host header"));
+                *res.status_mut() = StatusCode::BAD_REQUEST;
+                return res;
+            }
+        }
+    }
+
     let req_id = request
         .headers()
         .get("x-request-id")

@@ -1116,3 +1116,100 @@ async fn test_revoked_token_rejected_on_websocket() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn test_jwt_algorithm_confusion_defense() {
+    let (app, _) = setup_test_app().await;
+
+    // Attacker crafts token signed with HS512 instead of mandated HS256
+    let claims = obaf_core::JwtClaims {
+        sub: Uuid::new_v4(),
+        tenant_id: TenantId(Uuid::new_v4()),
+        role: "admin".to_string(),
+        exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp() as usize,
+    };
+    let hs512_header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS512);
+    let hs512_token = jsonwebtoken::encode(
+        &hs512_header,
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(TEST_SECRET.as_bytes()),
+    )
+    .unwrap();
+
+    // Verify obaf_core::verify_token rejects non-HS256 algorithms
+    let verify_res = obaf_core::verify_token(&hs512_token, TEST_SECRET);
+    assert!(
+        verify_res.is_err(),
+        "Algorithm confusion attempt (HS512) must be rejected"
+    );
+
+    // API request with HS512 token must be rejected with 401 Unauthorized
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", hs512_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[test]
+fn test_constant_time_comparison() {
+    assert!(obaf_core::constant_time_compare("secret_123", "secret_123"));
+    assert!(!obaf_core::constant_time_compare(
+        "secret_123",
+        "secret_124"
+    ));
+    assert!(!obaf_core::constant_time_compare("secret_123", "secret"));
+    assert!(!obaf_core::constant_time_compare("short", "longer_secret"));
+    assert!(obaf_core::constant_time_compare("", ""));
+}
+
+#[tokio::test]
+async fn test_host_header_poisoning_rejection() {
+    let (app, _) = setup_test_app().await;
+
+    // 1. Host with control character / newline injection
+    let req1 = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .header(header::HOST, "evil.com\r\nX-Injected: attack")
+        .body(Body::empty())
+        .unwrap_or_else(|_| {
+            // Some HTTP libraries might reject building malformed headers directly; fallback to space or slash
+            Request::builder()
+                .method("GET")
+                .uri("/health")
+                .header(header::HOST, "evil.com/attack")
+                .body(Body::empty())
+                .unwrap()
+        });
+
+    let res1 = app.clone().oneshot(req1).await.unwrap();
+    assert_eq!(res1.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Malformed X-Forwarded-Host header with illegal characters
+    let req2 = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .header(header::HOST, "localhost:8992")
+        .header("x-forwarded-host", "attacker.com:80<script>")
+        .body(Body::empty())
+        .unwrap();
+
+    let res2 = app.clone().oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Valid Host header accepted
+    let req3 = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .header(header::HOST, "my-business-app.com:8992")
+        .body(Body::empty())
+        .unwrap();
+
+    let res3 = app.oneshot(req3).await.unwrap();
+    assert_eq!(res3.status(), StatusCode::OK);
+}

@@ -39,7 +39,9 @@ pub use rules::{
     RuleEvaluationResult,
 };
 pub use schema_validation::validate_metadata;
-pub use security::{generate_token, hash_password, verify_password, verify_token, JwtClaims};
+pub use security::{
+    constant_time_compare, generate_token, hash_password, verify_password, verify_token, JwtClaims,
+};
 pub use tenant::{BranchId, TenantContext, TenantId};
 pub use totp::*;
 
