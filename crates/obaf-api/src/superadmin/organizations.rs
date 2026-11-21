@@ -455,6 +455,41 @@ pub async fn create_organization(
         ));
     }
 
+    let email_clean = payload.admin_email.trim().to_lowercase();
+    if email_clean.is_empty() || !email_clean.contains('@') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "A valid tenant admin email address is required.".to_string(),
+            }),
+        ));
+    }
+
+    // Defense-in-depth: Require an explicit, strong tenant admin password (CWE-1188 defense)
+    let raw_pw = payload
+        .admin_password
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "admin_password is required when provisioning a tenant organization."
+                        .to_string(),
+                }),
+            )
+        })?;
+
+    if raw_pw.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Tenant admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
     // Check slug uniqueness
     let existing = organization::Entity::find()
         .filter(organization::Column::Slug.eq(&slug_clean))
@@ -477,6 +512,38 @@ pub async fn create_organization(
             }),
         ));
     }
+
+    // Check tenant admin email uniqueness across platform users
+    let existing_email = user::Entity::find()
+        .filter(user::Column::Email.eq(&email_clean))
+        .one(state.reader())
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    if existing_email.is_some() {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(ErrorResponse {
+                error: format!("User with email '{}' already exists.", email_clean),
+            }),
+        ));
+    }
+
+    let pw_hash = hash_password(raw_pw).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ErrorResponse {
+                error: format!("Failed to hash password: {}", e),
+            }),
+        )
+    })?;
 
     // Determine enabled modules
     let active_modules = payload.active_modules.unwrap_or_else(|| {
@@ -511,7 +578,7 @@ pub async fn create_organization(
         updated_at: Set(now),
     };
 
-    new_org.insert(state.writer()).await.map_err(|e| {
+    let inserted_org = new_org.insert(state.writer()).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
@@ -522,30 +589,10 @@ pub async fn create_organization(
 
     // Create initial Tenant Admin user
     let user_id = Uuid::new_v4();
-    let raw_pw = payload
-        .admin_password
-        .unwrap_or_else(|| "admin123".to_string());
-    if raw_pw.len() < 8 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Tenant admin password must be at least 8 characters long".to_string(),
-            }),
-        ));
-    }
-    let pw_hash = hash_password(&raw_pw).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ErrorResponse {
-                error: format!("Failed to hash password: {}", e),
-            }),
-        )
-    })?;
-
     let admin_user = user::ActiveModel {
         id: Set(user_id),
         organization_id: Set(org_id),
-        email: Set(payload.admin_email.trim().to_lowercase()),
+        email: Set(email_clean),
         password_hash: Set(pw_hash),
         full_name: Set(payload.admin_name.trim().to_string()),
         role: Set("admin".to_string()),
@@ -554,14 +601,16 @@ pub async fn create_organization(
         updated_at: Set(now),
     };
 
-    admin_user.insert(state.writer()).await.map_err(|e| {
-        (
+    if let Err(e) = admin_user.insert(state.writer()).await {
+        // Rollback created organization if admin user creation fails
+        let _ = inserted_org.delete(state.writer()).await;
+        return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ErrorResponse {
                 error: format!("Failed to create admin user: {}", e),
             }),
-        )
-    })?;
+        ));
+    }
 
     // Pre-warm module cache for the new tenant
     state

@@ -1651,3 +1651,210 @@ async fn test_viewer_role_strictly_forbidden_from_mutating_state() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn test_insecure_default_passwords_rejected_across_all_onboarding_endpoints() {
+    let (app, _state) = setup_test_app().await;
+
+    let superadmin_token = generate_token(
+        obaf_api::superadmin::auth::SUPERADMIN_USER_ID,
+        TenantId(Uuid::nil()),
+        "superadmin",
+        TEST_SECRET,
+        24,
+    )
+    .unwrap();
+
+    // 1. Superadmin Create Org without admin_password -> 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/organizations")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "name": "No Password Org",
+                "slug": "no-password-org",
+                "admin_name": "Admin",
+                "admin_email": "admin@nopw.org"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Superadmin Create Org with short admin_password (< 8 chars) -> 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/organizations")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "name": "Short Password Org",
+                "slug": "short-password-org",
+                "admin_name": "Admin",
+                "admin_email": "admin@shortpw.org",
+                "admin_password": "short"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Admin Setup Preset without admin_password -> 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/setup/preset")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "No PW Preset",
+                "slug": "no-pw-preset",
+                "preset": "restaurant_pos",
+                "admin_name": "Preset Admin",
+                "admin_email": "admin@nopwpreset.org"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 4. Admin Provision Tenant without admin_password -> 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/tenants")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "No PW Tenant",
+                "slug": "no-pw-tenant",
+                "admin_name": "Tenant Admin",
+                "admin_email": "admin@nopwtenant.org"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 5. Admin Provision Tenant with short password -> 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/tenants")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "Short PW Tenant",
+                "slug": "short-pw-tenant",
+                "admin_name": "Tenant Admin",
+                "admin_email": "admin@shorttenant.org",
+                "admin_password": "123"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_duplicate_admin_email_rejected_across_onboarding_endpoints() {
+    let (app, _state) = setup_test_app().await;
+
+    // 1. Successfully provision first tenant
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/tenants")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "Alpha Corp",
+                "slug": "alpha-corp",
+                "admin_name": "Alpha Admin",
+                "admin_email": "shared_admin@corp.com",
+                "admin_password": "AlphaPassword123!"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 2. Attempt to provision second tenant with identical admin email -> 409 Conflict
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/tenants")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "Beta Corp",
+                "slug": "beta-corp",
+                "admin_name": "Beta Admin",
+                "admin_email": "shared_admin@corp.com",
+                "admin_password": "BetaPassword123!"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CONFLICT);
+
+    // 3. Attempt to bootstrap preset with identical admin email -> 409 Conflict
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/admin/setup/preset")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "organization_name": "Gamma Corp",
+                "slug": "gamma-corp",
+                "preset": "restaurant_pos",
+                "admin_name": "Gamma Admin",
+                "admin_email": "shared_admin@corp.com",
+                "admin_password": "GammaPassword123!"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn test_google_sso_unconfigured_audience_confusion_defense() {
+    let (app, _state) = setup_test_app().await;
+
+    // Attempting Google login with a real-looking JWT when Google SSO client ID is unconfigured -> 403 Forbidden
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/google-login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            json!({
+                "credential": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.dummy_token_without_mock_prefix"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+}

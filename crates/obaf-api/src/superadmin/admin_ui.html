@@ -1594,8 +1594,8 @@
             <input type="email" id="new-org-admin-email" class="form-input" required placeholder="admin@acmeglobal.com">
           </div>
           <div class="form-group">
-            <label class="form-label">Admin Password (optional, defaults to admin123)</label>
-            <input type="password" id="new-org-admin-password" class="form-input" placeholder="admin123">
+            <label class="form-label">Initial Tenant Administrator Password (min 8 chars)</label>
+            <input type="password" id="new-org-admin-password" class="form-input" required minlength="8" placeholder="Enter secure password">
           </div>
 
           <!-- Supported Modules Selector -->
@@ -2954,7 +2954,11 @@
       const preset = document.getElementById('new-org-preset').value;
       const adminName = document.getElementById('new-org-admin-name').value;
       const adminEmail = document.getElementById('new-org-admin-email').value;
-      const adminPassword = document.getElementById('new-org-admin-password').value || 'admin123';
+      const adminPassword = document.getElementById('new-org-admin-password').value;
+      if (!adminPassword || adminPassword.length < 8) {
+        showToast('Admin password is required and must be at least 8 characters', 'error');
+        return;
+      }
 
       const selectedModules = Array.from(document.querySelectorAll('input[name="create-module"]:checked'))
         .map(cb => cb.value);

@@ -1,7 +1,7 @@
 use axum::{extract::State, http::StatusCode, Json};
 use chrono::Utc;
 use obaf_database::{entities::organization, entities::user};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -78,6 +78,40 @@ pub async fn bootstrap_preset(
         ));
     }
 
+    let email_cleaned = payload.admin_email.trim().to_lowercase();
+    if email_cleaned.is_empty() || !email_cleaned.contains('@') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "A valid admin email address is required".to_string(),
+            }),
+        ));
+    }
+
+    // Defense-in-depth: Require an explicit, strong tenant admin password (CWE-1188 defense)
+    let raw_password = payload
+        .admin_password
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ApiErrorResponse {
+                    error: "admin_password is required to bootstrap an organization".to_string(),
+                }),
+            )
+        })?;
+
+    if raw_password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
     // 2. Verify slug uniqueness
     let existing = organization::Entity::find()
         .filter(organization::Column::Slug.eq(&slug))
@@ -100,6 +134,39 @@ pub async fn bootstrap_preset(
             }),
         ));
     }
+
+    // Check admin email uniqueness across platform users
+    let existing_email = user::Entity::find()
+        .filter(user::Column::Email.eq(&email_cleaned))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiErrorResponse {
+                    error: format!("Database error: {}", e),
+                }),
+            )
+        })?;
+
+    if existing_email.is_some() {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(ApiErrorResponse {
+                error: format!("User with email '{}' already exists", email_cleaned),
+            }),
+        ));
+    }
+
+    let password_hash = obaf_core::hash_password(raw_password).map_err(|e| {
+        tracing::error!("Failed to hash admin password: {:?}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiErrorResponse {
+                error: "Failed to process credentials securely".to_string(),
+            }),
+        )
+    })?;
 
     // 3. Load preset configuration from config/presets/*.json if available
     let preset_file_path = std::path::Path::new("config/presets").join(format!("{}.json", preset));
@@ -172,7 +239,7 @@ pub async fn bootstrap_preset(
         updated_at: Set(now),
     };
 
-    org.insert(&state.db).await.map_err(|e| {
+    let inserted_org = org.insert(&state.db).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
@@ -183,33 +250,10 @@ pub async fn bootstrap_preset(
 
     // 4. Create initial Admin user
     let user_id = Uuid::new_v4();
-    let raw_password = payload
-        .admin_password
-        .unwrap_or_else(|| "admin123".to_string());
-
-    if raw_password.len() < 8 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiErrorResponse {
-                error: "Admin password must be at least 8 characters long".to_string(),
-            }),
-        ));
-    }
-
-    let password_hash = obaf_core::hash_password(&raw_password).map_err(|e| {
-        tracing::error!("Failed to hash admin password: {:?}", e);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiErrorResponse {
-                error: "Failed to process credentials securely".to_string(),
-            }),
-        )
-    })?;
-
     let user = user::ActiveModel {
         id: Set(user_id),
         organization_id: Set(org_id),
-        email: Set(payload.admin_email),
+        email: Set(email_cleaned),
         password_hash: Set(password_hash),
         full_name: Set(payload.admin_name),
         role: Set("admin".to_string()),
@@ -218,14 +262,15 @@ pub async fn bootstrap_preset(
         updated_at: Set(now),
     };
 
-    user.insert(&state.db).await.map_err(|e| {
-        (
+    if let Err(e) = user.insert(&state.db).await {
+        let _ = inserted_org.delete(&state.db).await;
+        return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
                 error: format!("Failed to create admin user: {}", e),
             }),
-        )
-    })?;
+        ));
+    }
 
     super::audit::record_audit_log(
         &state.db,

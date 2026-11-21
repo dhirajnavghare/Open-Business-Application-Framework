@@ -724,12 +724,41 @@ pub async fn superadmin_google_login(
         ));
     }
 
-    let verified_email: String = if let Some(extracted) = credential
-        .strip_prefix("mock_google_token:")
-        .or_else(|| credential.strip_prefix("mock_google_token_"))
-    {
-        extracted.trim().to_lowercase()
+    #[cfg(any(test, debug_assertions))]
+    let is_mock_token = credential.starts_with("mock_google_token:")
+        || credential.starts_with("mock_google_token_");
+
+    #[cfg(not(any(test, debug_assertions)))]
+    let is_mock_token = false;
+
+    let verified_email: String = if is_mock_token {
+        credential
+            .strip_prefix("mock_google_token:")
+            .or_else(|| credential.strip_prefix("mock_google_token_"))
+            .unwrap_or("")
+            .trim()
+            .to_lowercase()
     } else {
+        let expected_client_id = match &config.google_client_id {
+            Some(cid) => Some(cid.clone()),
+            None => obaf_database::get_system_setting(&state.db, "google_client_id")
+                .await
+                .ok()
+                .flatten(),
+        };
+
+        // Audience Confusion Defense: Google SSO must be explicitly configured with a Client ID
+        let client_id = expected_client_id.ok_or_else(|| {
+            (
+                StatusCode::FORBIDDEN,
+                Json(ErrorMessage {
+                    error:
+                        "Google SSO is not configured on this server (Google Client ID missing)."
+                            .to_string(),
+                }),
+            )
+        })?;
+
         let verify_url = format!(
             "https://oauth2.googleapis.com/tokeninfo?id_token={}",
             credential
@@ -768,26 +797,25 @@ pub async fn superadmin_google_login(
             )
         })?;
 
-        let expected_client_id = match &config.google_client_id {
-            Some(cid) => Some(cid.clone()),
-            None => obaf_database::get_system_setting(&state.db, "google_client_id")
-                .await
-                .ok()
-                .flatten(),
-        };
+        let aud = token_info
+            .get("aud")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    Json(ErrorMessage {
+                        error: "Google token missing audience ('aud') claim.".to_string(),
+                    }),
+                )
+            })?;
 
-        if let Some(ref expected_client_id) = expected_client_id {
-            if let Some(aud) = token_info.get("aud").and_then(|v| v.as_str()) {
-                if aud != expected_client_id {
-                    return Err((
-                        StatusCode::UNAUTHORIZED,
-                        Json(ErrorMessage {
-                            error: "Google token client ID does not match configured audience."
-                                .to_string(),
-                        }),
-                    ));
-                }
-            }
+        if aud != client_id {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorMessage {
+                    error: "Google token client ID does not match configured audience.".to_string(),
+                }),
+            ));
         }
 
         let email_verified = token_info

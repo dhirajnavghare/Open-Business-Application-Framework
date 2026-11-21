@@ -7,7 +7,8 @@ use chrono::Utc;
 use obaf_core::security::{generate_token, hash_password};
 use obaf_database::entities::{order, organization, product, user};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -135,6 +136,74 @@ pub async fn provision_tenant(
             }),
         ));
     }
+
+    let email_cleaned = payload.admin_email.trim().to_lowercase();
+    if email_cleaned.is_empty() || !email_cleaned.contains('@') {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "A valid admin email address is required".to_string(),
+            }),
+        ));
+    }
+
+    // Defense-in-depth: Require an explicit, strong tenant admin password (CWE-1188 defense)
+    let raw_pwd = payload
+        .admin_password
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ApiErrorResponse {
+                    error: "admin_password is required when provisioning a tenant".to_string(),
+                }),
+            )
+        })?;
+
+    if raw_pwd.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Tenant admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
+    // Check tenant admin email uniqueness across platform users
+    let existing_user = user::Entity::find()
+        .filter(user::Column::Email.eq(&email_cleaned))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    if existing_user.is_some() {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(ApiErrorResponse {
+                error: format!("User with email '{}' already exists", email_cleaned),
+            }),
+        ));
+    }
+
+    let hashed_pwd = hash_password(raw_pwd).map_err(|e| {
+        tracing::error!("Password hashing failed: {:?}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiErrorResponse {
+                error: "Failed to process credentials securely".to_string(),
+            }),
+        )
+    })?;
+
     let plan_tier = payload
         .plan_tier
         .clone()
@@ -165,11 +234,7 @@ pub async fn provision_tenant(
         updated_at: Set(now),
     };
 
-    state
-        .cache
-        .insert(format!("tenant_modules:{}", org_id), modules_json);
-
-    new_org.insert(&state.db).await.map_err(|e| {
+    let inserted_org = new_org.insert(&state.db).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
@@ -178,36 +243,16 @@ pub async fn provision_tenant(
         )
     })?;
 
+    state
+        .cache
+        .insert(format!("tenant_modules:{}", org_id), modules_json);
+
     // Create admin user
     let user_id = Uuid::new_v4();
-    let raw_pwd = payload
-        .admin_password
-        .as_deref()
-        .unwrap_or("AdminSecure123!");
-
-    if raw_pwd.len() < 8 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiErrorResponse {
-                error: "Admin password must be at least 8 characters long".to_string(),
-            }),
-        ));
-    }
-
-    let hashed_pwd = hash_password(raw_pwd).map_err(|e| {
-        tracing::error!("Password hashing failed: {:?}", e);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiErrorResponse {
-                error: "Failed to process credentials securely".to_string(),
-            }),
-        )
-    })?;
-
     let new_user = user::ActiveModel {
         id: Set(user_id),
         organization_id: Set(org_id),
-        email: Set(payload.admin_email.clone()),
+        email: Set(email_cleaned),
         password_hash: Set(hashed_pwd),
         full_name: Set(payload.admin_name.clone()),
         role: Set("admin".to_string()),
@@ -216,14 +261,15 @@ pub async fn provision_tenant(
         updated_at: Set(now),
     };
 
-    new_user.insert(&state.db).await.map_err(|e| {
-        (
+    if let Err(e) = new_user.insert(&state.db).await {
+        let _ = inserted_org.delete(&state.db).await;
+        return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
                 error: format!("Failed to create admin user: {}", e),
             }),
-        )
-    })?;
+        ));
+    }
 
     let token = generate_token(
         user_id,
