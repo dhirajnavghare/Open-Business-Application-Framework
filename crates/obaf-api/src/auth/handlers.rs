@@ -162,6 +162,15 @@ pub async fn register(
         ));
     }
 
+    if payload.password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
     let password_hash = hash_password(&payload.password).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

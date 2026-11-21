@@ -101,6 +101,14 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let state = Arc::new(AppState::with_router(db, router, jwt_secret));
+
+    // Security Audit Check: Warn immediately if out-of-the-box credentials are in use
+    if state.superadmin.is_default_password() {
+        tracing::warn!(
+            "⚠️  [SECURITY ALERT] Super Admin is configured with default initial password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD in environment immediately!"
+        );
+    }
+
     let app = create_router(state.clone());
 
     // 6. Spawn automated Let's Encrypt renewal background supervisor (Single-Server Zero Maintenance)

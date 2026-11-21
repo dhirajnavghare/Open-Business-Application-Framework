@@ -83,6 +83,14 @@ pub async fn verify_domain_dns(domain: &str) -> DnsCheckResult {
         .trim_start_matches("http://")
         .trim_start_matches("https://");
 
+    if let Err(err_msg) = validate_domain(clean_domain) {
+        return DnsCheckResult {
+            resolves: false,
+            resolved_ips: vec![],
+            message: err_msg.to_string(),
+        };
+    }
+
     let lookup_outcome: Result<Vec<SocketAddr>, std::io::Error> =
         match tokio::net::lookup_host((clean_domain, 80u16)).await {
             Ok(iter) => Ok(iter.collect()),
@@ -91,7 +99,26 @@ pub async fn verify_domain_dns(domain: &str) -> DnsCheckResult {
 
     match lookup_outcome {
         Ok(ips_raw) => {
-            let ips: Vec<String> = ips_raw.into_iter().map(|a| a.ip().to_string()).collect();
+            let mut ips: Vec<String> = Vec::new();
+            let mut has_private_or_loopback = false;
+
+            for addr in ips_raw {
+                let ip = addr.ip();
+                ips.push(ip.to_string());
+                match ip {
+                    std::net::IpAddr::V4(v4) => {
+                        if v4.is_loopback() || v4.is_private() || v4.is_link_local() {
+                            has_private_or_loopback = true;
+                        }
+                    }
+                    std::net::IpAddr::V6(v6) => {
+                        if v6.is_loopback() {
+                            has_private_or_loopback = true;
+                        }
+                    }
+                }
+            }
+
             if ips.is_empty() {
                 DnsCheckResult {
                     resolves: false,
@@ -101,12 +128,22 @@ pub async fn verify_domain_dns(domain: &str) -> DnsCheckResult {
                         clean_domain
                     ),
                 }
+            } else if has_private_or_loopback {
+                DnsCheckResult {
+                    resolves: true,
+                    resolved_ips: ips.clone(),
+                    message: format!(
+                        "DNS check resolved domain '{}' to private/loopback IP ({}). Let's Encrypt requires a public internet-routable IP to issue certificates.",
+                        clean_domain,
+                        ips.join(", ")
+                    ),
+                }
             } else {
                 DnsCheckResult {
                     resolves: true,
                     resolved_ips: ips.clone(),
                     message: format!(
-                        "DNS check passed! Domain '{}' resolves to {}.",
+                        "DNS check passed! Domain '{}' resolves to public IP {}.",
                         clean_domain,
                         ips.join(", ")
                     ),
@@ -124,13 +161,96 @@ pub async fn verify_domain_dns(domain: &str) -> DnsCheckResult {
     }
 }
 
+/// Strict RFC 1123 hostname validation for Let's Encrypt FQDNs.
+pub fn validate_domain(domain: &str) -> Result<(), &'static str> {
+    if domain.is_empty() {
+        return Err("Domain name cannot be empty.");
+    }
+    if domain.len() > 253 {
+        return Err("Domain name exceeds maximum length of 253 characters.");
+    }
+    if domain.contains('\r') || domain.contains('\n') || domain.contains('\0') {
+        return Err("Domain name contains illegal control characters.");
+    }
+    if domain.contains(' ')
+        || domain.contains('/')
+        || domain.contains('\\')
+        || domain.contains(';')
+        || domain.contains('"')
+        || domain.contains('\'')
+    {
+        return Err("Domain name contains illegal characters or whitespace.");
+    }
+    if domain == "localhost" || domain.ends_with(".localhost") {
+        return Err("Localhost cannot be used as a public Let's Encrypt domain.");
+    }
+    // Reject direct IP addresses (IPv4 or IPv6)
+    if domain.parse::<std::net::IpAddr>().is_ok() {
+        return Err("Raw IP addresses cannot be used for Let's Encrypt certificates. Please supply a valid FQDN (e.g., api.yourcompany.com).");
+    }
+    if domain.starts_with('.') || domain.ends_with('.') || domain.contains("..") {
+        return Err("Domain name cannot have leading, trailing, or consecutive dots.");
+    }
+
+    let labels: Vec<&str> = domain.split('.').collect();
+    if labels.len() < 2 {
+        return Err("Domain must be a fully-qualified domain name (FQDN) with at least two labels (e.g. example.com).");
+    }
+
+    for label in labels {
+        if label.is_empty() || label.len() > 63 {
+            return Err("Each domain label must be between 1 and 63 characters.");
+        }
+        if label.starts_with('-') || label.ends_with('-') {
+            return Err("Domain labels cannot begin or end with a hyphen.");
+        }
+        if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            return Err(
+                "Domain labels may only contain alphanumeric ASCII characters and hyphens.",
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate contact email for Let's Encrypt notifications without CRLF injection risk.
+pub fn validate_email(email: &str) -> Result<(), &'static str> {
+    if email.is_empty() || email.len() > 254 {
+        return Err("Email address length must be between 1 and 254 characters.");
+    }
+    if email.contains('\r') || email.contains('\n') || email.contains('\0') || email.contains(' ') {
+        return Err("Email contains illegal characters or line breaks.");
+    }
+    let parts: Vec<&str> = email.split('@').collect();
+    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() || !parts[1].contains('.') {
+        return Err("Invalid email address format. Expected format: user@domain.com");
+    }
+    Ok(())
+}
+
 /// ACME HTTP-01 Challenge responder for Let's Encrypt verification.
 /// Let's Encrypt queries GET /.well-known/acme-challenge/:token over port 80.
 pub async fn acme_challenge_handler(
     Path(token): Path<String>,
     State(state): State<SharedState>,
 ) -> Response {
-    let key = format!("acme_challenge:{}", token.trim());
+    let clean_token = token.trim();
+    // Validate ACME token format: base64url characters only [a-zA-Z0-9_-], 8 to 128 characters (RFC 8555)
+    if clean_token.len() < 8
+        || clean_token.len() > 128
+        || !clean_token
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Invalid ACME challenge token format.",
+        )
+            .into_response();
+    }
+
+    let key = format!("acme_challenge:{}", clean_token);
     if let Ok(Some(auth_value)) = obaf_database::get_system_setting(&state.db, &key).await {
         let mut res = auth_value.into_response();
         res.headers_mut().insert(
@@ -270,24 +390,21 @@ pub async fn configure_domain(
         .trim_end_matches('/')
         .to_lowercase();
 
-    if clean_domain.is_empty() || !clean_domain.contains('.') || clean_domain.contains(' ') {
+    if let Err(err) = validate_domain(&clean_domain) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(AuthErrorResponse {
-                error:
-                    "Invalid domain format. Please supply a valid FQDN (e.g. api.yourcompany.com)."
-                        .to_string(),
+                error: err.to_string(),
             }),
         ));
     }
 
     let clean_email = payload.contact_email.trim().to_lowercase();
-    if !clean_email.contains('@') {
+    if let Err(err) = validate_email(&clean_email) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(AuthErrorResponse {
-                error: "Invalid contact email address. Required for Let's Encrypt expiration notifications."
-                    .to_string(),
+                error: err.to_string(),
             }),
         ));
     }
@@ -540,6 +657,7 @@ pub async fn get_proxy_config(
         .await
         .ok()
         .flatten()
+        .filter(|d| validate_domain(d).is_ok())
         .unwrap_or_else(|| "api.yourcompany.com".to_string());
 
     let caddyfile = format!(

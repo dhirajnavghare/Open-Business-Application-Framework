@@ -152,6 +152,17 @@ impl FromRequestParts<SharedState> for AuthUser {
             )
         })?;
 
+        // Intermediate MFA challenge tokens are strictly prohibited from authenticating standard APIs
+        if claims.role == "superadmin_mfa_pending" {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(AuthErrorResponse {
+                    error: "MFA challenge pending: please complete TOTP 2FA verification before accessing platform endpoints."
+                        .to_string(),
+                }),
+            ));
+        }
+
         Ok(AuthUser {
             user_id: claims.sub,
             tenant_id: claims.tenant_id,

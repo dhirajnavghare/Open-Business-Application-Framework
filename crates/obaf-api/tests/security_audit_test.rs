@@ -443,3 +443,254 @@ async fn test_stored_xss_protection_in_invoice_html() {
     assert!(html.contains("&lt;script&gt;alert(&#39;XSS-Customer&#39;)&lt;/script&gt;"));
     assert!(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
 }
+
+#[tokio::test]
+async fn test_domain_validation_and_injection_defense() {
+    let (app, _) = setup_test_app().await;
+
+    // 1. Authenticate as Super Admin
+    let login_body = json!({
+        "email": "admin@obaf.local",
+        "password": "admin123"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let login_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let admin_token = login_res["token"].as_str().unwrap();
+
+    // 2. Reject domain containing newlines (Caddy/Nginx CRLF config injection attempt)
+    let crlf_domain = json!({
+        "domain": "api.example.com\nserver {\nlisten 80;\n}",
+        "email": "admin@example.com"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/configure-domain")
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(crlf_domain.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Reject raw loopback / private IP as domain
+    let ip_domain = json!({
+        "domain": "127.0.0.1",
+        "email": "admin@example.com"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/configure-domain")
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(ip_domain.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 4. Reject localhost as domain
+    let localhost_domain = json!({
+        "domain": "localhost",
+        "email": "admin@example.com"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/configure-domain")
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(localhost_domain.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 5. Reject domain with command injection characters
+    let cmd_domain = json!({
+        "domain": "api.example.com; rm -rf /",
+        "email": "admin@example.com"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/configure-domain")
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(cmd_domain.to_string()))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_acme_challenge_token_security() {
+    let (app, _) = setup_test_app().await;
+
+    // 1. Directory traversal in token is rejected with 400 Bad Request
+    let req = Request::builder()
+        .method("GET")
+        .uri("/.well-known/acme-challenge/..%2F..%2Fetc%2Fpasswd")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Token with illegal characters (spaces, semicolons) is rejected
+    let req2 = Request::builder()
+        .method("GET")
+        .uri("/.well-known/acme-challenge/invalid!token@123")
+        .body(Body::empty())
+        .unwrap();
+
+    let res2 = app.clone().oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Excessively short token (< 8 chars) is rejected
+    let req3 = Request::builder()
+        .method("GET")
+        .uri("/.well-known/acme-challenge/short")
+        .body(Body::empty())
+        .unwrap();
+
+    let res3 = app.oneshot(req3).await.unwrap();
+    assert_eq!(res3.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_private_ip_ssrf_rejection_in_webhooks() {
+    let (app, _) = setup_test_app().await;
+
+    let tenant_id = Uuid::new_v4();
+    let user_id = Uuid::new_v4();
+    let token =
+        generate_token(user_id, TenantId::from(tenant_id), "admin", TEST_SECRET, 1).unwrap();
+
+    // 1. Private RFC 1918 Class C address (192.168.x.x) is rejected
+    let payload = json!({
+        "url": "http://192.168.1.1/admin-hook",
+        "event_types": ["order.created"]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/webhooks")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Private RFC 1918 Class A address (10.x.x.x) is rejected
+    let payload2 = json!({
+        "url": "http://10.0.0.1/internal-hook",
+        "event_types": ["order.created"]
+    });
+    let req2 = Request::builder()
+        .method("POST")
+        .uri("/api/v1/webhooks")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(payload2.to_string()))
+        .unwrap();
+
+    let res2 = app.oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_mfa_pending_token_privilege_isolation() {
+    let (app, _) = setup_test_app().await;
+
+    // Generate an intermediate token with role "superadmin_mfa_pending"
+    let mfa_pending_token = generate_token(
+        Uuid::new_v4(),
+        TenantId(Uuid::nil()),
+        "superadmin_mfa_pending",
+        TEST_SECRET,
+        1,
+    )
+    .unwrap();
+
+    // Attempting to call protected Super Admin routes with this token MUST be rejected
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/stats")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", mfa_pending_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // Attempting to call tenant routes with this token MUST also be rejected
+    let req2 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", mfa_pending_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res2 = app.oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_password_length_enforcement() {
+    let (app, state) = setup_test_app().await;
+
+    // Create an organization first
+    let org_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let org = obaf_database::entities::organization::ActiveModel {
+        id: Set(org_id),
+        name: Set("Security Org".to_string()),
+        slug: Set("security-org".to_string()),
+        preset: Set("retail".to_string()),
+        active_modules: Set("[\"catalog\"]".to_string()),
+        settings: Set("{}".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    org.insert(&state.db).await.unwrap();
+
+    // Attempt registration with weak password (< 8 characters)
+    let short_pw_payload = json!({
+        "organization_id": org_id,
+        "email": "user@security.org",
+        "password": "123",
+        "full_name": "Short Pw User",
+        "role": "cashier"
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/register")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(short_pw_payload.to_string()))
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("at least 8 characters"));
+}

@@ -525,6 +525,14 @@ pub async fn create_organization(
     let raw_pw = payload
         .admin_password
         .unwrap_or_else(|| "admin123".to_string());
+    if raw_pw.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "Tenant admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
     let pw_hash = hash_password(&raw_pw).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

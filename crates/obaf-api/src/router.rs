@@ -44,10 +44,48 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/info", get(engine_info))
         .route("/schema", get(schema_discovery));
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let allowed_methods = [
+        axum::http::Method::GET,
+        axum::http::Method::POST,
+        axum::http::Method::PUT,
+        axum::http::Method::PATCH,
+        axum::http::Method::DELETE,
+        axum::http::Method::OPTIONS,
+        axum::http::Method::HEAD,
+    ];
+
+    let cors = if let Ok(origins_str) = std::env::var("OBAF_CORS_ALLOWED_ORIGINS")
+        .or_else(|_| std::env::var("CORS_ALLOWED_ORIGINS"))
+    {
+        let origins: Vec<HeaderValue> = origins_str
+            .split(',')
+            .filter_map(|s| {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    HeaderValue::from_str(trimmed).ok()
+                }
+            })
+            .collect();
+
+        if origins.is_empty() || origins_str.trim() == "*" {
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(allowed_methods)
+                .allow_headers(Any)
+        } else {
+            CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods(allowed_methods)
+                .allow_headers(Any)
+        }
+    } else {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(allowed_methods)
+            .allow_headers(Any)
+    };
 
     Router::new()
         // Health, Metrics & AI Agent discovery endpoints

@@ -80,6 +80,24 @@ fn validate_webhook_url(raw_url: &str) -> Result<(), &'static str> {
         );
     }
 
+    // Prohibit private IP ranges (RFC 1918 & link-local)
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        match ip {
+            std::net::IpAddr::V4(v4) => {
+                if v4.is_loopback() || v4.is_private() || v4.is_link_local() {
+                    return Err(
+                        "Webhook destination address is prohibited (private or loopback IP range)",
+                    );
+                }
+            }
+            std::net::IpAddr::V6(v6) => {
+                if v6.is_loopback() {
+                    return Err("Webhook destination address is prohibited (IPv6 loopback)");
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 

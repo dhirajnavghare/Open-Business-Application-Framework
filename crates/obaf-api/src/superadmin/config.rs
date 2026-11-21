@@ -91,6 +91,11 @@ impl SuperAdminConfig {
     pub fn is_google_auth_enabled(&self) -> bool {
         self.google_client_id.is_some()
     }
+
+    /// Whether Super Admin is using the default out-of-the-box password ("admin123")
+    pub fn is_default_password(&self) -> bool {
+        self.password == "admin123"
+    }
 }
 
 impl Default for SuperAdminConfig {

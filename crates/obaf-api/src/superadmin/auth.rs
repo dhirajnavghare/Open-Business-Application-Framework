@@ -86,6 +86,7 @@ pub struct SuperAdminConfigResponse {
     pub google_auth_enabled: bool,
     pub superadmin_email: String,
     pub mfa_enabled: bool,
+    pub default_password_warning: bool,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -901,11 +902,14 @@ pub async fn get_superadmin_config(
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
 
+    let default_password_warning = config.is_default_password();
+
     Json(SuperAdminConfigResponse {
         google_client_id,
         google_auth_enabled,
         superadmin_email: config.email.clone(),
         mfa_enabled,
+        default_password_warning,
     })
 }
 
