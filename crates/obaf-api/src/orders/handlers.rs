@@ -262,7 +262,8 @@ pub async fn create_order(
     })?;
 
     // Real-time broadcast for Kitchen Display System (KDS) & POS screens
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "order.created",
         serde_json::json!({
             "order_id": order_id,
@@ -462,7 +463,8 @@ pub async fn update_status(
     }
 
     // Real-time broadcast for live kitchen & status updates
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "order.status_updated",
         serde_json::json!({
             "order_id": id,

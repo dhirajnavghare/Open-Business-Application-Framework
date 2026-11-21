@@ -441,11 +441,16 @@ pub async fn create_organization(
     })?;
 
     let slug_clean = payload.slug.trim().to_lowercase();
-    if slug_clean.is_empty() {
+    if slug_clean.is_empty()
+        || slug_clean.len() > 64
+        || !slug_clean
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ErrorResponse {
-                error: "Organization slug cannot be empty.".to_string(),
+                error: "Invalid slug format: must contain only lowercase alphanumeric characters and hyphens (1-64 chars).".to_string(),
             }),
         ));
     }

@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::{header, HeaderName, HeaderValue, StatusCode},
     middleware::{from_fn, from_fn_with_state, Next},
     response::{IntoResponse, Response},
@@ -87,6 +87,7 @@ pub fn create_router(state: SharedState) -> Router {
         .layer(from_fn_with_state(state.clone(), module_gating_middleware))
         .layer(from_fn(request_id_and_security_middleware))
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -112,25 +113,42 @@ async fn rate_limit_middleware(
         return next.run(request).await;
     }
 
-    // Determine client rate limiting key (Token Bucket per client/tenant)
+    // Determine client rate limiting key (Token Bucket per tenant / API key / IP)
     let client_key = if let Some(auth) = request
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
     {
-        format!("auth:{}", &auth[..auth.len().min(32)])
-    } else if let Some(ip) = request
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            if let Ok(claims) = obaf_core::verify_token(token, &state.jwt_secret) {
+                format!("tenant:{}", claims.tenant_id.0)
+            } else {
+                format!("auth:{}", &token[token.len().saturating_sub(16)..])
+            }
+        } else {
+            format!("auth:{}", &auth[auth.len().saturating_sub(16)..])
+        }
+    } else if let Some(api_key) = request
         .headers()
-        .get("x-forwarded-for")
+        .get("x-api-key")
         .and_then(|v| v.to_str().ok())
     {
-        format!("ip:{}", ip.split(',').next().unwrap_or("unknown").trim())
+        format!("apikey:{}", &api_key[api_key.len().saturating_sub(16)..])
     } else if let Some(ip) = request
         .headers()
         .get("cf-connecting-ip")
         .and_then(|v| v.to_str().ok())
     {
         format!("ip:{}", ip.trim())
+    } else if let Some(ip) = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+    {
+        format!(
+            "ip:{}",
+            ip.split(',').next_back().unwrap_or("unknown").trim()
+        )
     } else {
         "client:default".to_string()
     };
@@ -203,6 +221,12 @@ async fn request_id_and_security_middleware(
     headers.insert(
         header::REFERRER_POLICY,
         HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self';",
+        ),
     );
     response
 }

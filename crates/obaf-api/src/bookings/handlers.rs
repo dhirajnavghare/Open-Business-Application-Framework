@@ -163,7 +163,8 @@ pub async fn check_in_booking(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.checked_in",
         serde_json::json!({
             "booking_id": updated.id,
@@ -208,7 +209,8 @@ pub async fn check_out_booking(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.checked_out",
         serde_json::json!({
             "booking_id": updated.id,
@@ -284,7 +286,8 @@ pub async fn update_booking_status(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.status_updated",
         serde_json::json!({
             "booking_id": updated.id,

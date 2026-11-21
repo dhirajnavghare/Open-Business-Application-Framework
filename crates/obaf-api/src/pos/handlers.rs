@@ -134,7 +134,8 @@ pub async fn open_shift(
         .await
         .map_err(|e| internal_err(format!("Failed to open shift: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "pos.shift_opened",
         serde_json::json!({
             "shift_id": shift_id,
@@ -242,7 +243,8 @@ pub async fn close_shift(
         .await
         .map_err(|e| internal_err(format!("Failed to close shift: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "pos.shift_closed",
         serde_json::json!({
             "shift_id": id,

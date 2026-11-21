@@ -353,7 +353,8 @@ pub async fn refund_payment(
     .await;
 
     // Real-time broadcast
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "payment.refunded",
         serde_json::json!({
             "payment_id": id,

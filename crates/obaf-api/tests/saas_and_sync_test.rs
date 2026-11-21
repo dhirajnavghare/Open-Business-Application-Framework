@@ -52,6 +52,12 @@ async fn test_security_headers_middleware() {
         .to_str()
         .unwrap()
         .contains("max-age=31536000"));
+    assert!(headers
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("default-src 'self'"));
 }
 
 #[tokio::test]

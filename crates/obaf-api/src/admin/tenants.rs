@@ -79,9 +79,23 @@ pub async fn provision_tenant(
     State(state): State<SharedState>,
     Json(payload): Json<ProvisionTenantRequest>,
 ) -> Result<(StatusCode, Json<ProvisionTenantResponse>), (StatusCode, Json<ApiErrorResponse>)> {
+    // Validate slug format
+    let slug = payload.slug.trim().to_lowercase();
+    if slug.is_empty()
+        || slug.len() > 64
+        || !slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Invalid slug format: must contain only lowercase alphanumeric characters and hyphens (1-64 chars)".to_string(),
+            }),
+        ));
+    }
+
     // Check slug uniqueness
     let existing_org = organization::Entity::find()
-        .filter(organization::Column::Slug.eq(&payload.slug))
+        .filter(organization::Column::Slug.eq(&slug))
         .one(&state.db)
         .await
         .map_err(|e| {
@@ -97,7 +111,7 @@ pub async fn provision_tenant(
         return Err((
             StatusCode::CONFLICT,
             Json(ApiErrorResponse {
-                error: format!("Organization with slug '{}' already exists", payload.slug),
+                error: format!("Organization with slug '{}' already exists", slug),
             }),
         ));
     }
@@ -105,7 +119,21 @@ pub async fn provision_tenant(
     let preset_id = payload
         .preset_id
         .clone()
-        .unwrap_or_else(|| "retail_grocery".to_string());
+        .unwrap_or_else(|| "retail_grocery".to_string())
+        .trim()
+        .to_lowercase();
+
+    if !preset_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Invalid preset format: must contain only lowercase alphanumeric characters and underscores".to_string(),
+            }),
+        ));
+    }
     let plan_tier = payload
         .plan_tier
         .clone()
@@ -127,7 +155,7 @@ pub async fn provision_tenant(
 
     let new_org = organization::ActiveModel {
         id: Set(org_id),
-        slug: Set(payload.slug.clone()),
+        slug: Set(slug.clone()),
         name: Set(payload.organization_name.clone()),
         preset: Set(preset_id.clone()),
         active_modules: Set(modules_json.clone()),
@@ -206,7 +234,7 @@ pub async fn provision_tenant(
         Json(ProvisionTenantResponse {
             tenant_id: org_id,
             organization_name: payload.organization_name,
-            slug: payload.slug,
+            slug,
             plan_tier,
             admin_user_id: user_id,
             admin_email: payload.admin_email,

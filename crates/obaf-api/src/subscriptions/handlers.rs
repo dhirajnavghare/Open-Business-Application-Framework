@@ -260,7 +260,8 @@ pub async fn check_in_member(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "subscription.check_in",
         serde_json::json!({
             "subscription_id": sub.id,

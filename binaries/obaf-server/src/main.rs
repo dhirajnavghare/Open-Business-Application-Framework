@@ -81,6 +81,11 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // 5. Initialize shared state and create Axum router
+    if cfg.security.jwt_secret == "dev_secret_please_change_in_production" {
+        tracing::warn!(
+            "⚠️  SECURITY WARNING: Using default development JWT secret! Set JWT_SECRET in production."
+        );
+    }
     let state = Arc::new(AppState::with_router(db, router, cfg.security.jwt_secret));
     let app = create_router(state);
 

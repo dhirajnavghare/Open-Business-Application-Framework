@@ -49,9 +49,38 @@ pub async fn bootstrap_preset(
     State(state): State<SharedState>,
     Json(payload): Json<BootstrapPresetRequest>,
 ) -> Result<(StatusCode, Json<BootstrapPresetResponse>), (StatusCode, Json<ApiErrorResponse>)> {
-    // 1. Verify slug uniqueness
+    // 1. Validate slug and preset inputs to prevent injection and path traversal attacks
+    let slug = payload.slug.trim().to_lowercase();
+    if slug.is_empty()
+        || slug.len() > 64
+        || !slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Invalid slug format: must contain only lowercase alphanumeric characters and hyphens (1-64 chars)".to_string(),
+            }),
+        ));
+    }
+
+    let preset = payload.preset.trim().to_lowercase();
+    if preset.is_empty()
+        || preset.len() > 64
+        || !preset
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Invalid preset format: must contain only lowercase alphanumeric characters and underscores".to_string(),
+            }),
+        ));
+    }
+
+    // 2. Verify slug uniqueness
     let existing = organization::Entity::find()
-        .filter(organization::Column::Slug.eq(&payload.slug))
+        .filter(organization::Column::Slug.eq(&slug))
         .one(&state.db)
         .await
         .map_err(|e| {
@@ -67,13 +96,13 @@ pub async fn bootstrap_preset(
         return Err((
             StatusCode::CONFLICT,
             Json(ApiErrorResponse {
-                error: format!("Organization with slug '{}' already exists", payload.slug),
+                error: format!("Organization with slug '{}' already exists", slug),
             }),
         ));
     }
 
-    // 2. Load preset configuration from config/presets/*.json if available
-    let preset_file_path = format!("config/presets/{}.json", payload.preset);
+    // 3. Load preset configuration from config/presets/*.json if available
+    let preset_file_path = std::path::Path::new("config/presets").join(format!("{}.json", preset));
     let (active_modules, settings_json) =
         if let Ok(content) = std::fs::read_to_string(&preset_file_path) {
             if let Ok(preset_json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -135,8 +164,8 @@ pub async fn bootstrap_preset(
     let org = organization::ActiveModel {
         id: Set(org_id),
         name: Set(payload.organization_name.clone()),
-        slug: Set(payload.slug.clone()),
-        preset: Set(payload.preset.clone()),
+        slug: Set(slug.clone()),
+        preset: Set(preset.clone()),
         active_modules: Set(serde_json::to_string(&active_modules).unwrap_or_default()),
         settings: Set(settings_json),
         created_at: Set(now),
@@ -210,8 +239,8 @@ pub async fn bootstrap_preset(
         Json(BootstrapPresetResponse {
             organization_id: org_id,
             organization_name: payload.organization_name,
-            slug: payload.slug,
-            preset: payload.preset,
+            slug,
+            preset,
             active_modules,
             admin_user_id: user_id,
             message: "Organization and admin user successfully bootstrapped".to_string(),
