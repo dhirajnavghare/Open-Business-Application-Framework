@@ -24,6 +24,7 @@ use utoipa::{
         // Auth
         crate::auth::handlers::login,
         crate::auth::handlers::register,
+        crate::auth::handlers::logout,
         crate::auth::handlers::me,
         crate::auth::api_keys::create_api_key,
         crate::auth::api_keys::list_api_keys,
@@ -131,6 +132,7 @@ use utoipa::{
         crate::search::handlers::global_search,
         // SuperAdmin
         crate::superadmin::auth::superadmin_login,
+        crate::superadmin::auth::superadmin_logout,
         crate::superadmin::auth::superadmin_mfa_verify,
         crate::superadmin::auth::superadmin_mfa_setup,
         crate::superadmin::auth::superadmin_mfa_activate,

@@ -102,11 +102,28 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(AppState::with_router(db, router, jwt_secret));
 
-    // Security Audit Check: Warn immediately if out-of-the-box credentials are in use
+    // Security Audit Check: Enforce non-default credentials in production, warn in development
     if state.superadmin.is_default_password() {
-        tracing::warn!(
-            "⚠️  [SECURITY ALERT] Super Admin is configured with default initial password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD in environment immediately!"
-        );
+        let is_prod = std::env::var("OBAF_ENV")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("production")
+            || std::env::var("APP_ENV")
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("production")
+            || std::env::var("ENV")
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("production");
+
+        if is_prod {
+            tracing::error!(
+                "🛑 [FATAL SECURITY ERROR] Server refusing to start in PRODUCTION mode with default Super Admin password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD before launching."
+            );
+            anyhow::bail!("Refusing to start in production with default credentials. Set OBAF_SUPERADMIN_PASSWORD.");
+        } else {
+            tracing::warn!(
+                "⚠️  [SECURITY ALERT] Super Admin is configured with default initial password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD in environment immediately!"
+            );
+        }
     }
 
     let app = create_router(state.clone());

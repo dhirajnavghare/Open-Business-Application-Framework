@@ -936,3 +936,37 @@ pub async fn get_superadmin_me(
         role: user.role,
     }))
 }
+
+/// Revoke current Super Administrator session token and log out.
+#[utoipa::path(
+    post,
+    path = "/api/v1/superadmin/logout",
+    tag = "SuperAdmin",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Logged out successfully; session token revoked"),
+        (status = 401, description = "Unauthorized", body = ErrorMessage),
+        (status = 403, description = "Forbidden: requires superadmin role", body = ErrorMessage)
+    )
+)]
+pub async fn superadmin_logout(
+    user: AuthUser,
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorMessage>)> {
+    user.require_superadmin()
+        .map_err(|(s, j)| (s, Json(ErrorMessage { error: j.0.error })))?;
+
+    if let Some(auth_header) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            state.revoke_token(token);
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "message": "Super Administrator logged out successfully. Session token has been revoked."
+    })))
+}

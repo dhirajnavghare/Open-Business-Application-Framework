@@ -1,4 +1,8 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::State,
+    http::{header, HeaderMap, StatusCode},
+    Json,
+};
 use chrono::Utc;
 use obaf_core::{generate_token, hash_password, verify_password, TenantId};
 use obaf_database::entities::{organization, user};
@@ -58,10 +62,44 @@ pub struct UserProfileResponse {
 )]
 pub async fn login(
     State(state): State<SharedState>,
+    headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, (StatusCode, Json<AuthErrorResponse>)> {
-    let user = user::Entity::find()
-        .filter(user::Column::Email.eq(&payload.email))
+    let client_ip = if let Some(ip) = headers
+        .get("cf-connecting-ip")
+        .and_then(|v| v.to_str().ok())
+    {
+        ip.trim().to_string()
+    } else if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+        ip.trim().to_string()
+    } else if let Some(ip) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        ip.split(',')
+            .next_back()
+            .unwrap_or("127.0.0.1")
+            .trim()
+            .to_string()
+    } else {
+        "127.0.0.1".to_string()
+    };
+
+    let email_cleaned = payload.email.trim().to_lowercase();
+    let attempt_key = format!("tenant_login:{}:{}", email_cleaned, client_ip);
+
+    // Defense-in-Depth: Progressive brute force and credential stuffing mitigation
+    if let Err(retry_secs) = state.login_guard.check_lockout(&attempt_key) {
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Too many failed login attempts: account locked. Please retry after {} seconds.",
+                    retry_secs
+                ),
+            }),
+        ));
+    }
+
+    let user_opt = user::Entity::find()
+        .filter(user::Column::Email.eq(&email_cleaned))
         .filter(user::Column::IsActive.eq(true))
         .one(&state.db)
         .await
@@ -72,33 +110,42 @@ pub async fn login(
                     error: format!("Database error: {}", e),
                 }),
             )
-        })?
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(AuthErrorResponse {
-                    error: "Invalid email or password".to_string(),
-                }),
-            )
         })?;
 
-    let is_valid = verify_password(&payload.password, &user.password_hash).map_err(|_| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(AuthErrorResponse {
-                error: "Invalid email or password".to_string(),
-            }),
-        )
-    })?;
+    // Precomputed dummy Argon2id hash to equalize verification timing if user doesn't exist (anti-enumeration)
+    const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$ZHVtbXlzYWx0MTIzNDU2$O+xV3lqU4E8m8GvZ05vL4H9fD3P0gZp6l8K4j1s9Q0I";
 
-    if !is_valid {
+    let (is_valid, user) = match user_opt {
+        Some(u) => {
+            let valid = verify_password(&payload.password, &u.password_hash).unwrap_or(false);
+            (valid, Some(u))
+        }
+        None => {
+            let _ = verify_password(&payload.password, DUMMY_HASH);
+            (false, None)
+        }
+    };
+
+    if !is_valid || user.is_none() {
+        let (_count, is_locked) = state.login_guard.record_failure(&attempt_key);
+        let err_msg = if is_locked {
+            "Too many failed login attempts: account locked for 15 minutes.".to_string()
+        } else {
+            "Invalid email or password".to_string()
+        };
+
         return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(AuthErrorResponse {
-                error: "Invalid email or password".to_string(),
-            }),
+            if is_locked {
+                StatusCode::TOO_MANY_REQUESTS
+            } else {
+                StatusCode::UNAUTHORIZED
+            },
+            Json(AuthErrorResponse { error: err_msg }),
         ));
     }
+
+    state.login_guard.record_success(&attempt_key);
+    let user = user.unwrap();
 
     let token = generate_token(
         user.id,
@@ -298,4 +345,33 @@ pub async fn me(
         role: user.role,
         is_active: user.is_active,
     }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Logged out successfully; session token revoked"),
+        (status = 401, description = "Unauthorized", body = AuthErrorResponse)
+    )
+)]
+pub async fn logout(
+    State(state): State<SharedState>,
+    _auth: AuthUser,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    if let Some(auth_header) = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            state.revoke_token(token);
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "message": "Successfully logged out. Session token has been revoked."
+    })))
 }

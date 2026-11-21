@@ -80,6 +80,29 @@ async fn test_security_headers_and_csp() {
     assert!(csp.contains("script-src 'self'"));
     assert!(csp.contains("object-src 'none'"));
     assert!(csp.contains("base-uri 'self'"));
+
+    assert_eq!(
+        headers
+            .get("cross-origin-resource-policy")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "same-origin"
+    );
+    assert_eq!(
+        headers
+            .get("cross-origin-opener-policy")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "same-origin-allow-popups"
+    );
+    assert!(headers
+        .get("permissions-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("geolocation=()"));
 }
 
 #[tokio::test]
@@ -693,4 +716,308 @@ async fn test_password_length_enforcement() {
         .as_str()
         .unwrap()
         .contains("at least 8 characters"));
+}
+
+#[tokio::test]
+async fn test_token_logout_revocation_blacklist() {
+    let (app, state) = setup_test_app().await;
+
+    // Create an organization and user
+    let org_id = Uuid::new_v4();
+    let user_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let org = obaf_database::entities::organization::ActiveModel {
+        id: Set(org_id),
+        name: Set("Revoke Org".to_string()),
+        slug: Set("revoke-org".to_string()),
+        preset: Set("retail".to_string()),
+        active_modules: Set("[\"catalog\"]".to_string()),
+        settings: Set("{}".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    org.insert(&state.db).await.unwrap();
+
+    let user = obaf_database::entities::user::ActiveModel {
+        id: Set(user_id),
+        organization_id: Set(org_id),
+        email: Set("revokeme@security.org".to_string()),
+        password_hash: Set(obaf_core::security::hash_password("password123").unwrap()),
+        full_name: Set("Revoke User".to_string()),
+        role: Set("admin".to_string()),
+        is_active: Set(true),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    user.insert(&state.db).await.unwrap();
+
+    let token = generate_token(user_id, TenantId(org_id), "admin", TEST_SECRET, 24).unwrap();
+
+    // 1. Verify token works
+    let req1 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/auth/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res1 = app.clone().oneshot(req1).await.unwrap();
+    assert_eq!(res1.status(), StatusCode::OK);
+
+    // 2. Call logout endpoint to revoke the token
+    let req_logout = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/logout")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res_logout = app.clone().oneshot(req_logout).await.unwrap();
+    assert_eq!(res_logout.status(), StatusCode::OK);
+
+    // 3. Verify same token is now rejected with 401 UNAUTHORIZED
+    let req2 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/auth/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res2 = app.oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_superadmin_logout_revocation() {
+    let (app, _) = setup_test_app().await;
+
+    let token = generate_token(
+        obaf_api::superadmin::auth::SUPERADMIN_USER_ID,
+        TenantId(Uuid::nil()),
+        "superadmin",
+        TEST_SECRET,
+        24,
+    )
+    .unwrap();
+
+    // 1. Verify SuperAdmin token works
+    let req1 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res1 = app.clone().oneshot(req1).await.unwrap();
+    assert_eq!(res1.status(), StatusCode::OK);
+
+    // 2. Call SuperAdmin logout endpoint
+    let req_logout = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/logout")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res_logout = app.clone().oneshot(req_logout).await.unwrap();
+    assert_eq!(res_logout.status(), StatusCode::OK);
+
+    // 3. Verify same SuperAdmin token is now rejected with 401 UNAUTHORIZED
+    let req2 = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/me")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res2 = app.oneshot(req2).await.unwrap();
+    assert_eq!(res2.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_financial_business_logic_integrity() {
+    let (app, state) = setup_test_app().await;
+
+    let org_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let org = obaf_database::entities::organization::ActiveModel {
+        id: Set(org_id),
+        name: Set("Financial Org".to_string()),
+        slug: Set("fin-org".to_string()),
+        preset: Set("retail".to_string()),
+        active_modules: Set("[\"catalog\",\"orders\",\"payments\"]".to_string()),
+        settings: Set("{}".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    org.insert(&state.db).await.unwrap();
+
+    let token = generate_token(Uuid::new_v4(), TenantId(org_id), "admin", TEST_SECRET, 24).unwrap();
+
+    // 1. Attempt creating product with negative price
+    let neg_prod_payload = json!({
+        "name": "Negative Price Item",
+        "sku": "NEG-001",
+        "price": "-10.00",
+        "cost_price": "5.00",
+        "tax_rate": "0.1"
+    });
+
+    let req_prod = Request::builder()
+        .method("POST")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(neg_prod_payload.to_string()))
+        .unwrap();
+
+    let res_prod = app.clone().oneshot(req_prod).await.unwrap();
+    assert_eq!(res_prod.status(), StatusCode::BAD_REQUEST);
+
+    // Create a valid product for order tests
+    let valid_prod_id = Uuid::new_v4();
+    let valid_prod = obaf_database::entities::product::ActiveModel {
+        id: Set(valid_prod_id),
+        tenant_id: Set(org_id),
+        category_id: Set(None),
+        sku: Set("VALID-001".to_string()),
+        name: Set("Valid Widget".to_string()),
+        price: Set(Decimal::new(2000, 2)), // 20.00
+        cost_price: Set(Decimal::new(1000, 2)),
+        tax_rate: Set(Decimal::new(1, 1)), // 0.1
+        metadata: Set("{}".to_string()),
+        is_active: Set(true),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    valid_prod.insert(&state.db).await.unwrap();
+
+    // 2. Attempt creating order with negative quantity
+    let neg_order_payload = json!({
+        "items": [
+            {
+                "product_id": valid_prod_id,
+                "quantity": "-2.00"
+            }
+        ]
+    });
+
+    let req_order = Request::builder()
+        .method("POST")
+        .uri("/api/v1/orders")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(neg_order_payload.to_string()))
+        .unwrap();
+
+    let res_order = app.clone().oneshot(req_order).await.unwrap();
+    assert_eq!(res_order.status(), StatusCode::BAD_REQUEST);
+    let bytes = to_bytes(res_order.into_body(), usize::MAX).await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("strictly greater than zero"));
+
+    // 3. Attempt recording payment with negative amount
+    let neg_pay_payload = json!({
+        "amount": "-50.00",
+        "payment_method": "CASH"
+    });
+
+    let req_pay = Request::builder()
+        .method("POST")
+        .uri("/api/v1/payments")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(neg_pay_payload.to_string()))
+        .unwrap();
+
+    let res_pay = app.oneshot(req_pay).await.unwrap();
+    assert_eq!(res_pay.status(), StatusCode::BAD_REQUEST);
+    let bytes_pay = to_bytes(res_pay.into_body(), usize::MAX).await.unwrap();
+    let body_pay: serde_json::Value = serde_json::from_slice(&bytes_pay).unwrap();
+    assert!(body_pay["error"]
+        .as_str()
+        .unwrap()
+        .contains("strictly greater than zero"));
+}
+
+#[tokio::test]
+async fn test_tenant_login_brute_force_lockout() {
+    let (app, state) = setup_test_app().await;
+
+    let org_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let org = obaf_database::entities::organization::ActiveModel {
+        id: Set(org_id),
+        name: Set("Lockout Org".to_string()),
+        slug: Set("lockout-org".to_string()),
+        preset: Set("retail".to_string()),
+        active_modules: Set("[\"catalog\"]".to_string()),
+        settings: Set("{}".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    org.insert(&state.db).await.unwrap();
+
+    let user_id = Uuid::new_v4();
+    let user = obaf_database::entities::user::ActiveModel {
+        id: Set(user_id),
+        organization_id: Set(org_id),
+        email: Set("target@security.org".to_string()),
+        password_hash: Set(obaf_core::security::hash_password("correct-password").unwrap()),
+        full_name: Set("Target User".to_string()),
+        role: Set("admin".to_string()),
+        is_active: Set(true),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    user.insert(&state.db).await.unwrap();
+
+    let wrong_payload = json!({
+        "email": "target@security.org",
+        "password": "wrong-password-guess"
+    });
+
+    // Fire 4 incorrect attempts (first 4 return 401 UNAUTHORIZED)
+    for _ in 0..4 {
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/auth/login")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(wrong_payload.to_string()))
+            .unwrap();
+
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    // 5th attempt reaches threshold and triggers lockout (429 TOO_MANY_REQUESTS)
+    let req_lockout = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(wrong_payload.to_string()))
+        .unwrap();
+
+    let res_lockout = app.clone().oneshot(req_lockout).await.unwrap();
+    assert_eq!(res_lockout.status(), StatusCode::TOO_MANY_REQUESTS);
+
+    // 6th attempt is blocked immediately by check_lockout (429 TOO_MANY_REQUESTS)
+    let req_locked = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(wrong_payload.to_string()))
+        .unwrap();
+
+    let res_locked = app.oneshot(req_locked).await.unwrap();
+    assert_eq!(res_locked.status(), StatusCode::TOO_MANY_REQUESTS);
+    let bytes = to_bytes(res_locked.into_body(), usize::MAX).await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("Too many failed login attempts"));
 }

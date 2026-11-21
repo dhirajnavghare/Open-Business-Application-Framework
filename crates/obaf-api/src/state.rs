@@ -20,6 +20,7 @@ pub struct AppState {
     pub rate_limiter: TokenBucketRateLimiter,
     pub superadmin: crate::superadmin::SuperAdminConfig,
     pub login_guard: crate::superadmin::security::LoginAttemptGuard,
+    pub token_blacklist: TtlCache<String, ()>,
 }
 
 impl AppState {
@@ -63,7 +64,26 @@ impl AppState {
             rate_limiter,
             superadmin,
             login_guard: crate::superadmin::security::LoginAttemptGuard::new(),
+            token_blacklist: TtlCache::new(Duration::from_secs(86_400), 100_000),
         }
+    }
+
+    /// Revoke a JWT token by storing its SHA-256 fingerprint in the blacklist.
+    pub fn revoke_token(&self, token: &str) {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(token.trim().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        self.token_blacklist.insert(hash, ());
+    }
+
+    /// Check if a JWT token has been explicitly revoked or logged out.
+    pub fn is_token_revoked(&self, token: &str) -> bool {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(token.trim().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        self.token_blacklist.get(&hash).is_some()
     }
 
     /// Set custom Super Admin configuration (useful for testing)

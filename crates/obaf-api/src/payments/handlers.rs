@@ -100,6 +100,18 @@ pub async fn record_payment(
         }
     }
 
+    if payload.amount <= Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Payment amount must be strictly greater than zero, got {}",
+                    payload.amount
+                ),
+            }),
+        ));
+    }
+
     let payment_id = Uuid::new_v4();
     let now = Utc::now();
 

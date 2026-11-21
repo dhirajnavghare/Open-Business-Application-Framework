@@ -152,6 +152,17 @@ impl FromRequestParts<SharedState> for AuthUser {
             )
         })?;
 
+        // Check if token has been revoked or logged out
+        if state.is_token_revoked(token) {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(AuthErrorResponse {
+                    error: "Authentication token has been revoked. Please log in again."
+                        .to_string(),
+                }),
+            ));
+        }
+
         // Intermediate MFA challenge tokens are strictly prohibited from authenticating standard APIs
         if claims.role == "superadmin_mfa_pending" {
             return Err((

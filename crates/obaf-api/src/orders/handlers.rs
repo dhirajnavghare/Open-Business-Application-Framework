@@ -112,6 +112,15 @@ pub async fn create_order(
         ));
     }
 
+    if payload.items.len() > 500 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Order items batch size exceeds maximum limit of 500 items".to_string(),
+            }),
+        ));
+    }
+
     let txn = state.db.begin().await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -132,6 +141,18 @@ pub async fn create_order(
     let mut stock_movements_to_insert = Vec::new();
 
     for item_req in &payload.items {
+        if item_req.quantity <= Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!(
+                        "Order item quantity must be strictly greater than zero, got {}",
+                        item_req.quantity
+                    ),
+                }),
+            ));
+        }
+
         let p = product::Entity::find()
             .filter(product::Column::Id.eq(item_req.product_id))
             .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))

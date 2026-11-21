@@ -85,6 +85,31 @@ pub async fn create_product(
 ) -> Result<(StatusCode, Json<ProductResponse>), (StatusCode, Json<AuthErrorResponse>)> {
     auth.require_role(&["admin", "manager"])?;
 
+    if payload.price < Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Product price cannot be negative".to_string(),
+            }),
+        ));
+    }
+    if payload.cost_price < Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Product cost price cannot be negative".to_string(),
+            }),
+        ));
+    }
+    if payload.tax_rate < Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Product tax rate cannot be negative".to_string(),
+            }),
+        ));
+    }
+
     let product_id = Uuid::new_v4();
     let now = Utc::now();
     let meta_str = payload
@@ -279,12 +304,36 @@ pub async fn update_product(
         active.name = Set(name);
     }
     if let Some(price) = payload.price {
+        if price < Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: "Product price cannot be negative".to_string(),
+                }),
+            ));
+        }
         active.price = Set(price);
     }
     if let Some(cost_price) = payload.cost_price {
+        if cost_price < Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: "Product cost price cannot be negative".to_string(),
+                }),
+            ));
+        }
         active.cost_price = Set(cost_price);
     }
     if let Some(tax_rate) = payload.tax_rate {
+        if tax_rate < Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: "Product tax rate cannot be negative".to_string(),
+                }),
+            ));
+        }
         active.tax_rate = Set(tax_rate);
     }
     if let Some(cat_id) = payload.category_id {

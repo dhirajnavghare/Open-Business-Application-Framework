@@ -13,6 +13,7 @@ pub use extractor::{AuthErrorResponse, AuthUser};
 pub fn auth_routes() -> Router<SharedState> {
     Router::new()
         .route("/login", post(handlers::login))
+        .route("/logout", post(handlers::logout))
         .route("/register", post(handlers::register))
         .route("/me", get(handlers::me))
         .route(

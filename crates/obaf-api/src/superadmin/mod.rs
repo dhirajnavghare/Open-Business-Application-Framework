@@ -40,6 +40,7 @@ pub fn superadmin_routes() -> Router<SharedState> {
         // Public authentication and configuration
         .route("/login", post(auth::superadmin_login))
         .route("/google-login", post(auth::superadmin_google_login))
+        .route("/logout", post(auth::superadmin_logout))
         .route("/config", get(auth::get_superadmin_config))
         .route("/me", get(auth::get_superadmin_me))
         // Multi-Factor Authentication (TOTP 2FA)
