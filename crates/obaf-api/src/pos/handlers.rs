@@ -87,6 +87,8 @@ pub async fn open_shift(
     auth: AuthUser,
     Json(payload): Json<OpenShiftRequest>,
 ) -> Result<(StatusCode, Json<PosShiftResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     // Check if cashier already has an active open shift on this register
@@ -202,6 +204,8 @@ pub async fn close_shift(
     Path(id): Path<Uuid>,
     Json(payload): Json<CloseShiftRequest>,
 ) -> Result<Json<PosShiftResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     let shift = pos_shift::Entity::find()
@@ -218,6 +222,16 @@ pub async fn close_shift(
                 }),
             )
         })?;
+
+    if shift.cashier_id != auth.user_id && auth.role != "admin" && auth.role != "manager" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(AuthErrorResponse {
+                error: "Cannot close another user's shift without administrative privileges"
+                    .to_string(),
+            }),
+        ));
+    }
 
     if shift.status == "CLOSED" {
         return Err((

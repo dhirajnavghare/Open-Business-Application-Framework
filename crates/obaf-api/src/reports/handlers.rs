@@ -57,6 +57,8 @@ pub async fn get_dashboard_metrics(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Json<DashboardMetrics>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     // 1. Total revenue from successful/completed payments
@@ -152,6 +154,8 @@ pub async fn get_kitchen_prep_sheet(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<KitchenPrepItem>>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     // Fetch orders in active prep stages
@@ -218,6 +222,8 @@ pub async fn get_sales_by_payment_method(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<PaymentMethodSummary>>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     let payments = payment::Entity::find()
@@ -259,6 +265,8 @@ pub async fn export_orders_csv(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let orders = order::Entity::find()
         .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .all(&state.db)
@@ -310,6 +318,8 @@ pub async fn export_customers_csv(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let customers = customer::Entity::find()
         .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .all(&state.db)
@@ -356,6 +366,8 @@ pub async fn export_inventory_csv(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let products = product::Entity::find()
         .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .all(&state.db)
@@ -391,8 +403,11 @@ pub async fn export_inventory_csv(
 }
 
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
+    tracing::error!("Internal error in reports: {}", msg);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(AuthErrorResponse { error: msg }),
+        Json(AuthErrorResponse {
+            error: "A database error occurred".to_string(),
+        }),
     )
 }

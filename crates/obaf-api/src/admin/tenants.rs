@@ -14,6 +14,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::admin::setup::ApiErrorResponse;
+use crate::auth::extractor::AuthUser;
 use crate::state::SharedState;
 
 #[derive(Deserialize, ToSchema)]
@@ -183,11 +184,22 @@ pub async fn provision_tenant(
         .admin_password
         .as_deref()
         .unwrap_or("AdminSecure123!");
+
+    if raw_pwd.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
     let hashed_pwd = hash_password(raw_pwd).map_err(|e| {
+        tracing::error!("Password hashing failed: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
-                error: format!("Password hashing failed: {}", e),
+                error: "Failed to process credentials securely".to_string(),
             }),
         )
     })?;
@@ -248,22 +260,35 @@ pub async fn provision_tenant(
     get,
     path = "/api/v1/admin/tenants",
     tag = "Admin",
+    security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "List of all SaaS tenants", body = Vec<TenantSummary>)
+        (status = 200, description = "List of all SaaS tenants", body = Vec<TenantSummary>),
+        (status = 401, description = "Unauthorized", body = ApiErrorResponse),
+        (status = 403, description = "Forbidden: admin role required", body = ApiErrorResponse)
     )
 )]
 pub async fn list_tenants(
     State(state): State<SharedState>,
+    auth: AuthUser,
 ) -> Result<Json<Vec<TenantSummary>>, (StatusCode, Json<ApiErrorResponse>)> {
-    let orgs = organization::Entity::find()
+    auth.require_role(&["admin"])
+        .map_err(|(sc, res)| (sc, Json(ApiErrorResponse { error: res.0.error })))?;
+
+    let mut q = organization::Entity::find();
+    if !auth.is_superadmin() {
+        q = q.filter(organization::Column::Id.eq(auth.tenant_id.as_uuid()));
+    }
+
+    let orgs = q
         .order_by_desc(organization::Column::CreatedAt)
         .all(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error fetching tenants: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiErrorResponse {
-                    error: e.to_string(),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?;
@@ -297,26 +322,41 @@ pub async fn list_tenants(
     get,
     path = "/api/v1/admin/tenants/{id}/usage",
     tag = "Admin",
+    security(("bearer_auth" = [])),
     params(
         ("id" = Uuid, Path, description = "Tenant / Organization ID")
     ),
     responses(
         (status = 200, description = "Usage metrics and plan entitlements quota status", body = TenantUsageResponse),
+        (status = 401, description = "Unauthorized", body = ApiErrorResponse),
+        (status = 403, description = "Forbidden: cross-tenant access denied", body = ApiErrorResponse),
         (status = 404, description = "Tenant not found", body = ApiErrorResponse)
     )
 )]
 pub async fn get_tenant_usage(
     Path(id): Path<Uuid>,
     State(state): State<SharedState>,
+    auth: AuthUser,
 ) -> Result<Json<TenantUsageResponse>, (StatusCode, Json<ApiErrorResponse>)> {
+    // Cross-tenant BOLA/IDOR protection
+    if !auth.is_superadmin() && auth.tenant_id.as_uuid() != id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiErrorResponse {
+                error: "Forbidden: Cannot access usage metrics of another organization".to_string(),
+            }),
+        ));
+    }
+
     let org = organization::Entity::find_by_id(id)
         .one(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error fetching tenant usage: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiErrorResponse {
-                    error: e.to_string(),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?

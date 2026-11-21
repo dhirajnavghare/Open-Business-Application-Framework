@@ -205,6 +205,8 @@ pub async fn test_webhook(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin"])?;
+
     let hook = webhook::Entity::find()
         .filter(webhook::Column::Id.eq(id))
         .filter(webhook::Column::TenantId.eq(auth.tenant_id.as_uuid()))

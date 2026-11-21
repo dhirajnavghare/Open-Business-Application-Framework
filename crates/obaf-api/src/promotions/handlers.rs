@@ -189,6 +189,8 @@ pub async fn create_coupon(
     auth_user: AuthUser,
     Json(payload): Json<CreateCouponRequest>,
 ) -> Result<(StatusCode, Json<CouponResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager"])?;
+
     let tenant_id = auth_user.tenant_id.0;
     let code = payload.code.trim().to_uppercase();
 
@@ -373,6 +375,8 @@ pub async fn redeem_coupon(
     Path(code): Path<String>,
     Json(payload): Json<RedeemCouponRequest>,
 ) -> Result<Json<RedeemCouponResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     let tenant_id = auth_user.tenant_id.0;
     let code_upper = code.trim().to_uppercase();
     let now = Utc::now();

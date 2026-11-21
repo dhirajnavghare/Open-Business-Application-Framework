@@ -153,6 +153,7 @@ async fn test_saas_tenant_provisioning_and_usage() {
     let usage_req = Request::builder()
         .method("GET")
         .uri(format!("/api/v1/admin/tenants/{}/usage", tenant_id))
+        .header("Authorization", format!("Bearer {}", token))
         .body(Body::empty())
         .unwrap();
 

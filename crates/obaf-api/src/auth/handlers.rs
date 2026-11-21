@@ -6,7 +6,7 @@ use axum::{
 use chrono::Utc;
 use obaf_core::{generate_token, hash_password, verify_password, TenantId};
 use obaf_database::entities::{organization, user};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -104,10 +104,11 @@ pub async fn login(
         .one(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database query error on login: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: "A database error occurred during login".to_string(),
                 }),
             )
         })?;
@@ -185,17 +186,112 @@ pub async fn login(
 )]
 pub async fn register(
     State(state): State<SharedState>,
+    headers: HeaderMap,
     Json(payload): Json<RegisterUserRequest>,
 ) -> Result<(StatusCode, Json<LoginResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    let role_cleaned = payload.role.trim().to_lowercase();
+    if role_cleaned == "superadmin" || role_cleaned.contains("superadmin") {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(AuthErrorResponse {
+                error: "Forbidden: Superadmin role cannot be registered via tenant API".to_string(),
+            }),
+        ));
+    }
+
+    const ALLOWED_ROLES: &[&str] = &["admin", "manager", "staff", "cashier", "viewer", "waiter"];
+    if !ALLOWED_ROLES.contains(&role_cleaned.as_str()) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Invalid role '{}'. Allowed roles: {:?}",
+                    payload.role, ALLOWED_ROLES
+                ),
+            }),
+        ));
+    }
+
+    // Verify organization exists
+    let org_exists = organization::Entity::find_by_id(payload.organization_id)
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database error checking organization: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: "A database error occurred".to_string(),
+                }),
+            )
+        })?;
+
+    if org_exists.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(AuthErrorResponse {
+                error: "Organization not found".to_string(),
+            }),
+        ));
+    }
+
+    // Privilege Escalation Defense:
+    // If organization already has active users, adding new users requires an existing tenant admin (or superadmin).
+    let existing_users_count = user::Entity::find()
+        .filter(user::Column::OrganizationId.eq(payload.organization_id))
+        .count(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database error counting users: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: "A database error occurred".to_string(),
+                }),
+            )
+        })?;
+
+    if existing_users_count > 0 {
+        let auth_token = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|h| h.strip_prefix("Bearer "));
+
+        let is_authorized = match auth_token {
+            Some(t) => {
+                if state.is_token_revoked(t) {
+                    false
+                } else if let Ok(claims) = obaf_core::verify_token(t, &state.jwt_secret) {
+                    claims.role == "superadmin"
+                        || (claims.tenant_id.0 == payload.organization_id
+                            && (claims.role == "admin" || claims.role == "manager"))
+                } else {
+                    false
+                }
+            }
+            None => false,
+        };
+
+        if !is_authorized {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(AuthErrorResponse {
+                    error: "Forbidden: Registering users for an existing organization requires tenant admin authorization".to_string(),
+                }),
+            ));
+        }
+    }
+
     let existing = user::Entity::find()
         .filter(user::Column::Email.eq(&payload.email))
         .one(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error querying user email: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?;
@@ -219,10 +315,11 @@ pub async fn register(
     }
 
     let password_hash = hash_password(&payload.password).map_err(|e| {
+        tracing::error!("Failed to hash password: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to hash password: {}", e),
+                error: "Failed to process credentials securely".to_string(),
             }),
         )
     })?;
@@ -236,17 +333,18 @@ pub async fn register(
         email: Set(payload.email.clone()),
         password_hash: Set(password_hash),
         full_name: Set(payload.full_name.clone()),
-        role: Set(payload.role.clone()),
+        role: Set(role_cleaned.clone()),
         is_active: Set(true),
         created_at: Set(now),
         updated_at: Set(now),
     };
 
     new_user.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to create user: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to create user: {}", e),
+                error: "Failed to create user record".to_string(),
             }),
         )
     })?;
@@ -254,15 +352,16 @@ pub async fn register(
     let token = generate_token(
         user_id,
         TenantId(payload.organization_id),
-        &payload.role,
+        &role_cleaned,
         &state.jwt_secret,
         24,
     )
     .map_err(|e| {
+        tracing::error!("Failed to generate authentication token: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to generate authentication token: {}", e),
+                error: "Failed to generate authentication token".to_string(),
             }),
         )
     })?;
@@ -300,10 +399,11 @@ pub async fn me(
         .one(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database query error fetching user profile: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?
@@ -320,10 +420,11 @@ pub async fn me(
         .one(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database query error fetching organization: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?

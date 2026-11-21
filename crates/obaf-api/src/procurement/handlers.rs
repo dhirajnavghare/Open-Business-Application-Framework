@@ -116,6 +116,8 @@ pub async fn create_purchase_order(
     Json(payload): Json<CreatePurchaseOrderRequest>,
 ) -> Result<(StatusCode, Json<PurchaseOrderDetailResponse>), (StatusCode, Json<AuthErrorResponse>)>
 {
+    auth_user.require_role(&["admin", "manager", "staff"])?;
+
     let tenant_id = auth_user.tenant_id.0;
 
     if payload.items.is_empty() {
@@ -449,6 +451,8 @@ pub async fn receive_purchase_order(
     Path(id): Path<Uuid>,
     Json(payload): Json<ReceivePurchaseOrderRequest>,
 ) -> Result<Json<PurchaseOrderDetailResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager", "staff"])?;
+
     let tenant_id = auth_user.tenant_id.0;
 
     let po = purchase_order::Entity::find_by_id(id)
@@ -630,6 +634,8 @@ pub async fn cancel_purchase_order(
     auth_user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PurchaseOrderDetailResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager"])?;
+
     let tenant_id = auth_user.tenant_id.0;
 
     let po = purchase_order::Entity::find_by_id(id)

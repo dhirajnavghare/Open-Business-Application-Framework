@@ -79,6 +79,8 @@ pub async fn create_customer(
     auth: AuthUser,
     Json(payload): Json<CreateCustomerRequest>,
 ) -> Result<(StatusCode, Json<CustomerResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let customer_id = Uuid::new_v4();
     let now = Utc::now();
     let meta_str = payload
@@ -233,6 +235,8 @@ pub async fn update_customer(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateCustomerRequest>,
 ) -> Result<Json<CustomerResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let c = customer::Entity::find()
         .filter(customer::Column::Id.eq(id))
         .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))

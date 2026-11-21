@@ -186,11 +186,22 @@ pub async fn bootstrap_preset(
     let raw_password = payload
         .admin_password
         .unwrap_or_else(|| "admin123".to_string());
+
+    if raw_password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiErrorResponse {
+                error: "Admin password must be at least 8 characters long".to_string(),
+            }),
+        ));
+    }
+
     let password_hash = obaf_core::hash_password(&raw_password).map_err(|e| {
+        tracing::error!("Failed to hash admin password: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiErrorResponse {
-                error: format!("Failed to hash admin password: {}", e),
+                error: "Failed to process credentials securely".to_string(),
             }),
         )
     })?;

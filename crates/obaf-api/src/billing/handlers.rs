@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use obaf_database::entities::{order, order_item, organization};
+use obaf_database::entities::{customer, order, order_item, organization};
 use rust_decimal::Decimal;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
@@ -520,6 +520,78 @@ pub async fn issue_credit_note(
     auth: AuthUser,
     Json(payload): Json<IssueCreditNoteRequest>,
 ) -> Result<(StatusCode, Json<CreditNoteResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
+    if payload.amount <= Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Credit note amount must be strictly greater than zero".to_string(),
+            }),
+        ));
+    }
+
+    if payload.tax_amount < Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Credit note tax amount cannot be negative".to_string(),
+            }),
+        ));
+    }
+
+    // BOLA/IDOR Defense: Verify order belongs to current tenant if provided
+    if let Some(oid) = payload.order_id {
+        let order_exists = order::Entity::find_by_id(oid)
+            .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+            .one(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database query error verifying order: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: "A database error occurred".to_string(),
+                    }),
+                )
+            })?;
+
+        if order_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!("Order '{}' not found for current tenant", oid),
+                }),
+            ));
+        }
+    }
+
+    // BOLA/IDOR Defense: Verify customer belongs to current tenant if provided
+    if let Some(cid) = payload.customer_id {
+        let cust_exists = customer::Entity::find_by_id(cid)
+            .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+            .one(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database query error verifying customer: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: "A database error occurred".to_string(),
+                    }),
+                )
+            })?;
+
+        if cust_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!("Customer '{}' not found for current tenant", cid),
+                }),
+            ));
+        }
+    }
+
     use obaf_database::entities::credit_note;
     use sea_orm::{ActiveModelTrait, Set};
 
@@ -541,10 +613,11 @@ pub async fn issue_credit_note(
     };
 
     let inserted = new_cn.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to issue credit note: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to issue credit note: {}", e),
+                error: "Failed to issue credit note".to_string(),
             }),
         )
     })?;
@@ -683,6 +756,8 @@ pub async fn set_exchange_rate(
     auth: AuthUser,
     Json(payload): Json<SetExchangeRateRequest>,
 ) -> Result<Json<ExchangeRateResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     use obaf_database::entities::currency_exchange_rate;
     use sea_orm::{ActiveModelTrait, Set};
 

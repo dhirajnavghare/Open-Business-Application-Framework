@@ -89,6 +89,8 @@ pub async fn create_order(
     headers: HeaderMap,
     Json(payload): Json<CreateOrderRequest>,
 ) -> Result<axum::response::Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     // Distributed Systems Pattern: Idempotency Key deduplication (System Design Primer)
     let idempotency_key = headers
         .get("idempotency-key")
@@ -427,6 +429,8 @@ pub async fn update_status(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateOrderStatusRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     let order_model = order::Entity::find()
         .filter(order::Column::Id.eq(id))
         .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
