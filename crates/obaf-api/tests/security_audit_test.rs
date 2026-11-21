@@ -1919,3 +1919,61 @@ async fn test_database_backup_export_redaction_and_secret_filtering() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_sensitive_request_headers_layer() {
+    let (app, _) = setup_test_app().await;
+
+    // Send request with sensitive authentication and signature headers
+    let req = Request::builder()
+        .method("GET")
+        .uri("/health")
+        .header(header::AUTHORIZATION, "Bearer super-secret-jwt-token")
+        .header(header::COOKIE, "session_id=ultra-confidential-cookie")
+        .header("x-api-key", "prod-api-key-999")
+        .header("x-obaf-signature", "sha256=abcdef1234567890")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_websocket_handshake_upgrade_and_protocols() {
+    let (app, state) = setup_test_app().await;
+
+    let user_id = Uuid::new_v4();
+    let org_id = Uuid::new_v4();
+    let token = generate_token(user_id, TenantId(org_id), "admin", &state.jwt_secret, 24).unwrap();
+
+    // 1. Authenticated client sending RFC 6455 handshake headers reaches WebSocketUpgrade extractor
+    // (In in-memory oneshot testing without a live TCP duplex stream, Axum returns 426 Upgrade Required)
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/ws/events")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::CONNECTION, "Upgrade")
+        .header(header::UPGRADE, "websocket")
+        .header("sec-websocket-version", "13")
+        .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UPGRADE_REQUIRED);
+
+    // 2. Unauthenticated client sending handshake headers -> 401 Unauthorized
+    let unauth_req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/ws/events")
+        .header(header::CONNECTION, "Upgrade")
+        .header(header::UPGRADE, "websocket")
+        .header("sec-websocket-version", "13")
+        .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
+        .body(Body::empty())
+        .unwrap();
+
+    let unauth_res = app.oneshot(unauth_req).await.unwrap();
+    assert_eq!(unauth_res.status(), StatusCode::UNAUTHORIZED);
+}

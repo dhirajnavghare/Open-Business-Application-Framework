@@ -161,4 +161,68 @@ async fn test_swagger_ui_and_openapi_endpoints_served() {
         entities.len() >= 10,
         "Expected at least 10 discovered entities in schema discovery"
     );
+
+    // 4. Test Readiness Probe (/ready)
+    let ready_req = Request::builder()
+        .method("GET")
+        .uri("/ready")
+        .body(Body::empty())
+        .unwrap();
+
+    let ready_res = app.clone().oneshot(ready_req).await.unwrap();
+    assert_eq!(ready_res.status(), StatusCode::OK);
+    let ready_bytes = axum::body::to_bytes(ready_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let ready_json: serde_json::Value = serde_json::from_slice(&ready_bytes).unwrap();
+    assert_eq!(ready_json["status"], "ready");
+    assert_eq!(ready_json["database"], "connected");
+
+    // 5. Test Liveness Probe (/live)
+    let live_req = Request::builder()
+        .method("GET")
+        .uri("/live")
+        .body(Body::empty())
+        .unwrap();
+
+    let live_res = app.clone().oneshot(live_req).await.unwrap();
+    assert_eq!(live_res.status(), StatusCode::OK);
+    let live_bytes = axum::body::to_bytes(live_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let live_json: serde_json::Value = serde_json::from_slice(&live_bytes).unwrap();
+    assert_eq!(live_json["status"], "alive");
+    assert!(live_json["timestamp"].as_str().is_some());
+
+    // 6. Test Prometheus Operational Metrics (/metrics)
+    let metrics_req = Request::builder()
+        .method("GET")
+        .uri("/metrics")
+        .body(Body::empty())
+        .unwrap();
+
+    let metrics_res = app.clone().oneshot(metrics_req).await.unwrap();
+    assert_eq!(metrics_res.status(), StatusCode::OK);
+    let metrics_bytes = axum::body::to_bytes(metrics_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let metrics_str = String::from_utf8(metrics_bytes.to_vec()).unwrap();
+    assert!(metrics_str.contains("obaf_up 1"));
+    assert!(metrics_str.contains("obaf_database_connected 1"));
+    assert!(metrics_str.contains("obaf_info{version=\""));
+
+    // 7. Test AI Agent Documentation Standard (/llms.txt)
+    let llms_req = Request::builder()
+        .method("GET")
+        .uri("/llms.txt")
+        .body(Body::empty())
+        .unwrap();
+
+    let llms_res = app.oneshot(llms_req).await.unwrap();
+    assert_eq!(llms_res.status(), StatusCode::OK);
+    let llms_bytes = axum::body::to_bytes(llms_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let llms_str = String::from_utf8(llms_bytes.to_vec()).unwrap();
+    assert!(llms_str.contains("Open Business Application Framework (OBAF)"));
 }
