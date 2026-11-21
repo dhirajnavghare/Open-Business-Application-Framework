@@ -24,6 +24,7 @@ pub mod rules;
 pub mod schema_validation;
 pub mod security;
 pub mod tenant;
+pub mod totp;
 
 pub use audit::AuditContext;
 pub use cache::TtlCache;
@@ -40,6 +41,7 @@ pub use rules::{
 pub use schema_validation::validate_metadata;
 pub use security::{generate_token, hash_password, verify_password, verify_token, JwtClaims};
 pub use tenant::{BranchId, TenantContext, TenantId};
+pub use totp::*;
 
 #[cfg(test)]
 mod compile_time_tests {

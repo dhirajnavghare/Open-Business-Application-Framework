@@ -19,6 +19,7 @@ pub struct AppState {
     pub idempotency_cache: TtlCache<String, (StatusCode, serde_json::Value)>,
     pub rate_limiter: TokenBucketRateLimiter,
     pub superadmin: crate::superadmin::SuperAdminConfig,
+    pub login_guard: crate::superadmin::security::LoginAttemptGuard,
 }
 
 impl AppState {
@@ -61,6 +62,7 @@ impl AppState {
             idempotency_cache,
             rate_limiter,
             superadmin,
+            login_guard: crate::superadmin::security::LoginAttemptGuard::new(),
         }
     }
 

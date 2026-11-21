@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod middleware;
 pub mod organizations;
+pub mod security;
 pub mod settings;
 pub mod stats;
 pub mod ui;
@@ -38,6 +40,13 @@ pub fn superadmin_routes() -> Router<SharedState> {
         .route("/google-login", post(auth::superadmin_google_login))
         .route("/config", get(auth::get_superadmin_config))
         .route("/me", get(auth::get_superadmin_me))
+        // Multi-Factor Authentication (TOTP 2FA)
+        .route("/mfa-verify", post(auth::superadmin_mfa_verify))
+        .route("/mfa-setup", get(auth::superadmin_mfa_setup))
+        .route("/mfa-activate", post(auth::superadmin_mfa_activate))
+        .route("/mfa-disable", post(auth::superadmin_mfa_disable))
+        // Platform Security Audit Logs
+        .route("/audit-logs", get(audit::list_audit_logs))
         // Platform overview and modules catalog
         .route("/stats", get(stats::get_platform_stats))
         .route("/modules", get(organizations::list_supported_modules))

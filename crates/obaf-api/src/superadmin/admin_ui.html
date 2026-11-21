@@ -588,6 +588,73 @@
       border-color: var(--rose);
     }
 
+    /* Security Controls & Audit Styles */
+    .status-badge-inactive {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .status-badge-active {
+      font-size: 0.75rem;
+      color: var(--emerald);
+      background: var(--emerald-glow);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .recovery-code-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.5rem;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      color: #e2e8f0;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .audit-action-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
+      display: inline-block;
+    }
+
+    .audit-action-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .audit-action-badge.danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .audit-action-badge.warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .audit-action-badge.info {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
     /* Modal Backdrop */
     .modal-backdrop {
       display: none;
@@ -871,6 +938,9 @@
       <button class="nav-tab" data-tab="modules" onclick="switchTab('modules')">
         🧩 API Modules Catalog
       </button>
+      <button class="nav-tab" data-tab="audit" onclick="switchTab('audit')">
+        📜 Security Audit Log
+      </button>
       <button class="nav-tab" data-tab="system" onclick="switchTab('system')">
         ⚙️ Platform Settings
       </button>
@@ -917,6 +987,29 @@
             <span>Sign In to Super Admin</span>
           </button>
         </form>
+
+        <!-- 2FA / TOTP Challenge Form -->
+        <div id="mfa-challenge-section" style="display: none;">
+          <div style="text-align: center; margin-bottom: 1.25rem;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔐</div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Two-Factor Authentication</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">
+              Enter the 6-digit TOTP code from your authenticator app or an 8-character emergency backup recovery code.
+            </p>
+          </div>
+          <form id="mfa-verify-form" onsubmit="handleMfaVerify(event)">
+            <div class="form-group">
+              <label class="form-label" style="text-align: center;">Authentication Code / Backup Code</label>
+              <input type="text" id="mfa-verify-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; letter-spacing: 0.25em; text-align: center; font-weight: 600;" placeholder="123456" maxlength="16" required autocomplete="one-time-code">
+            </div>
+            <button type="submit" id="mfa-verify-btn" class="btn-primary" style="margin-top: 0.5rem;">
+              <span>Verify & Complete Sign In</span>
+            </button>
+            <button type="button" class="btn-icon" style="width: 100%; margin-top: 0.75rem; justify-content: center; padding: 0.65rem;" onclick="cancelMfaChallenge()">
+              ← Back to Login
+            </button>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -991,7 +1084,49 @@
       </div>
     </section>
 
-    <!-- 4. Dashboard: System & Platform Settings View -->
+    <!-- 4. Dashboard: Security Audit Log View -->
+    <section id="view-audit" class="view-section">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">📜 Platform Security Audit Log</h2>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Immutable zero-trust audit trail of administrative access, authentication attempts, and platform security events.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="audit-filter-input" placeholder="Filter by action or IP..." oninput="filterAuditLogs(this.value)">
+          </div>
+          <button class="btn-action" onclick="loadAuditLogs()" style="padding: 0.6rem 1rem;">
+            ↻ Refresh Logs
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 180px;">Timestamp (UTC)</th>
+              <th style="width: 230px;">Security Event / Action</th>
+              <th style="width: 170px;">Target Entity</th>
+              <th style="width: 140px;">Client IP</th>
+              <th>Audit Event Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+                Loading security audit log...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. Dashboard: System & Platform Settings View -->
     <section id="view-system" class="view-section">
       <div style="margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Platform Diagnostics & Settings</h2>
@@ -1020,6 +1155,63 @@
           <div class="stat-label">Security & Rate Limiting</div>
           <div class="stat-value" style="font-size: 1.35rem; color: var(--emerald);">Active</div>
           <div class="stat-sub">Token Bucket + Module Gate Shield</div>
+        </div>
+      </div>
+
+      <!-- Security & Access Controls Card -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 600;">🛡️ Super Admin Zero-Trust Security Controls</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+              World-class, bank-grade defense with Multi-Factor Authentication, Brute-Force lockout, and IP/CIDR access control gates.
+            </p>
+          </div>
+          <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            BANK-GRADE HARDENED
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+          <!-- 2FA Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="font-weight: 600; font-size: 0.95rem;">🔐 Multi-Factor Authentication (2FA)</span>
+                <span id="mfa-status-badge" class="status-badge-inactive">Disabled</span>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 1rem;">
+                RFC 6238 Time-based One-Time Password (TOTP) standard. Compatible with Google Authenticator, Microsoft Authenticator, and 1Password.
+              </p>
+            </div>
+            <div>
+              <button type="button" id="mfa-action-btn" class="btn-action" style="width: 100%; justify-content: center;" onclick="openMfaSetupModal()">
+                ⚡ Enable 2FA Authenticator
+              </button>
+            </div>
+          </div>
+
+          <!-- Brute-Force Defense Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.95rem;">🛡️ Brute-Force Shield</span>
+              <span style="font-size: 0.75rem; color: var(--emerald); background: var(--emerald-glow); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">Enforced</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">
+              Automatic progressive lockout: 5 consecutive failed attempts trigger an immediate 15-minute IP/account freeze with HTTP 429 Too Many Requests.
+            </p>
+          </div>
+
+          <!-- Inactivity Session Lock Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.95rem;">⏱️ Inactivity Auto-Lock</span>
+              <span style="font-size: 0.75rem; color: var(--emerald); background: var(--emerald-glow); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">15 Minutes</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">
+              Any idle administrative session is terminated automatically after 15 minutes of inactivity to protect against unauthorized physical access.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -1061,6 +1253,14 @@
               <label class="form-label">Google OAuth 2.0 Client ID (for Google SSO)</label>
               <input type="text" id="setting-google-client-id" class="form-input" placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com">
               <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Enable one-click Google SSO on the Super Admin login screen without container restarts.</small>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">Super Admin Allowed IP Whitelist (Optional)</label>
+              <input type="text" id="setting-allowed-ips" class="form-input" placeholder="e.g. 192.168.1.100, 10.0.0.0/8, 2001:db8::/32 (leave blank for unrestricted)">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Comma-separated IPv4, IPv6, or CIDR network blocks. If configured, any login or API request from an unlisted IP address is immediately rejected with HTTP 403 Forbidden.
+              </small>
             </div>
           </div>
 
@@ -1177,6 +1377,82 @@
     </div>
   </div>
 
+  <!-- Modal: MFA Setup -->
+  <div class="modal-backdrop" id="mfa-setup-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔐 Set Up Two-Factor Authentication (TOTP)</h3>
+        <button class="modal-close" onclick="closeModal('mfa-setup-modal')">&times;</button>
+      </div>
+      <form id="mfa-activate-form" onsubmit="handleMfaActivate(event)">
+        <div class="modal-body">
+          <div style="margin-bottom: 1.25rem;">
+            <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem;">1. Add to Authenticator App</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Open Google Authenticator, Authy, or 1Password and add an account using this Secret Key:
+            </p>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="mfa-setup-secret" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; letter-spacing: 0.1em; background: rgba(0,0,0,0.3); font-weight: 600; color: #a5b4fc;">
+              <button type="button" class="btn-icon" onclick="copyMfaSecret()" style="padding: 0.65rem 1rem;">📋 Copy</button>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <small style="font-size: 0.75rem; color: var(--text-dim);">Account URI: </small>
+              <input type="text" id="mfa-setup-uri" class="form-input" readonly style="font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); padding: 0.35rem 0.5rem; margin-top: 0.2rem;">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.25rem; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.85rem; color: var(--amber);">⚠️ 2. Emergency Backup Recovery Codes</span>
+              <button type="button" class="btn-icon" onclick="copyRecoveryCodes()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">📋 Copy All</button>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+              Save these one-time recovery codes in a safe place. If you lose your phone, each code can be used once to log in:
+            </p>
+            <div id="mfa-recovery-codes-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+              <!-- Recovery codes injected by JS -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">3. Enter Confirmation Code from Authenticator App *</label>
+            <input type="text" id="mfa-activate-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; letter-spacing: 0.2em; text-align: center;" placeholder="123456" maxlength="6" required autocomplete="one-time-code">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('mfa-setup-modal')">Cancel</button>
+          <button type="submit" id="btn-activate-mfa" class="btn-action">Confirm & Activate 2FA</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: MFA Disable -->
+  <div class="modal-backdrop" id="mfa-disable-modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--rose);">Disable Two-Factor Authentication</h3>
+        <button class="modal-close" onclick="closeModal('mfa-disable-modal')">&times;</button>
+      </div>
+      <form id="mfa-disable-form" onsubmit="handleMfaDisable(event)">
+        <div class="modal-body">
+          <div class="env-notice" style="margin-bottom: 1.25rem; border-color: rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.08);">
+            <span>⚠️</span>
+            <div style="color: #fda4af;">Disabling 2FA lowers platform security. You will only need email and password to log in.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Enter current 6-digit TOTP code to confirm:</label>
+            <input type="text" id="mfa-disable-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; letter-spacing: 0.2em; text-align: center;" placeholder="123456" maxlength="6" required autocomplete="one-time-code">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('mfa-disable-modal')">Cancel</button>
+          <button type="submit" id="btn-disable-mfa" class="btn-icon btn-danger" style="padding: 0.65rem 1.25rem;">Disable 2FA</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
@@ -1186,11 +1462,29 @@
     let currentAdmin = null;
     let modulesCatalog = [];
     let organizationsList = [];
+    let pendingMfaTempToken = null;
+    let currentMfaSetupData = null;
+    let auditLogsList = [];
+    let inactivityTimer = null;
 
     // DOM Elements
     const authView = document.getElementById('auth-view');
     const mainHeader = document.getElementById('main-header');
     const headerAdminEmail = document.getElementById('header-admin-email');
+
+    // Inactivity Auto-Logout Shield (15 minutes)
+    function resetInactivityTimer() {
+      clearTimeout(inactivityTimer);
+      if (authToken) {
+        inactivityTimer = setTimeout(() => {
+          logout();
+          showToast('Administrative session expired due to 15 minutes of inactivity for security.', 'info');
+        }, 15 * 60 * 1000);
+      }
+    }
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, resetInactivityTimer, { passive: true });
+    });
 
     // Bootstrap
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1274,8 +1568,21 @@
         });
         const data = await res.json();
         if (res.ok) {
-          setSession(data.token, data.user);
-          showToast('Welcome, Super Administrator', 'success');
+          if (data.mfa_required) {
+            // Two-Factor Authentication required
+            pendingMfaTempToken = data.temp_token;
+            document.getElementById('login-form').style.display = 'none';
+            const googleSec = document.getElementById('google-sso-section');
+            if (googleSec) googleSec.style.display = 'none';
+            document.getElementById('mfa-challenge-section').style.display = 'block';
+            const codeInput = document.getElementById('mfa-verify-code');
+            codeInput.value = '';
+            codeInput.focus();
+            showToast('Two-Factor Authentication required. Enter your 6-digit TOTP code.', 'info');
+          } else {
+            setSession(data.token, data.user);
+            showToast('Welcome, Super Administrator', 'success');
+          }
         } else {
           showToast(data.error || 'Invalid credentials', 'error');
         }
@@ -1287,10 +1594,54 @@
       }
     }
 
+    async function handleMfaVerify(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-verify-code').value.trim();
+      const btn = document.getElementById('mfa-verify-btn');
+
+      if (!code) return;
+      btn.disabled = true;
+      btn.textContent = 'Verifying Code...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temp_token: pendingMfaTempToken,
+            code: code,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          pendingMfaTempToken = null;
+          document.getElementById('mfa-challenge-section').style.display = 'none';
+          document.getElementById('login-form').style.display = 'block';
+          setSession(data.token, data.user);
+          showToast('Two-Factor Authentication verified. Welcome!', 'success');
+        } else {
+          showToast(data.error || 'Invalid authentication code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error verifying 2FA code', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify & Complete Sign In';
+      }
+    }
+
+    function cancelMfaChallenge() {
+      pendingMfaTempToken = null;
+      document.getElementById('mfa-challenge-section').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+      loadSuperAdminConfig();
+    }
+
     function setSession(token, user) {
       authToken = token;
       currentAdmin = user;
       localStorage.setItem('obaf_superadmin_token', token);
+      resetInactivityTimer();
       showDashboard();
     }
 
@@ -1301,6 +1652,7 @@
         });
         if (res.ok) {
           currentAdmin = await res.json();
+          resetInactivityTimer();
           showDashboard();
         } else {
           logout();
@@ -1313,7 +1665,9 @@
     function logout() {
       authToken = null;
       currentAdmin = null;
+      clearTimeout(inactivityTimer);
       localStorage.removeItem('obaf_superadmin_token');
+      cancelMfaChallenge();
       showAuthView();
       showToast('Signed out successfully', 'info');
     }
@@ -1345,6 +1699,8 @@
       if (tabName === 'system') {
         refreshStats();
         loadPlatformSettings();
+      } else if (tabName === 'audit') {
+        loadAuditLogs();
       }
     }
 
@@ -1454,6 +1810,26 @@
           document.getElementById('setting-default-currency').value = cfg.default_currency || 'USD';
           document.getElementById('setting-token-expiry').value = cfg.token_expiry_hours || 24;
           document.getElementById('setting-google-client-id').value = cfg.google_client_id || '';
+          document.getElementById('setting-allowed-ips').value = cfg.allowed_ips || '';
+
+          // Update MFA Status Pill and Action Button
+          const badge = document.getElementById('mfa-status-badge');
+          const actionBtn = document.getElementById('mfa-action-btn');
+          if (cfg.mfa_enabled) {
+            badge.className = 'status-badge-active';
+            badge.textContent = 'Active (Enforced)';
+            actionBtn.className = 'btn-icon btn-danger';
+            actionBtn.style.padding = '0.65rem 1.25rem';
+            actionBtn.textContent = 'Disable 2FA';
+            actionBtn.onclick = openMfaDisableModal;
+          } else {
+            badge.className = 'status-badge-inactive';
+            badge.textContent = 'Disabled';
+            actionBtn.className = 'btn-action';
+            actionBtn.style.padding = '0.65rem 1.25rem';
+            actionBtn.textContent = '⚡ Enable 2FA Authenticator';
+            actionBtn.onclick = openMfaSetupModal;
+          }
         }
       } catch (err) {
         console.error('Failed to load platform settings:', err);
@@ -1470,7 +1846,8 @@
         platform_name: document.getElementById('setting-platform-name').value.trim(),
         default_currency: document.getElementById('setting-default-currency').value.trim().toUpperCase(),
         token_expiry_hours: parseInt(document.getElementById('setting-token-expiry').value, 10),
-        google_client_id: document.getElementById('setting-google-client-id').value.trim() || null
+        google_client_id: document.getElementById('setting-google-client-id').value.trim() || null,
+        allowed_ips: document.getElementById('setting-allowed-ips').value.trim() || null
       };
 
       try {
@@ -1487,6 +1864,7 @@
         if (res.ok) {
           showToast('Platform settings saved successfully to database', 'success');
           await refreshStats();
+          await loadPlatformSettings();
         } else {
           showToast(data.error || 'Failed to save settings', 'error');
         }
@@ -1496,6 +1874,200 @@
         btn.disabled = false;
         btn.textContent = '💾 Save Platform Settings';
       }
+    }
+
+    // --- MFA Management Functions ---
+    async function openMfaSetupModal() {
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-setup', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          currentMfaSetupData = await res.json();
+          document.getElementById('mfa-setup-secret').value = currentMfaSetupData.secret;
+          document.getElementById('mfa-setup-uri').value = currentMfaSetupData.otpauth_uri;
+          
+          const grid = document.getElementById('mfa-recovery-codes-grid');
+          grid.innerHTML = currentMfaSetupData.recovery_codes.map(c => `
+            <div class="recovery-code-pill">${escapeHtml(c)}</div>
+          `).join('');
+          
+          document.getElementById('mfa-activate-code').value = '';
+          openModal('mfa-setup-modal');
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to initialize MFA setup', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to reach server for MFA setup', 'error');
+      }
+    }
+
+    function copyMfaSecret() {
+      const secret = document.getElementById('mfa-setup-secret').value;
+      navigator.clipboard.writeText(secret).then(() => {
+        showToast('Secret key copied to clipboard', 'info');
+      });
+    }
+
+    function copyRecoveryCodes() {
+      if (currentMfaSetupData && currentMfaSetupData.recovery_codes) {
+        const text = currentMfaSetupData.recovery_codes.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('All recovery codes copied to clipboard', 'info');
+        });
+      }
+    }
+
+    async function handleMfaActivate(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-activate-code').value.trim();
+      const btn = document.getElementById('btn-activate-mfa');
+
+      btn.disabled = true;
+      btn.textContent = 'Activating...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-activate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            secret: currentMfaSetupData.secret,
+            code: code,
+            recovery_codes: currentMfaSetupData.recovery_codes,
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('mfa-setup-modal');
+          showToast('Two-Factor Authentication successfully activated!', 'success');
+          await loadPlatformSettings();
+        } else {
+          showToast(data.error || 'Invalid 6-digit confirmation code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error activating 2FA', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm & Activate 2FA';
+      }
+    }
+
+    function openMfaDisableModal() {
+      document.getElementById('mfa-disable-code').value = '';
+      openModal('mfa-disable-modal');
+    }
+
+    async function handleMfaDisable(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-disable-code').value.trim();
+      const btn = document.getElementById('btn-disable-mfa');
+
+      btn.disabled = true;
+      btn.textContent = 'Disabling...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-disable', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('mfa-disable-modal');
+          showToast('Two-Factor Authentication disabled', 'warning');
+          await loadPlatformSettings();
+        } else {
+          showToast(data.error || 'Invalid confirmation code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error disabling 2FA', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Disable 2FA';
+      }
+    }
+
+    // --- Audit Log Functions ---
+    async function loadAuditLogs() {
+      const tbody = document.getElementById('audit-table-body');
+      try {
+        const res = await fetch('/api/v1/superadmin/audit-logs', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          auditLogsList = await res.json();
+          renderAuditLogs(auditLogsList);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--rose); padding: 2rem;">Failed to load audit logs</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--rose); padding: 2rem;">Network error fetching audit logs</td></tr>`;
+      }
+    }
+
+    function renderAuditLogs(logs) {
+      const tbody = document.getElementById('audit-table-body');
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">No security audit log records found yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        let badgeClass = 'info';
+        if (l.action.includes('SUCCESS') || l.action.includes('ACTIVATED')) {
+          badgeClass = 'success';
+        } else if (l.action.includes('FAILED') || l.action.includes('BLOCKED') || l.action.includes('DISABLED')) {
+          badgeClass = 'danger';
+        } else if (l.action.includes('UPDATE') || l.action.includes('SETTING')) {
+          badgeClass = 'warning';
+        }
+
+        const detailsStr = typeof l.details === 'object' ? JSON.stringify(l.details) : String(l.details);
+        const ipStr = l.ip_address || 'Internal/Local';
+
+        return `
+          <tr>
+            <td style="color: var(--text-dim); font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">
+              ${new Date(l.created_at).toISOString().replace('T', ' ').substring(0, 19)}
+            </td>
+            <td>
+              <span class="audit-action-badge ${badgeClass}">${escapeHtml(l.action)}</span>
+            </td>
+            <td>
+              <div style="font-weight: 500; font-size: 0.85rem;">${escapeHtml(l.entity_type)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); font-family: monospace;">${escapeHtml(l.entity_id || '-')}</div>
+            </td>
+            <td>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); color: #cbd5e1;">${escapeHtml(ipStr)}</span>
+            </td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); max-width: 400px; overflow-wrap: break-word;">
+              ${escapeHtml(detailsStr)}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterAuditLogs(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        renderAuditLogs(auditLogsList);
+        return;
+      }
+      const filtered = auditLogsList.filter(l => 
+        l.action.toLowerCase().includes(q) ||
+        (l.ip_address && l.ip_address.toLowerCase().includes(q)) ||
+        (l.entity_type && l.entity_type.toLowerCase().includes(q)) ||
+        (l.entity_id && l.entity_id.toLowerCase().includes(q))
+      );
+      renderAuditLogs(filtered);
     }
 
     function renderOrganizationsTable(orgs) {

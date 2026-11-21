@@ -16,6 +16,8 @@ use axum::{extract::State, http::StatusCode, Json};
 use obaf_database::{get_system_setting, set_system_setting};
 use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
+use std::str::FromStr;
 use utoipa::ToSchema;
 
 use crate::auth::extractor::{AuthErrorResponse, AuthUser};
@@ -31,6 +33,8 @@ pub struct PlatformSettingsResponse {
     pub database_type: String,
     pub server_version: String,
     pub superadmin_email: String,
+    pub allowed_ips: String,
+    pub mfa_enabled: bool,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -39,6 +43,7 @@ pub struct UpdatePlatformSettingsRequest {
     pub default_currency: Option<String>,
     pub token_expiry_hours: Option<u64>,
     pub google_client_id: Option<String>,
+    pub allowed_ips: Option<String>,
 }
 
 #[utoipa::path(
@@ -93,6 +98,19 @@ pub async fn get_platform_settings(
 
     let google_sso_active = google_client_id.is_some();
 
+    let allowed_ips = get_system_setting(&state.db, "superadmin_allowed_ips")
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
+    let mfa_enabled = get_system_setting(&state.db, "superadmin_totp_secret")
+        .await
+        .ok()
+        .flatten()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+
     Ok(Json(PlatformSettingsResponse {
         platform_name,
         default_currency,
@@ -102,6 +120,8 @@ pub async fn get_platform_settings(
         database_type: db_backend.to_string(),
         server_version: state.version.to_string(),
         superadmin_email: state.superadmin.email.clone(),
+        allowed_ips,
+        mfa_enabled,
     }))
 }
 
@@ -223,6 +243,65 @@ pub async fn update_platform_settings(
                 }),
             )
         })?;
+    }
+
+    if let Some(allowed) = &payload.allowed_ips {
+        let trimmed = allowed.trim();
+        if !trimmed.is_empty() {
+            for raw_entry in trimmed.split(',') {
+                let entry = raw_entry.trim();
+                if entry.is_empty() {
+                    continue;
+                }
+                let is_valid = if let Some((ip, prefix_str)) = entry.split_once('/') {
+                    IpAddr::from_str(ip.trim()).is_ok()
+                        && prefix_str
+                            .trim()
+                            .parse::<u8>()
+                            .map(|p| p <= 128)
+                            .unwrap_or(false)
+                } else {
+                    IpAddr::from_str(entry).is_ok()
+                };
+
+                if !is_valid {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        Json(AuthErrorResponse {
+                            error: format!(
+                                "Invalid IP or CIDR network '{}'. Expected format: '192.168.1.100' or '10.0.0.0/8'",
+                                entry
+                            ),
+                        }),
+                    ));
+                }
+            }
+        }
+
+        set_system_setting(
+            &state.db,
+            "superadmin_allowed_ips",
+            trimmed,
+            Some("Whitelisted client IP addresses and CIDR networks permitted to access the Super Admin console"),
+        )
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: format!("Failed to save allowed IPs: {}", e),
+                }),
+            )
+        })?;
+
+        crate::superadmin::security::log_security_event(
+            &state.db,
+            "SUPERADMIN_IP_RESTRICTION_UPDATED",
+            &auth.user_id.to_string(),
+            serde_json::json!({ "allowed_ips": trimmed }),
+            None,
+        )
+        .await;
     }
 
     // Return updated settings
