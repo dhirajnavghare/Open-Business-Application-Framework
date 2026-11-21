@@ -49,8 +49,8 @@ pub fn generate_token(
     expiry_hours: u64,
 ) -> Result<String> {
     let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(expiry_hours as i64))
-        .expect("Valid timestamp")
+        .checked_add_signed(Duration::hours(expiry_hours.min(87600) as i64))
+        .ok_or_else(|| ObafError::validation("Token expiry calculation out of bounds"))?
         .timestamp() as usize;
 
     let claims = JwtClaims {
