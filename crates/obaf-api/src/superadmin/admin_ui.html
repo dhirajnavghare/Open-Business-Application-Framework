@@ -872,7 +872,7 @@
         🧩 API Modules Catalog
       </button>
       <button class="nav-tab" data-tab="system" onclick="switchTab('system')">
-        📊 System & Health
+        ⚙️ Platform Settings
       </button>
     </div>
 
@@ -991,12 +991,12 @@
       </div>
     </section>
 
-    <!-- 4. Dashboard: System & Health View -->
+    <!-- 4. Dashboard: System & Platform Settings View -->
     <section id="view-system" class="view-section">
       <div style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Platform Diagnostics & Architecture</h2>
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Platform Diagnostics & Settings</h2>
         <p style="color: var(--text-muted); font-size: 0.875rem;">
-          High-performance, single-binary Rust engine architecture metrics.
+          Configure global platform parameters, branding, security limits, and inspect architecture diagnostics.
         </p>
       </div>
 
@@ -1021,6 +1021,55 @@
           <div class="stat-value" style="font-size: 1.35rem; color: var(--emerald);">Active</div>
           <div class="stat-sub">Token Bucket + Module Gate Shield</div>
         </div>
+      </div>
+
+      <!-- Platform Settings Form -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 600;">⚙️ Global Platform Configuration</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+              Managed dynamically by the Platform Super Administrator. Saved directly to the database.
+            </p>
+          </div>
+          <span style="font-size: 0.75rem; background: rgba(79, 70, 229, 0.2); color: #818cf8; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            SUPER ADMIN ONLY
+          </span>
+        </div>
+
+        <form id="platform-settings-form" onsubmit="handleSavePlatformSettings(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label">Platform Display Name</label>
+              <input type="text" id="setting-platform-name" class="form-input" placeholder="Open Business Application Framework" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Top-level platform branding displayed across headers and public endpoints.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default Base Currency (3-Letter ISO)</label>
+              <input type="text" id="setting-default-currency" class="form-input" placeholder="USD" maxlength="3" required style="text-transform: uppercase;">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Standard base currency for transactions and ledger billing (e.g. USD, EUR, INR, GBP).</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">JWT Token Expiry (Hours)</label>
+              <input type="number" id="setting-token-expiry" class="form-input" placeholder="24" min="1" max="8760" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Lifespan of tenant administrative authentication tokens.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Google OAuth 2.0 Client ID (for Google SSO)</label>
+              <input type="text" id="setting-google-client-id" class="form-input" placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Enable one-click Google SSO on the Super Admin login screen without container restarts.</small>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="submit" id="btn-save-settings" class="btn-action" style="padding: 0.65rem 1.5rem;">
+              💾 Save Platform Settings
+            </button>
+          </div>
+        </form>
       </div>
     </section>
   </main>
@@ -1295,6 +1344,7 @@
       });
       if (tabName === 'system') {
         refreshStats();
+        loadPlatformSettings();
       }
     }
 
@@ -1390,6 +1440,61 @@
         }
       } catch (err) {
         console.error('Failed to load stats:', err);
+      }
+    }
+
+    async function loadPlatformSettings() {
+      try {
+        const res = await fetch('/api/v1/superadmin/settings', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const cfg = await res.json();
+          document.getElementById('setting-platform-name').value = cfg.platform_name || '';
+          document.getElementById('setting-default-currency').value = cfg.default_currency || 'USD';
+          document.getElementById('setting-token-expiry').value = cfg.token_expiry_hours || 24;
+          document.getElementById('setting-google-client-id').value = cfg.google_client_id || '';
+        }
+      } catch (err) {
+        console.error('Failed to load platform settings:', err);
+      }
+    }
+
+    async function handleSavePlatformSettings(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-save-settings');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const payload = {
+        platform_name: document.getElementById('setting-platform-name').value.trim(),
+        default_currency: document.getElementById('setting-default-currency').value.trim().toUpperCase(),
+        token_expiry_hours: parseInt(document.getElementById('setting-token-expiry').value, 10),
+        google_client_id: document.getElementById('setting-google-client-id').value.trim() || null
+      };
+
+      try {
+        const res = await fetch('/api/v1/superadmin/settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Platform settings saved successfully to database', 'success');
+          await refreshStats();
+        } else {
+          showToast(data.error || 'Failed to save settings', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving settings', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save Platform Settings';
       }
     }
 

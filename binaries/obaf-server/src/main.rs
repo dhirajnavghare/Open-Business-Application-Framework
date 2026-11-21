@@ -81,12 +81,26 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // 5. Initialize shared state and create Axum router
-    if cfg.security.jwt_secret == "dev_secret_please_change_in_production" {
-        tracing::warn!(
-            "⚠️  SECURITY WARNING: Using default development JWT secret! Set JWT_SECRET in production."
-        );
-    }
-    let state = Arc::new(AppState::with_router(db, router, cfg.security.jwt_secret));
+    // Automatically retrieve or generate a persistent cryptographic JWT signing secret in database
+    // if not explicitly supplied in environment variables (Zero-Config Security).
+    let jwt_secret = if cfg.security.jwt_secret != "dev_secret_please_change_in_production" {
+        cfg.security.jwt_secret
+    } else {
+        match obaf_database::get_or_create_jwt_secret(&db).await {
+            Ok(secret) => {
+                tracing::info!(
+                    "🔒 Loaded persistent cryptographic JWT signing secret from database"
+                );
+                secret
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load or initialize persistent JWT secret: {}", e);
+                cfg.security.jwt_secret
+            }
+        }
+    };
+
+    let state = Arc::new(AppState::with_router(db, router, jwt_secret));
     let app = create_router(state);
 
     // 5. Print startup banner with direct links

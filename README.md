@@ -124,13 +124,21 @@ Open **[http://127.0.0.1:8080/admin](http://127.0.0.1:8080/admin)** in your brow
 
 OBAF includes an **embedded single-page Super Admin web console** served directly by `obaf-server` at `/admin` (and `/superadmin`) with **zero runtime external dependencies** (no Node.js or npm required).
 
+### Zero-Friction Deployment: Only 3 Environment Variables Required
+To deploy OBAF on any single server, VPS (e.g. Hostinger, Hetzner, DigitalOcean), Docker container, or Kubernetes cluster, **only 3 environment variables are required**:
+- `DATABASE_URL`: Target database connection string (SQLite file or PostgreSQL URL)
+- `SUPERADMIN_EMAIL`: Single designated root administrator email
+- `SUPERADMIN_PASSWORD`: Single designated root administrator password
+
+> **No complex configuration files or dozens of env vars:** Cryptographic JWT secrets are automatically generated and persisted in the database on first boot. Everything else—organizations, supported API modules, platform branding, default currency, session lifetimes, and Google SSO—is managed directly by the Super Admin in the web console at `/admin`!
+
 ### Key Capabilities
 - **Single-Root Top-Level Administrator**: Exactly one top-level platform administrator exists, strictly configured through environment variables:
-  - `OBAF_SUPERADMIN_EMAIL` (default: `admin@obaf.local`)
-  - `OBAF_SUPERADMIN_PASSWORD` (default: `admin123` - supports raw password or Argon2 hash)
-  - `OBAF_GOOGLE_CLIENT_ID` / `OBAF_GOOGLE_CLIENT_SECRET` (optional, for Google SSO)
-  - `OBAF_SUPERADMIN_GOOGLE_EMAIL` (optional, defaults to superadmin email)
+  - `SUPERADMIN_EMAIL` / `OBAF_SUPERADMIN_EMAIL` (default: `admin@obaf.local`)
+  - `SUPERADMIN_PASSWORD` / `OBAF_SUPERADMIN_PASSWORD` (default: `admin123` - supports raw password or Argon2 hash)
+  - `GOOGLE_CLIENT_ID` / `OBAF_GOOGLE_CLIENT_ID` (optional, can also be configured dynamically in the Super Admin UI)
 - **Dual Authentication**: Login via **Google SSO** (Google Identity Services ID tokens) or **Email & Password**.
+- **Platform Settings Management**: Update platform name, base billing currency, token expiry duration, and Google SSO client ID directly from the console without restarting the server.
 - **Organization Management**: Provision new tenant organizations with industry presets, custom slugs, and dedicated tenant admin accounts.
 - **Dynamic API Module Gating**:
   - The Super Admin can select which of the 15 API engines are supported for each organization (e.g. enabling `catalog` and `orders`, while disabling `bookings` or `pos`).

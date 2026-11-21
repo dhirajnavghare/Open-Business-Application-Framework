@@ -185,8 +185,16 @@ pub async fn superadmin_google_login(
             )
         })?;
 
+        let expected_client_id = match &config.google_client_id {
+            Some(cid) => Some(cid.clone()),
+            None => obaf_database::get_system_setting(&state.db, "google_client_id")
+                .await
+                .ok()
+                .flatten(),
+        };
+
         // Verify audience (client_id) if configured
-        if let Some(ref expected_client_id) = config.google_client_id {
+        if let Some(ref expected_client_id) = expected_client_id {
             if let Some(aud) = token_info.get("aud").and_then(|v| v.as_str()) {
                 if aud != expected_client_id {
                     return Err((
@@ -277,9 +285,18 @@ pub async fn get_superadmin_config(
     State(state): State<SharedState>,
 ) -> Json<SuperAdminConfigResponse> {
     let config = &state.superadmin;
+    let google_client_id = match &config.google_client_id {
+        Some(cid) => Some(cid.clone()),
+        None => obaf_database::get_system_setting(&state.db, "google_client_id")
+            .await
+            .ok()
+            .flatten(),
+    };
+    let google_auth_enabled = google_client_id.is_some();
+
     Json(SuperAdminConfigResponse {
-        google_client_id: config.google_client_id.clone(),
-        google_auth_enabled: config.is_google_auth_enabled(),
+        google_client_id,
+        google_auth_enabled,
         superadmin_email: config.email.clone(),
     })
 }

@@ -377,3 +377,128 @@ async fn test_organization_management_and_module_gating() {
     let res = app.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
+
+#[tokio::test]
+async fn test_superadmin_platform_settings_and_persistent_jwt() {
+    let db = establish_connection("sqlite::memory:").await.unwrap();
+    run_migrations(&db).await.unwrap();
+
+    // 1. Verify zero-config persistent JWT secret generation and caching
+    let jwt_secret_1 = obaf_database::get_or_create_jwt_secret(&db).await.unwrap();
+    assert_eq!(jwt_secret_1.len(), 64);
+
+    let jwt_secret_2 = obaf_database::get_or_create_jwt_secret(&db).await.unwrap();
+    assert_eq!(jwt_secret_1, jwt_secret_2);
+
+    let state = Arc::new(AppState::new(db, &jwt_secret_1));
+    let app = create_router(state.clone());
+
+    // 2. Login as Super Admin
+    let login_body = json!({
+        "email": "admin@obaf.local",
+        "password": "admin123"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let login_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let superadmin_token = login_resp["token"].as_str().unwrap();
+
+    // 3. Fetch default platform settings
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/settings")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let settings: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+        settings["platform_name"],
+        "Open Business Application Framework"
+    );
+    assert_eq!(settings["default_currency"], "USD");
+    assert_eq!(settings["token_expiry_hours"], 24);
+    assert_eq!(settings["superadmin_email"], "admin@obaf.local");
+
+    // 4. Update platform settings via Super Admin API
+    let update_body = json!({
+        "platform_name": "Acme SaaS Suite",
+        "default_currency": "EUR",
+        "token_expiry_hours": 48,
+        "google_client_id": "test-google-id-12345.apps.googleusercontent.com"
+    });
+    let req = Request::builder()
+        .method("PUT")
+        .uri("/api/v1/superadmin/settings")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(update_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let updated: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(updated["platform_name"], "Acme SaaS Suite");
+    assert_eq!(updated["default_currency"], "EUR");
+    assert_eq!(updated["token_expiry_hours"], 48);
+    assert_eq!(
+        updated["google_client_id"],
+        "test-google-id-12345.apps.googleusercontent.com"
+    );
+    assert_eq!(updated["google_sso_active"], true);
+
+    // 5. Verify public config now reflects dynamically configured Google SSO
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/config")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let cfg: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(cfg["google_auth_enabled"], true);
+    assert_eq!(
+        cfg["google_client_id"],
+        "test-google-id-12345.apps.googleusercontent.com"
+    );
+
+    // 6. Non-superadmin requests to settings are rejected (403 Forbidden)
+    let non_admin_token = obaf_core::generate_token(
+        uuid::Uuid::new_v4(),
+        obaf_core::TenantId(uuid::Uuid::new_v4()),
+        "admin",
+        &jwt_secret_1,
+        24,
+    )
+    .unwrap();
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/settings")
+        .header(header::AUTHORIZATION, format!("Bearer {}", non_admin_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+}

@@ -16,6 +16,7 @@ pub mod auth;
 pub mod config;
 pub mod middleware;
 pub mod organizations;
+pub mod settings;
 pub mod stats;
 pub mod ui;
 
@@ -50,5 +51,10 @@ pub fn superadmin_routes() -> Router<SharedState> {
             get(organizations::get_organization)
                 .put(organizations::update_organization)
                 .delete(organizations::delete_organization),
+        )
+        // Platform Settings & Configuration
+        .route(
+            "/settings",
+            get(settings::get_platform_settings).put(settings::update_platform_settings),
         )
 }
