@@ -9,8 +9,10 @@ type HmacSha256 = Hmac<Sha256>;
 
 /// Computes an HMAC-SHA256 hex digest for webhook payload verification.
 pub fn compute_hmac_signature(secret: &str, body: &str) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can accept key of any size");
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return String::new(),
+    };
     mac.update(body.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }

@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Orphaned Organization Mitigation**: Pre-creation email validation and uniqueness checks against existing users, with automatic transactional rollback upon user creation failure.
 - **Google SSO Audience Confusion Defense**: Immediate rejection with `403 Forbidden` if Google Client ID is unconfigured, and strict token `aud` claim matching against the configured client ID.
 - **Anonymous Registration Lockdown**: Anonymous user registration is blocked once tenant users exist, preventing unauthorized account takeover.
+- **Sensitive Headers Redaction (OWASP API3 / CWE-312)**: Added `SetSensitiveRequestHeadersLayer` to mask `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+- **Database Backup Sanitization (CWE-312)**: Automated redaction of `password_hash` to `[REDACTED]` and exclusion of MFA TOTP secrets and recovery codes in `/api/v1/superadmin/database/backup`.
+- **RFC 6455 WebSocket Heartbeats**: Added periodic 30-second `Message::Ping` intervals and `Message::Pong` responses on `/api/v1/ws` to mitigate proxy timeouts and prevent ghost socket leaks.
+- **Panic-Free Authentication & Webhook Resilience**: Eliminated unchecked `.unwrap()` calls in login dispatchers and HMAC key initialization.
 
 ---
 

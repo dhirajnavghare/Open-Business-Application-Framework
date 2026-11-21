@@ -50,6 +50,13 @@ OBAF enforces defense-in-depth across the following boundaries:
 - **Zero-Trust Role Gating:** Read-only `viewer` accounts are blocked from mutating state across orders, catalog, bookings, subscriptions, and promotions.
 - **BOLA Shift Isolation:** Cashier shift closures are strictly locked to the shift owner or authorized administrators.
 
+### 7. Sensitive Headers Redaction & Backup Sanitization (OWASP API3 / CWE-312)
+- **Trace Redaction:** `SetSensitiveRequestHeadersLayer` automatically redacts `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` headers with `[REDACTED]` in tracing logs and error output.
+- **Backup Sanitization:** Database backups downloaded from `/api/v1/superadmin/database/backup` automatically sanitize user `password_hash` to `[REDACTED]` and filter out MFA secrets (`superadmin_totp_secret`, recovery codes).
+
+### 8. RFC 6455 WebSocket Heartbeats & DoS Defense
+- **Heartbeat Pings:** Real-time event streams at `/api/v1/ws` emit periodic 30-second heartbeats (`Message::Ping`) and handle `Message::Pong`, preventing proxy timeouts, detecting dead clients, and mitigating ghost connection leaks.
+
 ---
 
 ## 🚨 Reporting a Vulnerability

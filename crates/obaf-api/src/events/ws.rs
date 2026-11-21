@@ -112,13 +112,31 @@ async fn handle_socket(
     );
     let mut receiver = state.event_sender.subscribe();
 
+    let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(30));
+    ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
     loop {
         tokio::select! {
+            // Heartbeat keep-alive to prevent intermediate proxy / NAT timeouts and detect dead clients
+            _ = ping_interval.tick() => {
+                if socket.send(Message::Ping(vec![])).await.is_err() {
+                    break;
+                }
+            }
             // Monitor client socket for disconnects, ping/pong, or close frames
             client_msg = socket.recv() => {
                 match client_msg {
                     Some(Ok(Message::Close(_))) | None => {
                         break;
+                    }
+                    Some(Ok(Message::Ping(payload))) => {
+                        // RFC 6455: Must reply with Pong containing identical payload
+                        if socket.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Some(Ok(Message::Pong(_))) => {
+                        // Client acknowledged heartbeat ping
                     }
                     Some(Err(_)) => {
                         break;

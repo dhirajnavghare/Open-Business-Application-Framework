@@ -146,7 +146,14 @@ pub async fn login(
     }
 
     state.login_guard.record_success(&attempt_key);
-    let user = user.unwrap();
+    let user = user.ok_or_else(|| {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(AuthErrorResponse {
+                error: "Invalid email or password".to_string(),
+            }),
+        )
+    })?;
 
     let token = generate_token(
         user.id,

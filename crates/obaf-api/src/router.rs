@@ -9,6 +9,7 @@ use axum::{
 use obaf_core::RateLimitResult;
 use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -136,6 +137,12 @@ pub fn create_router(state: SharedState) -> Router {
         .layer(cors)
         .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http())
+        .layer(SetSensitiveRequestHeadersLayer::new([
+            header::AUTHORIZATION,
+            header::COOKIE,
+            HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("x-obaf-signature"),
+        ]))
         .with_state(state)
 }
 

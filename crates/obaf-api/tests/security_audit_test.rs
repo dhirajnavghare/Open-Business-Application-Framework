@@ -1858,3 +1858,64 @@ async fn test_google_sso_unconfigured_audience_confusion_defense() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn test_database_backup_export_redaction_and_secret_filtering() {
+    let (app, state) = setup_test_app().await;
+
+    // Insert a sensitive setting (e.g. TOTP secret)
+    obaf_database::set_system_setting(
+        &state.db,
+        "superadmin_totp_secret",
+        "JBSWY3DPEHPK3PXP",
+        None,
+    )
+    .await
+    .unwrap();
+
+    let token = generate_token(
+        uuid::Uuid::new_v4(),
+        TenantId(uuid::Uuid::nil()),
+        "superadmin",
+        &state.jwt_secret,
+        1,
+    )
+    .unwrap();
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/database/backup")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let body_bytes = axum::body::to_bytes(res.into_body(), 10 * 1024 * 1024)
+        .await
+        .unwrap();
+    let backup_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+
+    // Verify all users in the backup have their password_hash redacted
+    let users = backup_json["users"].as_array().expect("Users array");
+    for u in users {
+        assert_eq!(
+            u["password_hash"], "[REDACTED]",
+            "Password hash must be redacted in database backup"
+        );
+    }
+
+    // Verify sensitive secrets are completely filtered out from system_settings
+    let settings = backup_json["system_settings"]
+        .as_array()
+        .expect("Settings array");
+    for s in settings {
+        let key = s["key"].as_str().unwrap_or("").to_lowercase();
+        assert!(
+            !key.contains("secret") && !key.contains("recovery_code") && !key.contains("password"),
+            "Sensitive key '{}' must not appear in exported settings",
+            key
+        );
+    }
+}

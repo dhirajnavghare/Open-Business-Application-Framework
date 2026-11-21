@@ -396,6 +396,33 @@ pub async fn download_database_backup(
         .await
         .unwrap_or_default();
 
+    // Redact password hashes in exported users to mitigate offline dictionary/brute-force attacks (OWASP API3 / CWE-312)
+    let sanitized_users: Vec<serde_json::Value> = users
+        .into_iter()
+        .map(|u| {
+            let mut v = serde_json::to_value(&u).unwrap_or_default();
+            if let Some(obj) = v.as_object_mut() {
+                obj.insert(
+                    "password_hash".to_string(),
+                    serde_json::Value::String("[REDACTED]".to_string()),
+                );
+            }
+            v
+        })
+        .collect();
+
+    // Redact sensitive keys from system settings (MFA secrets, recovery codes, tokens, passwords)
+    let sanitized_settings: Vec<system_setting::Model> = settings
+        .into_iter()
+        .filter(|s| {
+            let k = s.key.to_lowercase();
+            !k.contains("secret")
+                && !k.contains("recovery_code")
+                && !k.contains("password")
+                && !k.contains("token")
+        })
+        .collect();
+
     let backup_data = serde_json::json!({
         "metadata": {
             "platform": "Open Business Application Framework (OBAF)",
@@ -404,18 +431,18 @@ pub async fn download_database_backup(
             "exported_by": auth.user_id,
             "counts": {
                 "organizations": orgs.len(),
-                "users": users.len(),
+                "users": sanitized_users.len(),
                 "products": products.len(),
                 "orders": orders.len(),
-                "settings": settings.len(),
+                "settings": sanitized_settings.len(),
                 "audit_logs": audit_logs.len()
             }
         },
         "organizations": orgs,
-        "users": users,
+        "users": sanitized_users,
         "products": products,
         "orders": orders,
-        "system_settings": settings,
+        "system_settings": sanitized_settings,
         "audit_logs": audit_logs
     });
 
