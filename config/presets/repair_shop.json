@@ -9,7 +9,8 @@
     "orders",
     "customers",
     "payments",
-    "billing"
+    "billing",
+    "webhooks"
   ],
   "default_tax_slabs": [
     { "name": "GST 18% (Labor & Services)", "rate": 0.18 },

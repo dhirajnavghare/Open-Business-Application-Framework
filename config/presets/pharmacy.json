@@ -6,6 +6,7 @@
   "active_modules": [
     "catalog",
     "inventory",
+    "orders",
     "batches",
     "expiry_alerts",
     "billing",

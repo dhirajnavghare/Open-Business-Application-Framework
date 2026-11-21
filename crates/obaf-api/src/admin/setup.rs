@@ -211,6 +211,7 @@ pub async fn bootstrap_preset(
                 "pharmacy" => vec![
                     "catalog".to_string(),
                     "inventory".to_string(),
+                    "orders".to_string(),
                     "batches".to_string(),
                     "billing".to_string(),
                     "prescriptions".to_string(),
