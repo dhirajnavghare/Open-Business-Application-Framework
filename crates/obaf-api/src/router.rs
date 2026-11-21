@@ -127,6 +127,7 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/admin", admin_routes())
         .nest("/api/v1/superadmin", superadmin_routes())
         // Global Middlewares
+        .layer(from_fn(request_timeout_middleware))
         .layer(from_fn_with_state(state.clone(), module_gating_middleware))
         .layer(from_fn(request_id_and_security_middleware))
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
@@ -134,6 +135,27 @@ pub fn create_router(state: SharedState) -> Router {
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+async fn request_timeout_middleware(request: axum::extract::Request, next: Next) -> Response {
+    let path = request.uri().path().to_string();
+    // Exclude long-lived WebSockets from HTTP request timeouts
+    if path.starts_with("/api/v1/ws") {
+        return next.run(request).await;
+    }
+
+    match tokio::time::timeout(std::time::Duration::from_secs(30), next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => {
+            let body = serde_json::json!({
+                "error": "Request Timeout",
+                "message": "The server timed out waiting for the request to complete."
+            });
+            let mut res = Json(body).into_response();
+            *res.status_mut() = StatusCode::REQUEST_TIMEOUT;
+            res
+        }
+    }
 }
 
 async fn rate_limit_middleware(

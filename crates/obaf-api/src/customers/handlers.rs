@@ -149,9 +149,8 @@ pub async fn list_customers(
         );
     }
 
-    if let Some(limit) = query.limit {
-        q = q.limit(limit);
-    }
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    q = q.limit(limit);
 
     if let Some(offset) = query.offset {
         q = q.offset(offset);

@@ -5,7 +5,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use obaf_database::entities::booking;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -115,6 +115,7 @@ pub async fn list_bookings(
 ) -> Result<Json<Vec<BookingResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
     let bookings = booking::Entity::find()
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| {

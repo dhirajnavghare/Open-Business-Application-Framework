@@ -65,9 +65,20 @@ impl FromRequestParts<SharedState> for WsAuthUser {
             _ => return Err((StatusCode::UNAUTHORIZED, "Missing authentication token")),
         };
 
+        if state.is_token_revoked(&token) {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "Authentication token has been revoked",
+            ));
+        }
+
         // 2. Verify token
         let claims = verify_token(&token, &state.jwt_secret)
             .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid authentication token"))?;
+
+        if claims.role == "superadmin_mfa_pending" {
+            return Err((StatusCode::UNAUTHORIZED, "MFA verification pending"));
+        }
 
         Ok(WsAuthUser {
             tenant_id: claims.tenant_id.0,
@@ -84,7 +95,9 @@ pub async fn ws_handler(
     let tenant_id = auth.tenant_id;
     let is_superadmin = auth.is_superadmin;
 
-    ws.on_upgrade(move |socket| handle_socket(socket, state, tenant_id, is_superadmin))
+    ws.max_message_size(64 * 1024)
+        .max_frame_size(16 * 1024)
+        .on_upgrade(move |socket| handle_socket(socket, state, tenant_id, is_superadmin))
 }
 
 async fn handle_socket(
@@ -99,33 +112,62 @@ async fn handle_socket(
     );
     let mut receiver = state.event_sender.subscribe();
 
-    while let Ok(msg_text) = receiver.recv().await {
-        // Platform Superadmin receives all events across all tenants
-        if is_superadmin {
-            if socket.send(Message::Text(msg_text)).await.is_err() {
-                break;
+    loop {
+        tokio::select! {
+            // Monitor client socket for disconnects, ping/pong, or close frames
+            client_msg = socket.recv() => {
+                match client_msg {
+                    Some(Ok(Message::Close(_))) | None => {
+                        break;
+                    }
+                    Some(Err(_)) => {
+                        break;
+                    }
+                    _ => {
+                        // Keep connection alive, ignore incoming payload on read-only stream
+                    }
+                }
             }
-            continue;
-        }
+            // Stream broadcast events to client
+            broadcast = receiver.recv() => {
+                match broadcast {
+                    Ok(msg_text) => {
+                        if is_superadmin {
+                            if socket.send(Message::Text(msg_text)).await.is_err() {
+                                break;
+                            }
+                            continue;
+                        }
 
-        // Tenant users strictly receive only their own tenant's events
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg_text) {
-            if let Some(msg_tenant_str) = val.get("tenant_id").and_then(|v| v.as_str()) {
-                if let Ok(msg_tenant_id) = Uuid::parse_str(msg_tenant_str) {
-                    if msg_tenant_id != client_tenant_id {
-                        // Drop cross-tenant message for data isolation security
+                        // Tenant users strictly receive only their own tenant's events
+                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg_text) {
+                            if let Some(msg_tenant_str) = val.get("tenant_id").and_then(|v| v.as_str()) {
+                                if let Ok(msg_tenant_id) = Uuid::parse_str(msg_tenant_str) {
+                                    if msg_tenant_id != client_tenant_id {
+                                        // Drop cross-tenant message for data isolation security
+                                        continue;
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        if socket.send(Message::Text(msg_text)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        // Slow consumer lagged, skip dropped messages
                         continue;
                     }
-                } else {
-                    continue;
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
                 }
-            } else {
-                continue;
             }
-        }
-
-        if socket.send(Message::Text(msg_text)).await.is_err() {
-            break;
         }
     }
 }

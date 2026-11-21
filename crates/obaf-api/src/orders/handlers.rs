@@ -7,7 +7,9 @@ use axum::{
 use chrono::Utc;
 use obaf_database::entities::{order, order_item, product, stock_movement};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,6 +34,8 @@ pub struct CreateOrderRequest {
 #[derive(Deserialize, IntoParams)]
 pub struct OrderFilterQuery {
     pub status: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -344,6 +348,13 @@ pub async fn list_orders(
 
     if let Some(status) = query.status {
         q = q.filter(order::Column::Status.eq(status));
+    }
+
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    q = q.limit(limit);
+
+    if let Some(offset) = query.offset {
+        q = q.offset(offset);
     }
 
     let orders = q.all(&state.db).await.map_err(|e| {

@@ -6,7 +6,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use obaf_database::entities::subscription;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -130,6 +130,7 @@ pub async fn list_subscriptions(
 ) -> Result<Json<Vec<SubscriptionResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
     let subs = subscription::Entity::find()
         .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| {

@@ -26,6 +26,8 @@ use uuid::Uuid;
 pub const MAX_FAILED_LOGIN_ATTEMPTS: u32 = 5;
 /// Duration of lockout window in seconds (15 minutes)
 pub const LOCKOUT_DURATION_SECS: u64 = 900;
+/// Maximum tracking entries in memory before eviction to prevent state exhaustion DoS
+pub const MAX_LOGIN_GUARD_CAPACITY: usize = 50_000;
 
 #[derive(Clone, Debug)]
 struct AttemptState {
@@ -70,6 +72,28 @@ impl LoginAttemptGuard {
     pub fn record_failure(&self, key: &str) -> (u32, bool) {
         let now = Instant::now();
         let mut map = self.attempts.write().unwrap_or_else(|e| e.into_inner());
+
+        // State Exhaustion Protection (DoS): bound entries in memory
+        if !map.contains_key(key) && map.len() >= MAX_LOGIN_GUARD_CAPACITY {
+            map.retain(|_, state| {
+                if let Some(locked_until) = state.locked_until {
+                    now < locked_until
+                } else {
+                    now.duration_since(state.first_attempt)
+                        <= Duration::from_secs(LOCKOUT_DURATION_SECS)
+                }
+            });
+
+            if map.len() >= MAX_LOGIN_GUARD_CAPACITY {
+                if let Some(oldest_key) = map
+                    .iter()
+                    .min_by_key(|(_, state)| state.first_attempt)
+                    .map(|(k, _)| k.clone())
+                {
+                    map.remove(&oldest_key);
+                }
+            }
+        }
 
         let state = map.entry(key.to_string()).or_insert_with(|| AttemptState {
             count: 0,

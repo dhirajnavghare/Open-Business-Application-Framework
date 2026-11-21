@@ -1021,3 +1021,98 @@ async fn test_tenant_login_brute_force_lockout() {
         .unwrap()
         .contains("Too many failed login attempts"));
 }
+
+#[tokio::test]
+async fn test_rate_limiter_state_exhaustion_dos_protection() {
+    use obaf_core::rate_limiter::TokenBucketRateLimiter;
+
+    // Create a rate limiter with a strict maximum bound of 20 buckets
+    let limiter = TokenBucketRateLimiter::with_max_buckets(10.0, 1.0, 20);
+
+    // Simulate an attacker spraying 200 distinct spoofed client identifiers
+    for i in 0..200 {
+        let key = format!("spoofed_ip_{}", i);
+        let _ = limiter.check_and_consume(&key, 1.0);
+    }
+
+    // After 200 distinct keys, bucket count MUST remain strictly bounded to <= 20
+    assert!(
+        limiter.buckets_len() <= 20,
+        "Rate limiter state must not exceed configured capacity"
+    );
+}
+
+#[tokio::test]
+async fn test_ttl_cache_hard_capacity_eviction_dos_protection() {
+    use obaf_core::cache::TtlCache;
+    use std::time::Duration;
+
+    // Cache with maximum capacity of 15 items
+    let cache = TtlCache::new(Duration::from_secs(300), 15);
+
+    // Attacker floods 100 distinct items into the cache
+    for i in 0..100 {
+        cache.insert(format!("key_{}", i), format!("val_{}", i));
+    }
+
+    // Cache size MUST be strictly capped at max_capacity (<= 15)
+    assert!(
+        cache.len() <= 15,
+        "Cache entries count must strictly enforce max_capacity ceiling"
+    );
+}
+
+#[tokio::test]
+async fn test_query_pagination_limit_clamping_dos_protection() {
+    let (app, state) = setup_test_app().await;
+
+    let org_id = Uuid::new_v4();
+    let now = chrono::Utc::now();
+    let org = obaf_database::entities::organization::ActiveModel {
+        id: Set(org_id),
+        name: Set("Pagination Org".to_string()),
+        slug: Set("page-org".to_string()),
+        preset: Set("retail".to_string()),
+        active_modules: Set("[\"orders\"]".to_string()),
+        settings: Set("{}".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    org.insert(&state.db).await.unwrap();
+
+    let token = generate_token(Uuid::new_v4(), TenantId(org_id), "admin", TEST_SECRET, 24).unwrap();
+
+    // Attacker attempts to request an unbounded 10 million rows
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/orders?limit=10000000")
+        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    // Must succeed normally (clamped to 200 max) without crashing or OOM
+    assert_eq!(res.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_revoked_token_rejected_on_websocket() {
+    let (app, state) = setup_test_app().await;
+
+    let user_id = Uuid::new_v4();
+    let org_id = Uuid::new_v4();
+    let token = generate_token(user_id, TenantId(org_id), "admin", TEST_SECRET, 24).unwrap();
+
+    // Revoke token immediately
+    state.revoke_token(&token);
+
+    // Attempt connecting to WebSocket with revoked token
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/v1/ws/events?token={}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}

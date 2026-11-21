@@ -6,7 +6,9 @@ use axum::{
 use chrono::Utc;
 use obaf_database::entities::pos_shift;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -273,6 +275,7 @@ pub async fn list_shifts(
     let shifts = pos_shift::Entity::find()
         .filter(pos_shift::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .order_by_desc(pos_shift::Column::OpenedAt)
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| internal_err(format!("DB error: {}", e)))?;
