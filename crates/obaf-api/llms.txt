@@ -34,14 +34,14 @@ OBAF delivers a high-performance alternative to legacy monolithic ERPs (Odoo, ER
 - `GET /swagger-ui`: Interactive Swagger UI documentation.
 - `GET /api/v1/openapi.json`: OpenAPI 3.1 JSON specification.
 - `GET /api/v1/meta/schema`: Dynamic JSON schema discovery for headless UI auto-generation.
-- `POST /api/v1/admin/setup/preset`: 1-call tenant onboarding with domain preset.
+- `POST /api/v1/admin/setup/preset`: 1-call tenant onboarding with domain preset (enforces mandatory admin_password >= 8 chars).
 - `POST /api/v1/auth/login`: Tenant user authentication returning Bearer JWT token (with anti-brute force lockout and timing-attack equalization).
 - `POST /api/v1/auth/logout`: Revoke active tenant session token with instant cryptographic blacklist.
 - `POST /api/v1/superadmin/login`: Super Admin authentication via email/password or Google SSO.
 - `POST /api/v1/superadmin/logout`: Revoke Super Admin session token.
 - `POST /api/v1/superadmin/mfa-verify`: TOTP 2-Factor Authentication verification.
 - `GET /api/v1/superadmin/ssl`: Let's Encrypt automated SSL certificate status, DNS verification, and auto-renewal.
-- `POST /api/v1/superadmin/organizations`: Provision organizations and configure dynamic API module gating.
+- `POST /api/v1/superadmin/organizations`: Provision organizations and configure dynamic API module gating (enforces mandatory admin_password >= 8 chars).
 - `GET /api/v1/superadmin/database/backup`: 1-click database JSON snapshot backup.
 - `POST /api/v1/catalog`: Create products with dynamic custom schema validation.
 - `POST /api/v1/orders`: Create orders with state machine transitions and Idempotency-Key support.

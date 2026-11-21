@@ -67,3 +67,29 @@ Super Admins can granularly select which of the 15 API engines each tenant organ
 - Revoked tokens are fingerprinted with SHA-256 and blacklisted in a high-performance in-memory `TtlCache<String, ()>` with a 24-hour expiration window.
 - The `AuthUser` extractor checks each request against the blacklist, rejecting revoked tokens with `401 Unauthorized`.
 
+---
+
+## 7. Role-Based Access Control (RBAC) Hierarchy & Permissions
+
+OBAF enforces zero-trust role-based authorization across all tenant APIs:
+
+| Role | Scope | Key Capabilities & Boundaries |
+|---|---|---|
+| `superadmin` | Global Platform | Cross-tenant administration, module enablement, domain SSL configuration, database backups, system settings, global maintenance, and tenant impersonation. Blocked from registering via tenant auth. |
+| `admin` | Tenant Boundary | Tenant configuration, user creation, API key management, audit trail inspection, credit note generation, report exports, and currency exchange rate updates. |
+| `manager` | Tenant Boundary | Operational management: cashier shift close overrides, product catalog updates, inventory adjustments, and order processing. |
+| `staff` | Tenant Boundary | Front-line staff operations: order fulfillment, appointment booking, inventory receipts, and customer updates. |
+| `cashier` | Tenant Boundary | Point of sale cashier operations: opening shifts, executing cash/card sales, customer lookups, and closing **own** shifts. Cross-cashier shift closures strictly blocked (BOLA defense). |
+| `waiter` | Tenant Boundary | Table ordering, menu consultation, order placement, and status tracking. |
+| `viewer` | Tenant Boundary | Read-only access: querying catalog, orders, and customer lists. Strictly forbidden from mutating state across orders, catalog, bookings, subscriptions, and promotions. |
+
+---
+
+## 8. Tenant Provisioning Security & CWE-1188 Defenses
+
+To eliminate insecure default credentials (CWE-1188 / OWASP A07) and prevent orphaned records:
+- **Mandatory Password:** All onboarding endpoints (`POST /api/v1/superadmin/organizations`, `POST /api/v1/admin/setup/preset`, `POST /api/v1/admin/tenants`) enforce an explicit `admin_password` $\ge 8$ characters. Static default passwords (`admin123`, `AdminSecure123!`) are eliminated.
+- **Pre-Creation Verification:** The system verifies `admin_email` format and uniqueness against existing users before inserting an organization, preventing orphaned records.
+- **Atomic Rollback:** If tenant administrator record creation fails, the newly created organization record is automatically rolled back and deleted.
+- **Anonymous Registration Lock:** Anonymous user registration (`POST /api/v1/auth/register`) is blocked once users exist for that organization, requiring tenant admin authentication.
+

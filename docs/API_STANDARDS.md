@@ -59,11 +59,11 @@ All public REST endpoints follow standard versioning:
 |---|---|---|
 | `200 OK` | Request succeeded | Standard response for GET, PUT, and action RPCs |
 | `201 Created` | Resource created | Returned on successful POST creation |
-| `400 Bad Request` | Malformed input | Invalid parameters, negative quantities, or invalid domain names |
+| `400 Bad Request` | Malformed input | Invalid parameters, missing required fields (e.g. missing `admin_password`), negative quantities, or invalid domain names |
 | `401 Unauthorized` | Missing / invalid token | Expired, revoked, or invalid JWT token |
-| `403 Forbidden` | Access denied | User lacks required role, or tenant API module is disabled (`MODULE_DISABLED`) |
+| `403 Forbidden` | Access denied | User lacks required role (e.g. viewer attempting mutation), cross-cashier shift closure, unconfigured Google SSO, or tenant API module disabled (`MODULE_DISABLED`) |
 | `404 Not Found` | Resource not found | Resource does not exist or belongs to another tenant |
-| `409 Conflict` | Unique constraint conflict | Duplicate organization slug, order number, or coupon code |
+| `409 Conflict` | Unique constraint conflict | Duplicate organization slug, admin user email, order number, or coupon code |
 | `422 Unprocessable` | Schema validation error | Custom metadata failed preset JSON schema |
 | `423 Locked` | Mutation frozen | Returned on POST/PUT/DELETE when Super Admin emergency lockdown is active |
 | `429 Too Many Requests`| Rate limit / Lockout | Token bucket quota exhausted or anti-brute force account lockout triggered |
@@ -75,7 +75,7 @@ All public REST endpoints follow standard versioning:
 
 List endpoints support:
 - `page`: 1-based page index (default: `1`)
-- `page_size`: items per page (default: `20`, max: `100`)
+- `page_size` / `limit`: items per page (default: `20` or `50`, hard ceiling clamped to `200` to prevent memory exhaustion DoS)
 - `search`: case-insensitive substring matching on name, SKU, or email
 
 ---

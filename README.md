@@ -239,7 +239,8 @@ curl -X POST http://127.0.0.1:8080/api/v1/admin/setup/preset \
     "slug": "spice-bistro",
     "preset": "restaurant_pos",
     "admin_email": "admin@spicebistro.com",
-    "admin_name": "Alex Chef"
+    "admin_name": "Alex Chef",
+    "admin_password": "SecurePassword123!"
   }'
 ```
 

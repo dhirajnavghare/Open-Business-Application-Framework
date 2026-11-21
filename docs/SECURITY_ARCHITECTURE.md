@@ -20,6 +20,11 @@
 | **Machine-to-Machine Spoofing** | SHA-256 hashed API key validation (`X-API-Key`). |
 | **Tampered Webhook Payloads** | Cryptographic HMAC-SHA256 signature verification headers (`X-OBAF-Signature`). |
 | **Production Default Password Vulnerability**| Fatal startup abort in production mode (`OBAF_ENV=production`) if default Super Admin password (`admin123`) is detected. |
+| **Insecure Default Credentials (CWE-1188)**| Mandatory `admin_password` (minimum 8 characters) across all tenant onboarding endpoints (`/organizations`, `/setup/preset`, `/tenants`). All fallback defaults eliminated. |
+| **Orphaned Organization Mitigation**| Pre-creation validation of administrator email format and duplicate checks before inserting organizations; automatic transactional rollback on user creation failure. |
+| **Google SSO Audience Confusion**| Strict audience (`aud`) claim verification against configured Google client ID; unconfigured server returns `403 Forbidden` without external network calls; mock tokens gated strictly to debug/test builds. |
+| **Broken Object Level Authorization (BOLA/IDOR)**| POS cashier shift closure restricted to the owning cashier or administrative override; cross-tenant usage metrics and billing records strictly isolated. |
+| **Role Privilege Escalation (RBAC)**| Read-only `viewer` accounts blocked from mutating operations; anonymous registration locked down once users exist; superadmin role blocked from self-registration. |
 
 ---
 
@@ -28,6 +33,9 @@
 ### 2.1 Dual-Engine Super Admin Authentication
 - **Top-Level Root Admin:** Configured strictly via environment variables (`SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`).
 - **Google SSO:** Direct integration with Google Identity Services (GIS). Cryptographically verifies Google ID tokens using Google's public JSON Web Key Sets (JWKS) via `jsonwebtoken` with cache-aside TTL key caching.
+  - **Audience Confusion Defense:** Google SSO requires an explicitly configured `GOOGLE_CLIENT_ID`. If unconfigured, the endpoint immediately returns `403 Forbidden` without initiating external network calls.
+  - **Strict Audience Matching:** The token's `aud` claim must strictly match the server's configured client ID (`401 Unauthorized` on mismatch or missing claim).
+  - **Production Mock Isolation:** Development mock token bypasses (`mock_google_token:...`) are compiled exclusively within `#[cfg(any(test, debug_assertions))]` blocks, guaranteeing they are inactive in production release binaries.
 - **Email & Password:** Supports raw password configuration or pre-hashed Argon2id hashes in environment variables.
 
 ### 2.2 Multi-Factor Authentication (TOTP 2FA)
@@ -45,6 +53,19 @@ JWT tokens are inherently stateless. To provide immediate session revocation upo
 ### 2.4 Anti-Brute Force, Credential Stuffing & User Enumeration
 - **Progressive Lockout (`LoginAttemptGuard`):** Tracks failed attempts keyed by `login:<email>:<client_ip>`. After 5 consecutive failures, subsequent requests are rejected immediately with `429 Too Many Requests` for 15 minutes.
 - **Timing Equalization:** In standard authentication handlers, non-existent users trigger an immediate failure, creating a measurable ~50ms difference compared to password hashing for existing users. OBAF executes an Argon2id verification against a precomputed dummy hash on non-existent users, equalizing server response time and eliminating user enumeration side-channels.
+
+### 2.5 Zero-Trust Role-Based Access Control (RBAC) & BOLA / IDOR Defense
+OBAF implements a hierarchical role matrix: `superadmin` > `admin` > `manager` > `staff` > `cashier` > `viewer`.
+- **Read-Only Viewer Lockdown:** Accounts with role `viewer` are strictly forbidden from mutating state across orders, catalog, customers, booking check-ins/check-outs, subscription status updates, and promotions (`403 Forbidden`).
+- **POS Cashier Shift Isolation (BOLA Defense):** Cashiers can only manage and close their own shifts (`pos/shifts/:id/close`). Attempting to close another cashier's shift returns `403 Forbidden`, while tenant administrators or managers possess operational override capability.
+- **Tenant Self-Registration Takeover Prevention:** Anonymous user registration (`POST /api/v1/auth/register`) is permitted only during initial tenant bootstrapping. Once tenant users exist, registration requires tenant admin or superadmin authorization.
+- **Superadmin Role Gating:** The `superadmin` role cannot be registered via tenant API endpoints under any circumstances (`403 Forbidden`).
+- **Administrative Operation Gating:** Financial report exports, credit notes, currency exchange rates, and webhooks are strictly gated to administrative privileges.
+
+### 2.6 Tenant Provisioning & Default Credential Defense (CWE-1188)
+- **Mandatory Administrator Password:** All organization and tenant creation endpoints (`POST /api/v1/superadmin/organizations`, `POST /api/v1/admin/setup/preset`, and `POST /api/v1/admin/tenants`) enforce an explicit `admin_password` of at least 8 characters. Hardcoded fallback passwords (`"admin123"`, `"AdminSecure123!"`) are completely removed.
+- **Pre-Creation Email Validation & Uniqueness:** Administrator email format and uniqueness are verified against existing users prior to organization database insertion, preventing orphaned organization records.
+- **Automatic Rollback:** If user record creation fails, the newly inserted organization record is automatically rolled back and deleted.
 
 ---
 
