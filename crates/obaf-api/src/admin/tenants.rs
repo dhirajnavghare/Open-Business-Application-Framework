@@ -25,6 +25,7 @@ pub struct ProvisionTenantRequest {
     pub admin_email: String,
     pub admin_name: String,
     pub admin_password: Option<String>,
+    pub active_modules: Option<Vec<String>>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -117,16 +118,27 @@ pub async fn provision_tenant(
         "provisioned_via": "saas_admin"
     });
 
+    let default_all_modules: Vec<String> = crate::superadmin::organizations::ALL_MODULES
+        .iter()
+        .map(|m| m.id.to_string())
+        .collect();
+    let modules = payload.active_modules.unwrap_or(default_all_modules);
+    let modules_json = serde_json::to_string(&modules).unwrap_or_else(|_| "[]".to_string());
+
     let new_org = organization::ActiveModel {
         id: Set(org_id),
         slug: Set(payload.slug.clone()),
         name: Set(payload.organization_name.clone()),
         preset: Set(preset_id.clone()),
-        active_modules: Set("[\"customers\",\"catalog\",\"orders\",\"billing\"]".to_string()),
+        active_modules: Set(modules_json.clone()),
         settings: Set(settings.to_string()),
         created_at: Set(now),
         updated_at: Set(now),
     };
+
+    state
+        .cache
+        .insert(format!("tenant_modules:{}", org_id), modules_json);
 
     new_org.insert(&state.db).await.map_err(|e| {
         (

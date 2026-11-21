@@ -28,11 +28,28 @@ pub struct AuthErrorResponse {
 }
 
 impl AuthUser {
+    pub fn is_superadmin(&self) -> bool {
+        self.role == "superadmin"
+    }
+
+    pub fn require_superadmin(&self) -> Result<(), (StatusCode, Json<AuthErrorResponse>)> {
+        if self.is_superadmin() {
+            Ok(())
+        } else {
+            Err((
+                StatusCode::FORBIDDEN,
+                Json(AuthErrorResponse {
+                    error: "Forbidden: Platform superadmin privileges required".to_string(),
+                }),
+            ))
+        }
+    }
+
     pub fn require_role(
         &self,
         allowed_roles: &[&str],
     ) -> Result<(), (StatusCode, Json<AuthErrorResponse>)> {
-        if allowed_roles.contains(&self.role.as_str()) {
+        if self.is_superadmin() || allowed_roles.contains(&self.role.as_str()) {
             Ok(())
         } else {
             Err((

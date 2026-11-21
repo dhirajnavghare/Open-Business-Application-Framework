@@ -129,6 +129,18 @@ use utoipa::{
         crate::sync::handlers::sync_pull,
         // Search
         crate::search::handlers::global_search,
+        // SuperAdmin
+        crate::superadmin::auth::superadmin_login,
+        crate::superadmin::auth::superadmin_google_login,
+        crate::superadmin::auth::get_superadmin_config,
+        crate::superadmin::auth::get_superadmin_me,
+        crate::superadmin::stats::get_platform_stats,
+        crate::superadmin::organizations::list_supported_modules,
+        crate::superadmin::organizations::list_organizations,
+        crate::superadmin::organizations::get_organization,
+        crate::superadmin::organizations::create_organization,
+        crate::superadmin::organizations::update_organization,
+        crate::superadmin::organizations::delete_organization,
     ),
     components(
         schemas(
@@ -235,6 +247,19 @@ use utoipa::{
             crate::search::handlers::OrderSearchResult,
             crate::search::handlers::SupplierSearchResult,
             crate::search::handlers::GlobalSearchResponse,
+            // SuperAdmin
+            crate::superadmin::auth::SuperAdminLoginRequest,
+            crate::superadmin::auth::SuperAdminGoogleLoginRequest,
+            crate::superadmin::auth::SuperAdminUserInfo,
+            crate::superadmin::auth::SuperAdminLoginResponse,
+            crate::superadmin::auth::SuperAdminConfigResponse,
+            crate::superadmin::stats::PlatformStatsResponse,
+            crate::superadmin::organizations::ModuleCatalogItem,
+            crate::superadmin::organizations::OrganizationSummary,
+            crate::superadmin::organizations::OrganizationDetail,
+            crate::superadmin::organizations::UserSummary,
+            crate::superadmin::organizations::CreateOrganizationRequest,
+            crate::superadmin::organizations::UpdateOrganizationRequest,
         )
     ),
     modifiers(&SecurityAddon),
@@ -258,7 +283,8 @@ use utoipa::{
         (name = "Sync", description = "Edge and offline synchronization with batch idempotency"),
         (name = "Search", description = "Global omni-search across products, customers, orders, and suppliers"),
         (name = "Meta", description = "Dynamic introspection and schema discovery for headless admin panels"),
-        (name = "Admin", description = "Platform management and domain preset bootstrapping")
+        (name = "Admin", description = "Platform management and domain preset bootstrapping"),
+        (name = "SuperAdmin", description = "Platform root super administrator management and module configuration")
     ),
     info(
         title = "Open Business Application Framework (OBAF) API",

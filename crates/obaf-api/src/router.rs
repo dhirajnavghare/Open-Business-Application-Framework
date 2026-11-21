@@ -32,6 +32,7 @@ use crate::reports::report_routes;
 use crate::search::search_routes;
 use crate::state::SharedState;
 use crate::subscriptions::subscription_routes;
+use crate::superadmin::{module_gating_middleware, serve_admin_ui, superadmin_routes};
 use crate::suppliers::supplier_routes;
 use crate::sync::sync_routes;
 use crate::webhooks::webhook_routes;
@@ -55,6 +56,9 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/ready", get(ready_check))
         .route("/metrics", get(metrics_check))
         .route("/llms.txt", get(llms_txt))
+        // Super Admin Single Page Application UI
+        .route("/admin", get(serve_admin_ui))
+        .route("/superadmin", get(serve_admin_ui))
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api/v1/openapi.json", openapi))
         // API v1 routes
@@ -78,7 +82,9 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/meta", meta_routes)
         .nest("/api/v1/sync", sync_routes())
         .nest("/api/v1/admin", admin_routes())
+        .nest("/api/v1/superadmin", superadmin_routes())
         // Global Middlewares
+        .layer(from_fn_with_state(state.clone(), module_gating_middleware))
         .layer(from_fn(request_id_and_security_middleware))
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
         .layer(cors)
@@ -98,6 +104,8 @@ async fn rate_limit_middleware(
         || path == "/ready"
         || path == "/metrics"
         || path == "/llms.txt"
+        || path == "/admin"
+        || path == "/superadmin"
         || path.starts_with("/swagger-ui")
         || path == "/api/v1/openapi.json"
     {

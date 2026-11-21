@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBAF Super Admin Console</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #111827;
+      --bg-card-hover: #1e293b;
+      --bg-input: #0f172a;
+      --border-color: #1f2937;
+      --border-focus: #6366f1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-glow: rgba(79, 70, 229, 0.35);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--primary), #a855f7);
+      color: white;
+      padding: 0.35rem 0.65rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-pulse {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--emerald);
+      font-weight: 500;
+      padding: 0.2rem 0.6rem;
+      background: var(--emerald-glow);
+      border-radius: 999px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pulse::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-tab.active {
+      color: white;
+      background: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .admin-email-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--rose);
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .btn-logout:hover {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--rose);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Auth Overlay / Modal */
+    #auth-view {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 120px);
+    }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px var(--primary-glow);
+      position: relative;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .auth-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      display: inline-block;
+    }
+
+    .auth-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .env-notice {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.15s;
+    }
+
+    .form-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .auth-divider::before, .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .auth-divider span {
+      padding: 0 0.75rem;
+    }
+
+    .google-btn-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 0.5rem;
+    }
+
+    .google-custom-btn {
+      width: 100%;
+      background: white;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .google-custom-btn:hover {
+      background: #f9fafb;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Dashboard & Tabs View */
+    .view-section {
+      display: none;
+    }
+
+    .view-section.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 0.4rem;
+    }
+
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.6rem 1rem 0.6rem 2.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .btn-action {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s;
+    }
+
+    .btn-action:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Organizations Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 0.85rem 1.25rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .org-title {
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .org-slug {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .preset-pill {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .modules-cell {
+      max-width: 380px;
+    }
+
+    .module-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+
+    .module-badge {
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-sm);
+      background: rgba(16, 185, 129, 0.12);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .module-badge.more {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dim);
+      border-color: var(--border-color);
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.4rem 0.65rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
+    }
+
+    .btn-icon:hover {
+      color: var(--text-main);
+      background: var(--bg-card-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-icon.btn-manage-api {
+      background: rgba(99, 102, 241, 0.15);
+      color: #c7d2fe;
+      border-color: rgba(99, 102, 241, 0.4);
+      font-weight: 600;
+    }
+
+    .btn-icon.btn-manage-api:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-icon.btn-danger:hover {
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.1);
+      border-color: var(--rose);
+    }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      animation: modalScale 0.2s ease;
+    }
+
+    @keyframes modalScale {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      padding: 1.75rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 1.25rem 1.75rem;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    /* Modules Checkbox Grid */
+    .module-selector-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .module-category-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin: 1.25rem 0 0.5rem 0;
+    }
+
+    .module-category-title:first-child {
+      margin-top: 0;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .module-card-choice {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .module-card-choice:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .module-card-choice.checked {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: var(--primary);
+    }
+
+    .module-card-choice input[type="checkbox"] {
+      margin-top: 0.2rem;
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .module-choice-info {
+      flex: 1;
+    }
+
+    .module-choice-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .module-choice-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .module-choice-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      line-height: 1.3;
+    }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 9999;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--text-main);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      animation: slideIn 0.2s ease;
+      max-width: 380px;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast.success { border-color: var(--emerald); }
+    .toast.error { border-color: var(--rose); color: #fecdd3; }
+
+    /* Modules Catalog Tab View */
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .catalog-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      transition: all 0.15s;
+    }
+
+    .catalog-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .catalog-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      margin-bottom: 0.75rem;
+    }
+
+    .catalog-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .catalog-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--emerald);
+      margin-bottom: 0.75rem;
+    }
+
+    .catalog-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar (visible when authenticated) -->
+  <header id="main-header" style="display: none;">
+    <div class="brand">
+      <span class="brand-badge">OBAF</span>
+      <span>Super Admin Console</span>
+      <span class="status-pulse">PLATFORM ACTIVE</span>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="organizations" onclick="switchTab('organizations')">
+        🏢 Organizations
+      </button>
+      <button class="nav-tab" data-tab="modules" onclick="switchTab('modules')">
+        🧩 API Modules Catalog
+      </button>
+      <button class="nav-tab" data-tab="system" onclick="switchTab('system')">
+        📊 System & Health
+      </button>
+    </div>
+
+    <div class="user-pill">
+      <span class="admin-email-tag" id="header-admin-email">admin@obaf.local</span>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Super Admin Authentication View -->
+    <div id="auth-view">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-icon">👑</div>
+          <h1 class="auth-title">Super Admin Login</h1>
+          <p class="auth-subtitle">Platform Super Administrator console for Open Business Application Framework</p>
+        </div>
+
+        <div class="env-notice">
+          <span>ℹ️</span>
+          <div>Single designated platform root user. Configured via <code>OBAF_SUPERADMIN_EMAIL</code> and <code>OBAF_SUPERADMIN_PASSWORD</code>.</div>
+        </div>
+
+        <!-- Google SSO Container -->
+        <div id="google-sso-section" style="display: none; margin-bottom: 1.25rem;">
+          <div id="google-btn" class="google-btn-container"></div>
+          <div class="auth-divider"><span>OR EMAIL & PASSWORD</span></div>
+        </div>
+
+        <!-- Email & Password Form -->
+        <form id="login-form" onsubmit="handleEmailLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Super Admin Email</label>
+            <input type="email" id="login-email" class="form-input" required placeholder="admin@obaf.local" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="login-password" class="form-input" required placeholder="••••••••••••" autocomplete="current-password">
+          </div>
+          <button type="submit" id="login-submit-btn" class="btn-primary">
+            <span>Sign In to Super Admin</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. Dashboard: Organizations View -->
+    <section id="view-organizations" class="view-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Organizations</div>
+          <div class="stat-value" id="stat-orgs">-</div>
+          <div class="stat-sub">Multi-tenant instances</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Products</div>
+          <div class="stat-value" id="stat-products">-</div>
+          <div class="stat-sub">Across all organizations</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Orders</div>
+          <div class="stat-value" id="stat-orders">-</div>
+          <div class="stat-sub">Processed transactions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value" id="stat-users">-</div>
+          <div class="stat-sub">Tenant admins & staff</div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="org-search-input" placeholder="Search organizations by name or slug..." oninput="filterOrganizations()">
+        </div>
+        <button class="btn-action" onclick="openCreateOrgModal()">
+          <span>+</span> Create Organization
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Organization</th>
+              <th>Preset Template</th>
+              <th>Supported APIs & Modules</th>
+              <th>Usage Stats</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="orgs-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+                Loading organizations...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. Dashboard: Modules Catalog View -->
+    <section id="view-modules" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Supported OBAF API Engines</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          The platform super administrator can dynamically enable or disable any of these API modules for each organization.
+        </p>
+      </div>
+      <div class="catalog-grid" id="catalog-grid-container">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+    <!-- 4. Dashboard: System & Health View -->
+    <section id="view-system" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Platform Diagnostics & Architecture</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          High-performance, single-binary Rust engine architecture metrics.
+        </p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Database Backend</div>
+          <div class="stat-value" style="font-size: 1.35rem;" id="sys-db">-</div>
+          <div class="stat-sub">Connection pooling with read/write routing</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Server Version</div>
+          <div class="stat-value" id="sys-version">-</div>
+          <div class="stat-sub">Zero-downtime Rust Axum runtime</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Google SSO</div>
+          <div class="stat-value" style="font-size: 1.35rem;" id="sys-google">-</div>
+          <div class="stat-sub" id="sys-google-sub">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Security & Rate Limiting</div>
+          <div class="stat-value" style="font-size: 1.35rem; color: var(--emerald);">Active</div>
+          <div class="stat-sub">Token Bucket + Module Gate Shield</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Create Organization -->
+  <div class="modal-backdrop" id="create-org-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Organization</h3>
+        <button class="modal-close" onclick="closeModal('create-org-modal')">&times;</button>
+      </div>
+      <form id="create-org-form" onsubmit="handleCreateOrganization(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Organization Name *</label>
+            <input type="text" id="new-org-name" class="form-input" required placeholder="Acme Global Retail" oninput="autoSlugify(this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL Slug * (Unique Tenant Identifier)</label>
+            <input type="text" id="new-org-slug" class="form-input" required placeholder="acme-global">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Domain Preset Template</label>
+            <select id="new-org-preset" class="form-input" onchange="onPresetChange(this.value)">
+              <option value="retail_grocery">Retail & Grocery (Catalog, Inventory, Orders, POS, Billing)</option>
+              <option value="restaurant_pos">Restaurant & POS (Tables, KOT, POS, Orders, Billing)</option>
+              <option value="pharmacy">Pharmacy & Healthcare (Batches, Expiry, Billing, Inventory)</option>
+              <option value="clinic_opd">Clinic & OPD (Bookings, Patients, Billing, Prescriptions)</option>
+              <option value="coworking_space">Coworking Space (Subscriptions, Bookings, Billing)</option>
+              <option value="hotel_management">Hotel & Hospitality (Rooms, Bookings, POS, Billing)</option>
+              <option value="equipment_rental">Equipment Rental (Inventory, Bookings, Billing)</option>
+              <option value="gym_fitness">Gym & Fitness (Subscriptions, Bookings, Customers)</option>
+              <option value="salon_spa">Salon & Spa (Bookings, POS, Customers, Billing)</option>
+              <option value="manufacturing_jobwork">Manufacturing & Job Work (Procurement, Inventory, Orders)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial Tenant Administrator Name</label>
+            <input type="text" id="new-org-admin-name" class="form-input" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial Tenant Administrator Email</label>
+            <input type="email" id="new-org-admin-email" class="form-input" required placeholder="admin@acmeglobal.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Admin Password (optional, defaults to admin123)</label>
+            <input type="password" id="new-org-admin-password" class="form-input" placeholder="admin123">
+          </div>
+
+          <!-- Supported Modules Selector -->
+          <div style="margin-top: 1.5rem;">
+            <div class="module-selector-toolbar">
+              <label class="form-label" style="margin-bottom: 0;">Select Supported APIs & Modules</label>
+              <div>
+                <button type="button" class="btn-icon" onclick="toggleAllModules('create', true)">Select All</button>
+                <button type="button" class="btn-icon" onclick="toggleAllModules('create', false)">Clear</button>
+              </div>
+            </div>
+            <div id="create-modules-container" class="modules-grid">
+              <!-- Checkboxes injected by JS -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('create-org-modal')">Cancel</button>
+          <button type="submit" class="btn-action">Provision Organization</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Configure Supported APIs -->
+  <div class="modal-backdrop" id="manage-apis-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Supported APIs & Module Gating</h3>
+          <p style="font-size: 0.8rem; color: var(--text-dim);" id="manage-apis-org-subtitle">Organization: -</p>
+        </div>
+        <button class="modal-close" onclick="closeModal('manage-apis-modal')">&times;</button>
+      </div>
+      <form id="manage-apis-form" onsubmit="handleSaveSupportedApis(event)">
+        <input type="hidden" id="manage-apis-org-id">
+        <div class="modal-body">
+          <div class="env-notice" style="margin-bottom: 1rem;">
+            <span>⚡</span>
+            <div>Enabling or disabling an API module applies immediately. Unselected modules will return <code>403 MODULE_DISABLED</code> to tenant callers.</div>
+          </div>
+          <div class="module-selector-toolbar">
+            <span style="font-size: 0.85rem; font-weight: 600;">API Engine Modules</span>
+            <div>
+              <button type="button" class="btn-icon" onclick="toggleAllModules('manage', true)">Select All</button>
+              <button type="button" class="btn-icon" onclick="toggleAllModules('manage', false)">Deselect All</button>
+            </div>
+          </div>
+          <div id="manage-modules-container" class="modules-grid">
+            <!-- Checkboxes injected by JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('manage-apis-modal')">Cancel</button>
+          <button type="submit" class="btn-action">Save Supported APIs</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script>
+    // State
+    let authToken = localStorage.getItem('obaf_superadmin_token') || null;
+    let currentAdmin = null;
+    let modulesCatalog = [];
+    let organizationsList = [];
+
+    // DOM Elements
+    const authView = document.getElementById('auth-view');
+    const mainHeader = document.getElementById('main-header');
+    const headerAdminEmail = document.getElementById('header-admin-email');
+
+    // Bootstrap
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadSuperAdminConfig();
+      if (authToken) {
+        verifySession();
+      } else {
+        showAuthView();
+      }
+    });
+
+    async function loadSuperAdminConfig() {
+      try {
+        const res = await fetch('/api/v1/superadmin/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          document.getElementById('login-email').value = cfg.superadmin_email;
+          if (cfg.google_auth_enabled && cfg.google_client_id) {
+            initGoogleSso(cfg.google_client_id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load superadmin config:', err);
+      }
+    }
+
+    function initGoogleSso(clientId) {
+      document.getElementById('google-sso-section').style.display = 'block';
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.google) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+          });
+          window.google.accounts.id.renderButton(
+            document.getElementById('google-btn'),
+            { theme: 'outline', size: 'large', width: '380', shape: 'rectangular' }
+          );
+        }
+      };
+      document.head.appendChild(script);
+    }
+
+    async function handleGoogleCredentialResponse(response) {
+      try {
+        const res = await fetch('/api/v1/superadmin/google-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSession(data.token, data.user);
+          showToast('Google Sign-In successful', 'success');
+        } else {
+          showToast(data.error || 'Google Sign-In failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during Google Sign-In', 'error');
+      }
+    }
+
+    async function handleEmailLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-submit-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSession(data.token, data.user);
+          showToast('Welcome, Super Administrator', 'success');
+        } else {
+          showToast(data.error || 'Invalid credentials', 'error');
+        }
+      } catch (err) {
+        showToast('Login request failed', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In to Super Admin';
+      }
+    }
+
+    function setSession(token, user) {
+      authToken = token;
+      currentAdmin = user;
+      localStorage.setItem('obaf_superadmin_token', token);
+      showDashboard();
+    }
+
+    async function verifySession() {
+      try {
+        const res = await fetch('/api/v1/superadmin/me', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          currentAdmin = await res.json();
+          showDashboard();
+        } else {
+          logout();
+        }
+      } catch (err) {
+        logout();
+      }
+    }
+
+    function logout() {
+      authToken = null;
+      currentAdmin = null;
+      localStorage.removeItem('obaf_superadmin_token');
+      showAuthView();
+      showToast('Signed out successfully', 'info');
+    }
+
+    function showAuthView() {
+      authView.style.display = 'flex';
+      mainHeader.style.display = 'none';
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    }
+
+    async function showDashboard() {
+      authView.style.display = 'none';
+      mainHeader.style.display = 'flex';
+      headerAdminEmail.textContent = currentAdmin ? currentAdmin.email : 'admin@obaf.local';
+
+      await loadModulesCatalog();
+      switchTab('organizations');
+      await refreshOrganizations();
+      await refreshStats();
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.nav-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.view-section').forEach(s => {
+        s.classList.toggle('active', s.id === `view-${tabName}`);
+      });
+      if (tabName === 'system') {
+        refreshStats();
+      }
+    }
+
+    async function loadModulesCatalog() {
+      try {
+        const res = await fetch('/api/v1/superadmin/modules', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          modulesCatalog = await res.json();
+          renderCatalogTab();
+          renderModuleCheckboxes('create-modules-container', 'create');
+          renderModuleCheckboxes('manage-modules-container', 'manage');
+        }
+      } catch (err) {
+        console.error('Failed to load modules catalog:', err);
+      }
+    }
+
+    function renderCatalogTab() {
+      const container = document.getElementById('catalog-grid-container');
+      container.innerHTML = modulesCatalog.map(m => `
+        <div class="catalog-card">
+          <div class="catalog-badge">${escapeHtml(m.category)}</div>
+          <div class="catalog-name">${escapeHtml(m.name)}</div>
+          <div class="catalog-id">Module ID: /api/v1/${escapeHtml(m.id)}/*</div>
+          <div class="catalog-desc">${escapeHtml(m.description)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderModuleCheckboxes(containerId, prefix) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = modulesCatalog.map(m => `
+        <label class="module-card-choice ${m.default_enabled ? 'checked' : ''}" id="${prefix}-label-${m.id}">
+          <input type="checkbox" name="${prefix}-module" value="${m.id}" ${m.default_enabled ? 'checked' : ''} onchange="onModuleCheckboxChange('${prefix}', '${m.id}', this.checked)">
+          <div class="module-choice-info">
+            <div class="module-choice-name">
+              <span>${escapeHtml(m.name)}</span>
+              <span class="module-choice-code">${m.id}</span>
+            </div>
+            <div class="module-choice-desc">${escapeHtml(m.description)}</div>
+          </div>
+        </label>
+      `).join('');
+    }
+
+    function onModuleCheckboxChange(prefix, modId, isChecked) {
+      const label = document.getElementById(`${prefix}-label-${modId}`);
+      if (label) {
+        label.classList.toggle('checked', isChecked);
+      }
+    }
+
+    function toggleAllModules(prefix, enable) {
+      const checkboxes = document.querySelectorAll(`input[name="${prefix}-module"]`);
+      checkboxes.forEach(cb => {
+        cb.checked = enable;
+        onModuleCheckboxChange(prefix, cb.value, enable);
+      });
+    }
+
+    async function refreshOrganizations() {
+      try {
+        const res = await fetch('/api/v1/superadmin/organizations', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          organizationsList = await res.json();
+          renderOrganizationsTable(organizationsList);
+        }
+      } catch (err) {
+        showToast('Failed to fetch organizations', 'error');
+      }
+    }
+
+    async function refreshStats() {
+      try {
+        const res = await fetch('/api/v1/superadmin/stats', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const stats = await res.json();
+          document.getElementById('stat-orgs').textContent = stats.total_organizations;
+          document.getElementById('stat-products').textContent = stats.total_products;
+          document.getElementById('stat-orders').textContent = stats.total_orders;
+          document.getElementById('stat-users').textContent = stats.total_users;
+
+          document.getElementById('sys-db').textContent = stats.database_backend;
+          document.getElementById('sys-version').textContent = `v${stats.server_version}`;
+          document.getElementById('sys-google').textContent = stats.google_auth_enabled ? 'Configured' : 'Not Configured';
+          document.getElementById('sys-google-sub').textContent = stats.google_auth_enabled ? `Audience checked` : 'OBAF_GOOGLE_CLIENT_ID unset';
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    function renderOrganizationsTable(orgs) {
+      const tbody = document.getElementById('orgs-table-body');
+      if (orgs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+              No organizations found. Click "+ Create Organization" above to provision your first tenant.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = orgs.map(org => {
+        const modules = org.active_modules || [];
+        const badgesHtml = modules.slice(0, 5).map(m => `
+          <span class="module-badge">${escapeHtml(m)}</span>
+        `).join('') + (modules.length > 5 ? `<span class="module-badge more">+${modules.length - 5} more</span>` : '');
+
+        return `
+          <tr>
+            <td>
+              <div class="org-title">${escapeHtml(org.name)}</div>
+              <div class="org-slug">${escapeHtml(org.slug)} • <span style="color: var(--text-dim);">${org.id}</span></div>
+            </td>
+            <td>
+              <span class="preset-pill">${escapeHtml(org.preset)}</span>
+            </td>
+            <td class="modules-cell">
+              <div class="module-badges">${badgesHtml || '<span style="color: var(--rose);">None Enabled</span>'}</div>
+            </td>
+            <td>
+              <div style="font-size: 0.8rem; font-family: monospace;">
+                📦 ${org.products_count} prod | 🧾 ${org.orders_count} ord | 👥 ${org.users_count} users
+              </div>
+            </td>
+            <td style="color: var(--text-dim); font-size: 0.8rem;">
+              ${new Date(org.created_at).toLocaleDateString()}
+            </td>
+            <td>
+              <div class="table-actions">
+                <button class="btn-icon btn-manage-api" onclick="openManageApisModal('${org.id}')">
+                  ⚙️ Select APIs
+                </button>
+                <button class="btn-icon btn-danger" onclick="deleteOrganization('${org.id}', '${escapeHtml(org.name)}')">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterOrganizations() {
+      const query = document.getElementById('org-search-input').value.toLowerCase().trim();
+      if (!query) {
+        renderOrganizationsTable(organizationsList);
+        return;
+      }
+      const filtered = organizationsList.filter(o => 
+        o.name.toLowerCase().includes(query) || o.slug.toLowerCase().includes(query)
+      );
+      renderOrganizationsTable(filtered);
+    }
+
+    function autoSlugify(name) {
+      const slugInput = document.getElementById('new-org-slug');
+      slugInput.value = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function onPresetChange(preset) {
+      // Auto-tune default modules based on preset selection
+      let selected = ["catalog", "orders", "billing"];
+      if (preset === 'restaurant_pos') {
+        selected = ["catalog", "orders", "pos", "billing", "customers"];
+      } else if (preset === 'pharmacy') {
+        selected = ["catalog", "inventory", "procurement", "billing", "suppliers"];
+      } else if (preset === 'clinic_opd') {
+        selected = ["bookings", "customers", "billing", "reports"];
+      } else if (preset === 'coworking_space') {
+        selected = ["bookings", "subscriptions", "billing", "customers"];
+      } else if (preset === 'gym_fitness') {
+        selected = ["subscriptions", "bookings", "customers", "billing"];
+      }
+      const checkboxes = document.querySelectorAll('input[name="create-module"]');
+      checkboxes.forEach(cb => {
+        const check = selected.includes(cb.value);
+        cb.checked = check;
+        onModuleCheckboxChange('create', cb.value, check);
+      });
+    }
+
+    function openCreateOrgModal() {
+      document.getElementById('create-org-form').reset();
+      toggleAllModules('create', false);
+      // default modules
+      ["catalog", "inventory", "orders", "billing", "customers", "payments"].forEach(id => {
+        const cb = document.querySelector(`input[name="create-module"][value="${id}"]`);
+        if (cb) {
+          cb.checked = true;
+          onModuleCheckboxChange('create', id, true);
+        }
+      });
+      document.getElementById('create-org-modal').classList.add('open');
+    }
+
+    async function handleCreateOrganization(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-org-name').value;
+      const slug = document.getElementById('new-org-slug').value;
+      const preset = document.getElementById('new-org-preset').value;
+      const adminName = document.getElementById('new-org-admin-name').value;
+      const adminEmail = document.getElementById('new-org-admin-email').value;
+      const adminPassword = document.getElementById('new-org-admin-password').value || 'admin123';
+
+      const selectedModules = Array.from(document.querySelectorAll('input[name="create-module"]:checked'))
+        .map(cb => cb.value);
+
+      try {
+        const res = await fetch('/api/v1/superadmin/organizations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            name,
+            slug,
+            preset,
+            active_modules: selectedModules,
+            admin_name: adminName,
+            admin_email: adminEmail,
+            admin_password: adminPassword,
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('create-org-modal');
+          showToast(`Organization "${name}" provisioned successfully`, 'success');
+          await refreshOrganizations();
+          await refreshStats();
+        } else {
+          showToast(data.error || 'Failed to create organization', 'error');
+        }
+      } catch (err) {
+        showToast('Network error creating organization', 'error');
+      }
+    }
+
+    function openManageApisModal(orgId) {
+      const org = organizationsList.find(o => o.id === orgId);
+      if (!org) return;
+
+      document.getElementById('manage-apis-org-id').value = org.id;
+      document.getElementById('manage-apis-org-subtitle').textContent = `Organization: ${org.name} (${org.slug})`;
+
+      const active = org.active_modules || [];
+      const checkboxes = document.querySelectorAll('input[name="manage-module"]');
+      checkboxes.forEach(cb => {
+        const check = active.includes(cb.value) || active.includes('*');
+        cb.checked = check;
+        onModuleCheckboxChange('manage', cb.value, check);
+      });
+
+      document.getElementById('manage-apis-modal').classList.add('open');
+    }
+
+    async function handleSaveSupportedApis(e) {
+      e.preventDefault();
+      const orgId = document.getElementById('manage-apis-org-id').value;
+      const selectedModules = Array.from(document.querySelectorAll('input[name="manage-module"]:checked'))
+        .map(cb => cb.value);
+
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            active_modules: selectedModules
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('manage-apis-modal');
+          showToast(`Supported APIs updated for ${data.name}! Gating is active.`, 'success');
+          await refreshOrganizations();
+        } else {
+          showToast(data.error || 'Failed to update supported APIs', 'error');
+        }
+      } catch (err) {
+        showToast('Network error updating APIs', 'error');
+      }
+    }
+
+    async function deleteOrganization(orgId, orgName) {
+      if (!confirm(`Are you sure you want to permanently delete organization "${orgName}"? This will remove all its users and data.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (res.ok) {
+          showToast(`Organization "${orgName}" deleted`, 'success');
+          await refreshOrganizations();
+          await refreshStats();
+        } else {
+          const data = await res.json();
+          showToast(data.error || 'Failed to delete organization', 'error');
+        }
+      } catch (err) {
+        showToast('Network error deleting organization', 'error');
+      }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+      toast.innerHTML = `<span>${icon}</span> <span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

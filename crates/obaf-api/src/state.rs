@@ -18,6 +18,7 @@ pub struct AppState {
     pub cache: TtlCache<String, String>,
     pub idempotency_cache: TtlCache<String, (StatusCode, serde_json::Value)>,
     pub rate_limiter: TokenBucketRateLimiter,
+    pub superadmin: crate::superadmin::SuperAdminConfig,
 }
 
 impl AppState {
@@ -46,6 +47,9 @@ impl AppState {
         // System Design Primer: Token Bucket Rate Limiter (burst 100 requests, 50 req/sec refill)
         let rate_limiter = TokenBucketRateLimiter::new(100.0, 50.0);
 
+        // Platform Super Administrator single-user root credentials
+        let superadmin = crate::superadmin::SuperAdminConfig::from_env();
+
         Self {
             db,
             router,
@@ -56,7 +60,14 @@ impl AppState {
             cache,
             idempotency_cache,
             rate_limiter,
+            superadmin,
         }
+    }
+
+    /// Set custom Super Admin configuration (useful for testing)
+    pub fn with_superadmin(mut self, config: crate::superadmin::SuperAdminConfig) -> Self {
+        self.superadmin = config;
+        self
     }
 
     /// Access database connection pool for read operations (queries, reports, searches).

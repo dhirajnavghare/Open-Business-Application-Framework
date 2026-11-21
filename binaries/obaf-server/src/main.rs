@@ -138,12 +138,14 @@ fn print_banner(bind_addr: &str) {
  High-Performance Headless Business & Billing Engine in Rust
  ────────────────────────────────────────────────────────────
  🚀 Server running at: http://{}
+ 👑 Super Admin UI:   http://{}/admin
  📖 Swagger UI Docs:   http://{}/swagger-ui
  ⚡ OpenAPI JSON Spec: http://{}/api/v1/openapi.json
  🩺 Health & Probes:   http://{}/health (/live, /ready)
  ────────────────────────────────────────────────────────────
 "#,
         env!("CARGO_PKG_VERSION"),
+        bind_addr,
         bind_addr,
         bind_addr,
         bind_addr,

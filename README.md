@@ -107,6 +107,7 @@ You will see:
  High-Performance Headless Business & Billing Engine in Rust
  ────────────────────────────────────────────────────────────
  🚀 Server running at: http://127.0.0.1:8080
+ 👑 Super Admin UI:   http://127.0.0.1:8080/admin
  📖 Swagger UI Docs:   http://127.0.0.1:8080/swagger-ui
  ⚡ OpenAPI JSON Spec: http://127.0.0.1:8080/api/v1/openapi.json
  🤖 AI Agent Context:  http://127.0.0.1:8080/llms.txt
@@ -115,7 +116,29 @@ You will see:
  ────────────────────────────────────────────────────────────
 ```
 
-Open **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** in your browser to interactively test endpoints, or query **[http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)** with Cursor, Claude Code, or Copilot for instant AI context.
+Open **[http://127.0.0.1:8080/admin](http://127.0.0.1:8080/admin)** in your browser for the **Super Admin Console**, or **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** to interactively test endpoints, or query **[http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)** with Cursor, Claude Code, or Copilot for instant AI context.
+
+---
+
+## 👑 Super Admin Web Console & API Module Gating
+
+OBAF includes an **embedded single-page Super Admin web console** served directly by `obaf-server` at `/admin` (and `/superadmin`) with **zero runtime external dependencies** (no Node.js or npm required).
+
+### Key Capabilities
+- **Single-Root Top-Level Administrator**: Exactly one top-level platform administrator exists, strictly configured through environment variables:
+  - `OBAF_SUPERADMIN_EMAIL` (default: `admin@obaf.local`)
+  - `OBAF_SUPERADMIN_PASSWORD` (default: `admin123` - supports raw password or Argon2 hash)
+  - `OBAF_GOOGLE_CLIENT_ID` / `OBAF_GOOGLE_CLIENT_SECRET` (optional, for Google SSO)
+  - `OBAF_SUPERADMIN_GOOGLE_EMAIL` (optional, defaults to superadmin email)
+- **Dual Authentication**: Login via **Google SSO** (Google Identity Services ID tokens) or **Email & Password**.
+- **Organization Management**: Provision new tenant organizations with industry presets, custom slugs, and dedicated tenant admin accounts.
+- **Dynamic API Module Gating**:
+  - The Super Admin can select which of the 15 API engines are supported for each organization (e.g. enabling `catalog` and `orders`, while disabling `bookings` or `pos`).
+  - Gated modules return `403 Forbidden` (`{"code": "MODULE_DISABLED", "error": "Module Disabled"}`) to tenant callers if disabled.
+  - Toggling supported APIs in the Super Admin UI takes effect immediately across all endpoints with zero server downtime via in-memory TTL cache invalidation.
+  - Platform Super Administrator possesses universal bypass across all modules.
+
+---
 
 ## 💻 Developer CLI (`obaf-cli`)
 
