@@ -936,13 +936,19 @@
         🏢 Organizations
       </button>
       <button class="nav-tab" data-tab="modules" onclick="switchTab('modules')">
-        🧩 API Modules Catalog
+        🧩 API Modules
+      </button>
+      <button class="nav-tab" data-tab="ssl" onclick="switchTab('ssl')">
+        🌐 Domain & SSL
+      </button>
+      <button class="nav-tab" data-tab="miracles" onclick="switchTab('miracles')">
+        ✨ Miracle Tools
       </button>
       <button class="nav-tab" data-tab="audit" onclick="switchTab('audit')">
-        📜 Security Audit Log
+        📜 Security Audit
       </button>
       <button class="nav-tab" data-tab="system" onclick="switchTab('system')">
-        ⚙️ Platform Settings
+        ⚙️ Settings
       </button>
     </div>
 
@@ -1084,7 +1090,269 @@
       </div>
     </section>
 
-    <!-- 4. Dashboard: Security Audit Log View -->
+    <!-- 4. Dashboard: Domain & Let's Encrypt Automated SSL View -->
+    <section id="view-ssl" class="view-section">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">🌐 Custom Domain & Let's Encrypt SSL/TLS</h2>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Configure your custom domain pointing to this server IP and manage automated, zero-maintenance Let's Encrypt SSL certificates.
+          </p>
+        </div>
+        <button class="btn-action" onclick="loadSslStatus()" style="padding: 0.6rem 1rem;">
+          ↻ Refresh SSL Status
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Configured Domain</div>
+          <div class="stat-value" style="font-size: 1.25rem; font-family: monospace;" id="ssl-stat-domain">None</div>
+          <div class="stat-sub" id="ssl-stat-dns-sub">DNS A-record pointing status</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">SSL Certificate Status</div>
+          <div class="stat-value" style="font-size: 1.25rem;" id="ssl-stat-status">Not Configured</div>
+          <div class="stat-sub" id="ssl-stat-expiry-sub">90-day Let's Encrypt X.509</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Auto-Renewal Engine</div>
+          <div class="stat-value" style="font-size: 1.25rem; color: var(--emerald);" id="ssl-stat-autorenew">Active</div>
+          <div class="stat-sub">Automated 30-day pre-expiry renewal</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ACME Challenge Gate</div>
+          <div class="stat-value" style="font-size: 1.25rem; color: var(--emerald);">HTTP-01 Ready</div>
+          <div class="stat-sub">Port 80 RFC 8555 responder active</div>
+        </div>
+      </div>
+
+      <!-- Domain Configuration & Certificate Manager -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-bottom: 1.75rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.85rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 600;">⚙️ Domain Configuration & SSL Issuer</h3>
+          <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            AUTOMATED LET'S ENCRYPT
+          </span>
+        </div>
+
+        <form id="domain-config-form" onsubmit="handleConfigureDomain(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+            <div class="form-group">
+              <label class="form-label">Primary Platform Domain (FQDN) *</label>
+              <input type="text" id="ssl-input-domain" class="form-input" placeholder="e.g. api.yourcompany.com" required style="font-family: monospace;">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Point an <code>A</code> record in your DNS provider (Cloudflare, Hostinger, GoDaddy, Route53) to your server's public IP address.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Let's Encrypt Administrator Contact Email *</label>
+              <input type="email" id="ssl-input-email" class="form-input" placeholder="admin@yourcompany.com" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Used by Let's Encrypt CA to send certificate expiration alerts and critical notifications.
+              </small>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+            <input type="checkbox" id="ssl-input-autorenew" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+            <label for="ssl-input-autorenew" style="font-size: 0.875rem; font-weight: 500; cursor: pointer;">
+              Enable Automated Background SSL Renewal (Renews certificate automatically 30 days before expiration)
+            </label>
+          </div>
+
+          <!-- DNS Preflight Result Box -->
+          <div id="dns-preflight-box" style="display: none; padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.85rem;"></div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" class="btn-icon" onclick="handleTestDns()" id="btn-test-dns" style="padding: 0.65rem 1.25rem;">
+              🔍 Test DNS Preflight
+            </button>
+            <button type="submit" class="btn-secondary" id="btn-save-domain" style="padding: 0.65rem 1.25rem;">
+              💾 Save Domain Settings
+            </button>
+            <button type="button" class="btn-action" onclick="handleProvisionSsl()" id="btn-provision-ssl" style="padding: 0.65rem 1.5rem;">
+              ⚡ Provision Let's Encrypt SSL
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live Certificate Inspector & Reverse Proxy Guides -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <!-- Certificate Inspector -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            📜 Active Certificate Inspector
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Certificate Authority</span>
+              <span id="cert-issuer" style="font-weight: 500;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Issued / Valid From</span>
+              <span id="cert-from" style="font-family: monospace;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Valid Until / Expiration</span>
+              <span id="cert-until" style="font-family: monospace;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Days Remaining</span>
+              <span id="cert-days" style="font-weight: 700; color: var(--emerald);">-</span>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <span style="color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Last Renewal Audit Log:</span>
+              <div id="cert-log" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-family: monospace; font-size: 0.75rem; color: #94a3b8; line-height: 1.4;">
+                No renewal events recorded yet.
+              </div>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <button class="btn-icon" onclick="handleRenewSsl()" id="btn-force-renew" style="width: 100%; justify-content: center; padding: 0.6rem;">
+                🔄 Force Renew SSL Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reverse Proxy & Edge TLS Configuration -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🚀 Production Web Server Setup</span>
+            <button class="btn-icon" onclick="copyProxySnippet()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">📋 Copy Config</button>
+          </h4>
+          <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+            Ready-to-deploy reverse proxy configurations with automatic Let's Encrypt TLS:
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <button type="button" class="btn-icon active" id="tab-btn-caddy" onclick="showProxyTab('caddy')">Caddy (Automatic TLS)</button>
+            <button type="button" class="btn-icon" id="tab-btn-nginx" onclick="showProxyTab('nginx')">Nginx</button>
+            <button type="button" class="btn-icon" id="tab-btn-docker" onclick="showProxyTab('docker')">Docker Compose</button>
+          </div>
+          <pre id="proxy-code-block" style="background: #070a13; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1; overflow-x: auto; max-height: 230px;"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Dashboard: Miracle Power Tools View -->
+    <section id="view-miracles" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">✨ Super Admin Miracle Power Tools</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          High-privilege platform controls, emergency panic switches, live database operations, and platform-wide broadcasts.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <!-- Miracle Card 1: Emergency Platform Controls -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">🚨 Emergency Controls</h3>
+              <span id="miracle-maint-badge" class="status-badge-inactive">Normal Service</span>
+            </div>
+            
+            <!-- Maintenance Mode -->
+            <div style="margin-bottom: 1.25rem;">
+              <label class="form-label">Platform Maintenance Mode</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                When active, all tenant requests return <code>503 Service Unavailable</code> with custom message. Super Admin retains full console access.
+              </p>
+              <textarea id="maint-msg-input" class="form-input" rows="2" style="font-size: 0.8rem; margin-bottom: 0.5rem;" placeholder="Platform is undergoing scheduled maintenance..."></textarea>
+              <button type="button" class="btn-action" id="btn-toggle-maint" onclick="handleSetMaintenance()" style="width: 100%; justify-content: center;">
+                🚨 Toggle Maintenance Mode
+              </button>
+            </div>
+
+            <!-- Global Mutation Lockdown -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <label class="form-label" style="margin-bottom: 0;">Emergency Mutation Lockdown</label>
+                <span id="miracle-lock-badge" class="status-badge-inactive">Disabled</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+                Instantly freezes all POST/PUT/DELETE mutations across all tenants (HTTP 423 Locked) during active security incidents.
+              </p>
+              <button type="button" class="btn-icon btn-danger" id="btn-toggle-lockdown" onclick="handleToggleLockdown()" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                🔒 Toggle Mutation Freeze
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Miracle Card 2: Database Operations Center -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">💾 Database Operations Center</h3>
+              <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">OPERATIONS</span>
+            </div>
+
+            <!-- Instant Database Snapshot Backup -->
+            <div style="margin-bottom: 1.25rem;">
+              <label class="form-label">1-Click Platform Snapshot Backup</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Exports consistent snapshot containing all tenants, users, catalog items, orders, and system settings.
+              </p>
+              <button type="button" class="btn-action" onclick="handleDownloadBackup()" style="width: 100%; justify-content: center;">
+                💾 Download Platform Backup (.json)
+              </button>
+            </div>
+
+            <!-- Database Optimization -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-bottom: 1.25rem;">
+              <label class="form-label">Database Optimization & Vacuum</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Runs <code>PRAGMA optimize</code> / <code>VACUUM ANALYZE</code> and updates query planner statistics.
+              </p>
+              <button type="button" class="btn-secondary" id="btn-optimize-db" onclick="handleOptimizeDb()" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                ⚡ Optimize Database & Query Planner
+              </button>
+              <div id="optimize-result-box" style="display: none; margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); font-size: 0.75rem; font-family: monospace;"></div>
+            </div>
+
+            <!-- Cache & Rate Limiter Flush -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <label class="form-label">Cache & Rate Limiter Flush</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Purges global TTL cache, idempotency keys, and resets rate limiter token buckets.
+              </p>
+              <button type="button" class="btn-icon" onclick="handleFlushCache()" id="btn-flush-cache" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                🧹 Flush In-Memory Cache
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Miracle Card 3: Global System Announcement -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">📢 Platform Broadcast</h3>
+              <span style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">BROADCAST</span>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+              Broadcast a message banner displayed across all connected tenant apps, POS terminals, and portals:
+            </p>
+            <div class="form-group">
+              <textarea id="announcement-input" class="form-input" rows="4" placeholder="e.g. Scheduled platform upgrade tonight from 02:00 to 02:30 UTC."></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <button type="button" class="btn-action" onclick="handleSaveAnnouncement()" style="flex: 1; justify-content: center;">
+                📢 Broadcast
+              </button>
+              <button type="button" class="btn-secondary" onclick="handleClearAnnouncement()" style="padding: 0.65rem 1rem;">
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Dashboard: Security Audit Log View -->
     <section id="view-audit" class="view-section">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <div>
@@ -1453,6 +1721,36 @@
     </div>
   </div>
 
+  <!-- Modal: Tenant Magic Impersonation -->
+  <div class="modal-backdrop" id="impersonate-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">✨ Tenant Administrator Magic Login</h3>
+        <button class="modal-close" onclick="closeModal('impersonate-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="env-notice" style="margin-bottom: 1rem; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+          <span>✨</span>
+          <div>Impersonation active for <strong id="impersonate-org-name" style="color: #6ee7b7;">-</strong>. Valid for 15 minutes.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Single-Use Tenant Admin Bearer JWT Token</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="impersonate-token-input" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: rgba(0,0,0,0.3); color: #a5b4fc;">
+            <button type="button" class="btn-icon" onclick="copyImpersonateToken()" style="padding: 0.65rem 1rem;">📋 Copy</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 1rem;">
+          <label class="form-label">cURL API Test Snippet</label>
+          <pre id="impersonate-curl-snippet" style="background: #070a13; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1; overflow-x: auto;"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-action" onclick="closeModal('impersonate-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
@@ -1466,6 +1764,9 @@
     let currentMfaSetupData = null;
     let auditLogsList = [];
     let inactivityTimer = null;
+    let proxyConfigData = null;
+    let currentProxyTab = 'caddy';
+    let currentImpersonateToken = '';
 
     // DOM Elements
     const authView = document.getElementById('auth-view');
@@ -1701,6 +2002,11 @@
         loadPlatformSettings();
       } else if (tabName === 'audit') {
         loadAuditLogs();
+      } else if (tabName === 'ssl') {
+        loadSslStatus();
+        loadProxyConfig();
+      } else if (tabName === 'miracles') {
+        loadMiraclesStatus();
       }
     }
 
@@ -2070,6 +2376,447 @@
       renderAuditLogs(filtered);
     }
 
+    // --- SSL & Domain Management Functions ---
+    async function loadSslStatus() {
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('ssl-stat-domain').textContent = data.domain || 'None';
+          document.getElementById('ssl-input-domain').value = data.domain || '';
+          document.getElementById('ssl-input-email').value = data.contact_email || '';
+          document.getElementById('ssl-input-autorenew').checked = data.auto_renew;
+
+          // Status & Expiry
+          const statusElem = document.getElementById('ssl-stat-status');
+          const expirySub = document.getElementById('ssl-stat-expiry-sub');
+          if (data.status === 'active') {
+            statusElem.textContent = 'Active 🟢';
+            statusElem.style.color = 'var(--emerald)';
+            expirySub.textContent = data.days_remaining != null ? `Valid for ${data.days_remaining} more days` : 'Active X.509';
+          } else if (data.status === 'expired') {
+            statusElem.textContent = 'Expired 🔴';
+            statusElem.style.color = 'var(--rose)';
+            expirySub.textContent = 'Renewal required immediately';
+          } else {
+            statusElem.textContent = 'Not Configured ⚪';
+            statusElem.style.color = 'var(--text-dim)';
+            expirySub.textContent = 'Point DNS to provision SSL';
+          }
+
+          document.getElementById('ssl-stat-autorenew').textContent = data.auto_renew ? 'Active 🟢' : 'Disabled ⚪';
+          document.getElementById('cert-issuer').textContent = data.issuer || 'Not Issued';
+          document.getElementById('cert-from').textContent = data.valid_from ? new Date(data.valid_from).toLocaleString() : '-';
+          document.getElementById('cert-until').textContent = data.valid_until ? new Date(data.valid_until).toLocaleString() : '-';
+          document.getElementById('cert-days').textContent = data.days_remaining != null ? `${data.days_remaining} Days` : '-';
+          document.getElementById('cert-log').textContent = data.last_renewal_log || 'No renewal events recorded yet.';
+
+          // DNS preflight
+          const dnsBox = document.getElementById('dns-preflight-box');
+          if (data.domain) {
+            dnsBox.style.display = 'block';
+            if (data.dns_check.resolves) {
+              dnsBox.style.background = 'rgba(16, 185, 129, 0.1)';
+              dnsBox.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+              dnsBox.style.color = '#34d399';
+              dnsBox.innerHTML = `✅ ${escapeHtml(data.dns_check.message)}`;
+            } else {
+              dnsBox.style.background = 'rgba(244, 63, 94, 0.1)';
+              dnsBox.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+              dnsBox.style.color = '#fb7185';
+              dnsBox.innerHTML = `⚠️ ${escapeHtml(data.dns_check.message)}`;
+            }
+          } else {
+            dnsBox.style.display = 'none';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load SSL status:', err);
+      }
+    }
+
+    async function handleTestDns() {
+      const domain = document.getElementById('ssl-input-domain').value.trim();
+      if (!domain) {
+        showToast('Please enter a domain name to test DNS', 'error');
+        return;
+      }
+      const btn = document.getElementById('btn-test-dns');
+      btn.disabled = true;
+      btn.textContent = 'Testing DNS...';
+
+      try {
+        await loadSslStatus();
+        showToast('DNS preflight verification completed', 'info');
+      } catch (err) {
+        showToast('DNS test request failed', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Test DNS Preflight';
+      }
+    }
+
+    async function handleConfigureDomain(e) {
+      e.preventDefault();
+      const domain = document.getElementById('ssl-input-domain').value.trim();
+      const contact_email = document.getElementById('ssl-input-email').value.trim();
+      const auto_renew = document.getElementById('ssl-input-autorenew').checked;
+      const btn = document.getElementById('btn-save-domain');
+
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/configure-domain', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ domain, contact_email, auto_renew })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Domain configuration saved successfully', 'success');
+          await loadSslStatus();
+          await loadProxyConfig();
+        } else {
+          showToast(data.error || 'Failed to configure domain', 'error');
+        }
+      } catch (err) {
+        showToast('Network error configuring domain', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save Domain Settings';
+      }
+    }
+
+    async function handleProvisionSsl() {
+      const btn = document.getElementById('btn-provision-ssl');
+      btn.disabled = true;
+      btn.textContent = 'Provisioning SSL...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/provision', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          await loadSslStatus();
+        } else {
+          showToast(data.error || 'SSL provisioning failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during SSL provisioning', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Provision Let\'s Encrypt SSL';
+      }
+    }
+
+    async function handleRenewSsl() {
+      const btn = document.getElementById('btn-force-renew');
+      btn.disabled = true;
+      btn.textContent = 'Renewing Certificate...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/renew', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          await loadSslStatus();
+        } else {
+          showToast(data.error || 'SSL renewal failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during renewal', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Force Renew SSL Now';
+      }
+    }
+
+    async function loadProxyConfig() {
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/proxy-config', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          proxyConfigData = await res.json();
+          showProxyTab(currentProxyTab);
+        }
+      } catch (err) {
+        console.error('Failed to load proxy config:', err);
+      }
+    }
+
+    function showProxyTab(tab) {
+      currentProxyTab = tab;
+      ['caddy', 'nginx', 'docker'].forEach(t => {
+        const b = document.getElementById(`tab-btn-${t}`);
+        if (b) b.classList.toggle('active', t === tab);
+      });
+      const codeBlock = document.getElementById('proxy-code-block');
+      if (!proxyConfigData || !codeBlock) return;
+      if (tab === 'caddy') codeBlock.textContent = proxyConfigData.caddyfile;
+      else if (tab === 'nginx') codeBlock.textContent = proxyConfigData.nginx_conf;
+      else if (tab === 'docker') codeBlock.textContent = proxyConfigData.docker_compose;
+    }
+
+    function copyProxySnippet() {
+      const codeBlock = document.getElementById('proxy-code-block');
+      if (codeBlock && codeBlock.textContent) {
+        navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+          showToast('Reverse proxy configuration copied to clipboard', 'info');
+        });
+      }
+    }
+
+    // --- Miracle Tools Functions ---
+    async function loadMiraclesStatus() {
+      try {
+        // 1. Maintenance & Lockdown
+        const resMaint = await fetch('/api/v1/superadmin/system/maintenance', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (resMaint.ok) {
+          const m = await resMaint.json();
+          const maintBadge = document.getElementById('miracle-maint-badge');
+          const btnMaint = document.getElementById('btn-toggle-maint');
+          if (m.maintenance_mode) {
+            maintBadge.className = 'status-badge-active';
+            maintBadge.style.color = 'var(--rose)';
+            maintBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+            maintBadge.textContent = 'Active (503 Enforced)';
+            btnMaint.textContent = '✅ Deactivate Maintenance Mode';
+            btnMaint.className = 'btn-secondary';
+          } else {
+            maintBadge.className = 'status-badge-inactive';
+            maintBadge.style.color = 'var(--emerald)';
+            maintBadge.style.background = 'var(--emerald-glow)';
+            maintBadge.textContent = 'Normal Service';
+            btnMaint.textContent = '🚨 Enable Maintenance Mode';
+            btnMaint.className = 'btn-action';
+          }
+          document.getElementById('maint-msg-input').value = m.maintenance_message || '';
+
+          const lockBadge = document.getElementById('miracle-lock-badge');
+          const btnLock = document.getElementById('btn-toggle-lockdown');
+          if (m.emergency_lockdown) {
+            lockBadge.className = 'status-badge-active';
+            lockBadge.style.color = 'var(--rose)';
+            lockBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+            lockBadge.textContent = 'FROZEN (Writes Blocked)';
+            btnLock.textContent = '🔓 Release Mutation Freeze';
+          } else {
+            lockBadge.className = 'status-badge-inactive';
+            lockBadge.textContent = 'Disabled (Writes Allowed)';
+            btnLock.textContent = '🔒 Freeze Mutations';
+          }
+        }
+
+        // 2. Global Announcement
+        const resAnn = await fetch('/api/v1/superadmin/system/announcement', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (resAnn.ok) {
+          const a = await resAnn.json();
+          document.getElementById('announcement-input').value = a.announcement || '';
+        }
+      } catch (err) {
+        console.error('Failed to load miracles status:', err);
+      }
+    }
+
+    async function handleSetMaintenance() {
+      const msg = document.getElementById('maint-msg-input').value.trim();
+      const currentText = document.getElementById('miracle-maint-badge').textContent;
+      const willEnable = !currentText.includes('Active');
+
+      try {
+        const res = await fetch('/api/v1/superadmin/system/maintenance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ enabled: willEnable, message: msg || null })
+        });
+        if (res.ok) {
+          showToast(willEnable ? 'Platform Maintenance Mode activated (HTTP 503)' : 'Platform returned to normal service', 'success');
+          await loadMiraclesStatus();
+        }
+      } catch (err) {
+        showToast('Error toggling maintenance mode', 'error');
+      }
+    }
+
+    async function handleToggleLockdown() {
+      const currentText = document.getElementById('miracle-lock-badge').textContent;
+      const willEnable = !currentText.includes('FROZEN');
+
+      try {
+        const res = await fetch('/api/v1/superadmin/system/emergency-lockdown', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ enabled: willEnable })
+        });
+        if (res.ok) {
+          showToast(willEnable ? 'Emergency Mutation Lockdown active (All writes frozen)' : 'Mutation lockdown lifted', 'warning');
+          await loadMiraclesStatus();
+        }
+      } catch (err) {
+        showToast('Error toggling mutation lockdown', 'error');
+      }
+    }
+
+    function handleDownloadBackup() {
+      showToast('Generating consistent database snapshot...', 'info');
+      fetch('/api/v1/superadmin/database/backup', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      .then(resp => {
+        if (!resp.ok) throw new Error('Backup failed');
+        return resp.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `obaf_platform_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('Platform database backup downloaded successfully', 'success');
+      })
+      .catch(err => {
+        showToast('Failed to download database backup', 'error');
+      });
+    }
+
+    async function handleOptimizeDb() {
+      const btn = document.getElementById('btn-optimize-db');
+      const box = document.getElementById('optimize-result-box');
+      btn.disabled = true;
+      btn.textContent = 'Optimizing Database...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/database/optimize', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          box.style.display = 'block';
+          box.style.color = '#34d399';
+          box.textContent = `✅ [${data.database_backend}] ${data.message} (${data.duration_ms}ms) - Integrity: ${data.integrity_status}`;
+          showToast('Database optimization and integrity check passed', 'success');
+        } else {
+          showToast('Database optimization failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during optimization', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Optimize Database & Query Planner';
+      }
+    }
+
+    async function handleFlushCache() {
+      const btn = document.getElementById('btn-flush-cache');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/v1/superadmin/system/flush-cache', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          showToast('In-memory TTL cache and rate limiters purged successfully', 'success');
+        } else {
+          showToast('Failed to flush cache', 'error');
+        }
+      } catch (err) {
+        showToast('Network error flushing cache', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleSaveAnnouncement() {
+      const text = document.getElementById('announcement-input').value.trim();
+      try {
+        const res = await fetch('/api/v1/superadmin/system/announcement', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ announcement: text || null })
+        });
+        if (res.ok) {
+          showToast('Global announcement broadcast updated', 'success');
+        } else {
+          showToast('Failed to update announcement', 'error');
+        }
+      } catch (err) {
+        showToast('Network error updating announcement', 'error');
+      }
+    }
+
+    async function handleClearAnnouncement() {
+      document.getElementById('announcement-input').value = '';
+      await handleSaveAnnouncement();
+    }
+
+    // --- Tenant Impersonation (Magic Login) ---
+    async function magicImpersonateOrg(orgId, orgName) {
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}/impersonate`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentImpersonateToken = data.token;
+          document.getElementById('impersonate-org-name').textContent = orgName;
+          document.getElementById('impersonate-token-input').value = data.token;
+          document.getElementById('impersonate-curl-snippet').textContent = 
+`curl -H "Authorization: Bearer ${data.token}" \\
+  http://localhost:8992/api/v1/catalog/products`;
+          openModal('impersonate-modal');
+          showToast(`Impersonating ${orgName} (Token valid for 15 mins)`, 'success');
+        } else {
+          showToast(data.error || 'Failed to impersonate tenant', 'error');
+        }
+      } catch (err) {
+        showToast('Network error initiating magic login', 'error');
+      }
+    }
+
+    function copyImpersonateToken() {
+      if (currentImpersonateToken) {
+        navigator.clipboard.writeText(currentImpersonateToken).then(() => {
+          showToast('Tenant Administrator JWT token copied to clipboard', 'info');
+        });
+      }
+    }
+
     function renderOrganizationsTable(orgs) {
       const tbody = document.getElementById('orgs-table-body');
       if (orgs.length === 0) {
@@ -2111,6 +2858,9 @@
             </td>
             <td>
               <div class="table-actions">
+                <button class="btn-icon" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4);" onclick="magicImpersonateOrg('${org.id}', '${escapeHtml(org.name)}')">
+                  ✨ Magic Login
+                </button>
                 <button class="btn-icon btn-manage-api" onclick="openManageApisModal('${org.id}')">
                   ⚙️ Select APIs
                 </button>

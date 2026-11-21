@@ -830,3 +830,548 @@ async fn test_superadmin_mfa_totp_setup_activation_and_recovery() {
     assert_eq!(login_res_final["mfa_required"].as_bool(), Some(false));
     assert!(login_res_final["token"].as_str().is_some());
 }
+
+#[tokio::test]
+async fn test_superadmin_custom_domain_and_ssl_flow() {
+    let db = establish_connection("sqlite::memory:").await.unwrap();
+    run_migrations(&db).await.unwrap();
+
+    let state = Arc::new(AppState::new(
+        db.clone(),
+        "test_secret_32_characters_minimum_len",
+    ));
+    let app = create_router(state.clone());
+
+    // 1. Super Admin login
+    let login_body = json!({
+        "email": "admin@obaf.local",
+        "password": "admin123"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let login_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let superadmin_token = login_resp["token"].as_str().unwrap().to_string();
+
+    // 2. Query initial SSL status (unconfigured)
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/ssl")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let ssl_status: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(ssl_status["status"], "not_configured");
+
+    // 3. Configure custom domain
+    let domain_body = json!({
+        "domain": "api.cloud-obaf.io",
+        "email": "admin@cloud-obaf.io",
+        "auto_renew": true
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/configure-domain")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(domain_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let config_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(config_res["domain"], "api.cloud-obaf.io");
+    assert_eq!(config_res["auto_renew"], true);
+
+    // 4. Test reverse-proxy config generation (Caddy, Nginx, Docker Compose)
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/ssl/proxy-config")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let proxy_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(proxy_res["caddyfile"]
+        .as_str()
+        .unwrap()
+        .contains("api.cloud-obaf.io"));
+    assert!(proxy_res["caddyfile"]
+        .as_str()
+        .unwrap()
+        .contains("reverse_proxy localhost:8992"));
+    assert!(proxy_res["nginx_conf"]
+        .as_str()
+        .unwrap()
+        .contains("api.cloud-obaf.io"));
+    assert!(proxy_res["docker_compose"]
+        .as_str()
+        .unwrap()
+        .contains("caddy"));
+
+    // 5. Test Let's Encrypt automated ACME HTTP-01 challenge responder
+    obaf_database::set_system_setting(
+        &db,
+        "acme_challenge:token123",
+        "token123.authvalue456",
+        None,
+    )
+    .await
+    .unwrap();
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("/.well-known/acme-challenge/token123")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let challenge_content = String::from_utf8(bytes.to_vec()).unwrap();
+    assert_eq!(challenge_content, "token123.authvalue456");
+
+    // Test unknown ACME token returns 404
+    let req = Request::builder()
+        .method("GET")
+        .uri("/.well-known/acme-challenge/nonexistent_token")
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // 6. Test SSL provisioning
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/provision")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let provision_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(provision_res["success"], true);
+    assert_eq!(provision_res["domain"], "api.cloud-obaf.io");
+    assert!(provision_res["expires_at"].as_str().is_some());
+
+    // Verify status updated via GET /api/v1/superadmin/ssl
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/ssl")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let status_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(status_res["status"], "active");
+    assert!(status_res["days_remaining"].as_i64().unwrap() >= 89);
+
+    // 7. Test manual SSL renewal
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/ssl/renew")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let renew_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(renew_res["success"], true);
+    assert!(renew_res["expires_at"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn test_superadmin_miracle_power_tools() {
+    let db = establish_connection("sqlite::memory:").await.unwrap();
+    run_migrations(&db).await.unwrap();
+
+    let state = Arc::new(AppState::new(
+        db.clone(),
+        "test_secret_32_characters_minimum_len",
+    ));
+    let app = create_router(state.clone());
+
+    // 1. Super Admin login
+    let login_body = json!({
+        "email": "admin@obaf.local",
+        "password": "admin123"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let login_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let superadmin_token = login_resp["token"].as_str().unwrap().to_string();
+
+    // 2. Create organization with "catalog" module enabled
+    let create_org_body = json!({
+        "name": "Miracle Corp",
+        "slug": "miracle-corp",
+        "preset": "retail_grocery",
+        "active_modules": ["catalog"],
+        "admin_name": "Tenant Root",
+        "admin_email": "root@miracle.com",
+        "admin_password": "password123"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/organizations")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(create_org_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let org_resp: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let org_id = org_resp["id"].as_str().unwrap().to_string();
+
+    // 3. ✨ Test Magic Tenant Impersonation ("God Mode Login")
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!(
+            "/api/v1/superadmin/organizations/{}/impersonate",
+            org_id
+        ))
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let imp_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(imp_res["organization_name"], "Miracle Corp");
+    assert_eq!(imp_res["role"], "admin");
+    assert_eq!(imp_res["expires_in_seconds"], 900);
+    let tenant_token = imp_res["token"].as_str().unwrap().to_string();
+
+    // Verify tenant token accesses tenant-scoped catalog endpoint
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 4. 🚨 Test Global Maintenance Mode
+    // 4a. Enable maintenance mode
+    let maint_body = json!({
+        "enabled": true,
+        "message": "Scheduled infrastructure maintenance underway."
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/maintenance")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(maint_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 4b. Tenant request is rejected with 503 SERVICE_UNAVAILABLE
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let err_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(err_res["error"], "MAINTENANCE_MODE");
+    assert!(err_res["message"]
+        .as_str()
+        .unwrap()
+        .contains("Scheduled infrastructure maintenance"));
+
+    // 4c. Super Admin can still query system endpoints (Universal Bypass)
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/system/maintenance")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 4d. Disable maintenance mode
+    let maint_disable = json!({ "enabled": false });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/maintenance")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(maint_disable.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // Tenant requests resume normally
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 5. 🔒 Test Emergency Global Mutation Lockdown
+    // 5a. Enable emergency lockdown
+    let lockdown_body = json!({
+        "enabled": true,
+        "reason": "Suspicious mutation spikes detected across system."
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/lockdown")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(lockdown_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 5b. Tenant mutation (POST) is rejected with 423 LOCKED
+    let product_body = json!({
+        "sku": "LOCK-001",
+        "name": "Lockdown Shield Product",
+        "price": 49.99,
+        "cost_price": 25.0,
+        "tax_rate": 0.18
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(product_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::LOCKED);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let err_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(err_res["error"], "EMERGENCY_LOCKDOWN");
+
+    // 5c. Tenant read-only (GET) remains functional
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 5d. Disable emergency lockdown
+    let lockdown_disable = json!({ "enabled": false });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/lockdown")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(lockdown_disable.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // 5e. Tenant mutation now succeeds (201 Created)
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/catalog/products")
+        .header(header::AUTHORIZATION, format!("Bearer {}", tenant_token))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(product_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // 6. 💾 Test 1-Click Database Snapshot Backup
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/database/backup")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let disposition = res
+        .headers()
+        .get(header::CONTENT_DISPOSITION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(disposition.contains("obaf_backup_"));
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let backup_data: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(backup_data["metadata"]["version"].as_str().is_some());
+    let orgs = backup_data["organizations"].as_array().unwrap();
+    assert!(orgs.iter().any(|o| o["slug"] == "miracle-corp"));
+    assert!(backup_data["users"].as_array().is_some());
+    assert!(backup_data["system_settings"].as_array().is_some());
+    assert!(backup_data["audit_logs"].as_array().is_some());
+
+    // 7. ⚡ Test Database Optimizer & Query Planner
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/database/optimize")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let opt_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(opt_res["success"], true);
+    assert_eq!(opt_res["database_backend"], "SQLite");
+    assert!(opt_res["message"].as_str().is_some());
+    assert!(opt_res["integrity_status"].as_str().is_some());
+
+    // 8. 🧹 Test Cache & Rate-Limiter Flush
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/flush-cache")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let flush_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(flush_res["success"], true);
+    assert!(flush_res["message"].as_str().is_some());
+
+    // 9. 📢 Test Global System Broadcast Announcement
+    let announce_body = json!({
+        "announcement": "Platform upgrading to v2.0 tonight at 02:00 UTC"
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/superadmin/system/announcement")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(announce_body.to_string()))
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/superadmin/system/announcement")
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", superadmin_token),
+        )
+        .body(Body::empty())
+        .unwrap();
+
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let announce_res: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+        announce_res["announcement"],
+        "Platform upgrading to v2.0 tonight at 02:00 UTC"
+    );
+}

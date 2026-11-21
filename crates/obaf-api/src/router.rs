@@ -59,6 +59,11 @@ pub fn create_router(state: SharedState) -> Router {
         // Super Admin Single Page Application UI
         .route("/admin", get(serve_admin_ui))
         .route("/superadmin", get(serve_admin_ui))
+        // Let's Encrypt Automated ACME HTTP-01 Challenge Responder
+        .route(
+            "/.well-known/acme-challenge/:token",
+            get(crate::superadmin::ssl::acme_challenge_handler),
+        )
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api/v1/openapi.json", openapi))
         // API v1 routes

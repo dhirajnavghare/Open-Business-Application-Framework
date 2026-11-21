@@ -16,9 +16,11 @@ pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod middleware;
+pub mod miracles;
 pub mod organizations;
 pub mod security;
 pub mod settings;
+pub mod ssl;
 pub mod stats;
 pub mod ui;
 
@@ -65,5 +67,32 @@ pub fn superadmin_routes() -> Router<SharedState> {
         .route(
             "/settings",
             get(settings::get_platform_settings).put(settings::update_platform_settings),
+        )
+        // Domain & Let's Encrypt Automated SSL
+        .route("/ssl", get(ssl::get_ssl_status))
+        .route("/ssl/configure-domain", post(ssl::configure_domain))
+        .route("/ssl/provision", post(ssl::provision_ssl))
+        .route("/ssl/renew", post(ssl::renew_ssl))
+        .route("/ssl/proxy-config", get(ssl::get_proxy_config))
+        // Super Admin Miracle Power Tools
+        .route(
+            "/organizations/:id/impersonate",
+            post(miracles::impersonate_tenant_admin),
+        )
+        .route(
+            "/system/maintenance",
+            get(miracles::get_maintenance_status).post(miracles::set_maintenance_mode),
+        )
+        .route(
+            "/system/emergency-lockdown",
+            post(miracles::set_emergency_lockdown),
+        )
+        .route("/system/lockdown", post(miracles::set_emergency_lockdown))
+        .route("/database/backup", get(miracles::download_database_backup))
+        .route("/database/optimize", post(miracles::optimize_database))
+        .route("/system/flush-cache", post(miracles::flush_system_cache))
+        .route(
+            "/system/announcement",
+            get(miracles::get_global_announcement).post(miracles::set_global_announcement),
         )
 }

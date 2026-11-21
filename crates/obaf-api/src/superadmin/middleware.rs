@@ -75,6 +75,86 @@ pub async fn module_gating_middleware(
 ) -> Response {
     let path = request.uri().path();
 
+    // Check if caller is authenticated as Super Admin
+    let is_superadmin = if let Some(auth_header) = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            if let Ok(claims) = verify_token(token, &state.jwt_secret) {
+                claims.role == "superadmin"
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    // Platform Super Admin bypasses maintenance mode and emergency locks
+    if is_superadmin {
+        return next.run(request).await;
+    }
+
+    // Enforce Global Maintenance Mode & Emergency Lockdown on tenant APIs
+    if path.starts_with("/api/v1/") && !path.starts_with("/api/v1/superadmin") {
+        // 1. Maintenance Mode Check
+        if let Ok(Some(m_mode)) =
+            obaf_database::get_system_setting(&state.db, "maintenance_mode").await
+        {
+            if m_mode == "true" {
+                let msg = obaf_database::get_system_setting(&state.db, "maintenance_message")
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        "Platform is undergoing scheduled maintenance. Please check back shortly."
+                            .to_string()
+                    });
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(serde_json::json!({
+                        "error": "MAINTENANCE_MODE",
+                        "message": msg
+                    })),
+                )
+                    .into_response();
+            }
+        }
+
+        // 2. Emergency Global Mutation Lockdown Check
+        if matches!(
+            *request.method(),
+            axum::http::Method::POST
+                | axum::http::Method::PUT
+                | axum::http::Method::PATCH
+                | axum::http::Method::DELETE
+        ) {
+            if let Ok(Some(lockdown)) =
+                obaf_database::get_system_setting(&state.db, "emergency_lockdown").await
+            {
+                if lockdown == "true" {
+                    let reason = obaf_database::get_system_setting(&state.db, "lockdown_reason")
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| "Emergency write freeze active.".to_string());
+                    return (
+                        StatusCode::LOCKED,
+                        Json(serde_json::json!({
+                            "error": "EMERGENCY_LOCKDOWN",
+                            "message": reason
+                        })),
+                    )
+                        .into_response();
+                }
+            }
+        }
+    }
+
     let module_name = match extract_gated_module(path) {
         Some(m) => m,
         None => return next.run(request).await,

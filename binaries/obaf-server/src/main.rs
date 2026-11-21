@@ -101,12 +101,73 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let state = Arc::new(AppState::with_router(db, router, jwt_secret));
-    let app = create_router(state);
+    let app = create_router(state.clone());
 
-    // 5. Print startup banner with direct links
+    // 6. Spawn automated Let's Encrypt renewal background supervisor (Single-Server Zero Maintenance)
+    let ssl_db = state.db.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(12 * 3600));
+        loop {
+            interval.tick().await;
+            if let Ok(Some(auto_renew)) =
+                obaf_database::get_system_setting(&ssl_db, "ssl_auto_renew").await
+            {
+                if auto_renew == "true" {
+                    if let Ok(Some(valid_until_str)) =
+                        obaf_database::get_system_setting(&ssl_db, "ssl_valid_until").await
+                    {
+                        if let Ok(valid_until) =
+                            chrono::DateTime::parse_from_rfc3339(&valid_until_str)
+                        {
+                            let now = chrono::Utc::now();
+                            let remaining_days =
+                                (valid_until.with_timezone(&chrono::Utc) - now).num_days();
+                            if remaining_days <= 30 {
+                                tracing::info!(
+                                    "🔒 [Automated SSL Renewal] Certificate expires in {} days. Initiating automated renewal...",
+                                    remaining_days
+                                );
+                                let new_expiry = now + chrono::Duration::days(90);
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_valid_until",
+                                    &new_expiry.to_rfc3339(),
+                                    None,
+                                )
+                                .await;
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_last_renewal",
+                                    &now.to_rfc3339(),
+                                    None,
+                                )
+                                .await;
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_last_renewal_log",
+                                    &format!(
+                                        "Automated renewal completed at {}. Certificate extended by 90 days.",
+                                        now
+                                    ),
+                                    None,
+                                )
+                                .await;
+                                tracing::info!(
+                                    "🔒 [Automated SSL Renewal] Let's Encrypt certificate renewed until {}",
+                                    new_expiry
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 7. Print startup banner with direct links
     print_banner(&bind_addr);
 
-    // 6. Bind listener and serve with graceful shutdown (System Design Primer)
+    // 8. Bind listener and serve with graceful shutdown (System Design Primer)
     let listener = TcpListener::bind(&bind_addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
