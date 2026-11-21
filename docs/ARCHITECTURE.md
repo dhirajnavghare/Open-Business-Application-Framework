@@ -20,46 +20,63 @@ Rather than building domain-siloed tables (e.g., `medicines`, `hotel_rooms`, `la
 
 ---
 
-## 2. Supported Domain Presets (Out-of-the-box Targets)
+## 2. Supported Domain Presets (22 Out-of-the-Box Targets)
 
-### Retail & Small Business Management
-1. **Pharmacy & Medical Store:** Batch tracking, expiry tracking, low-stock alerts, GST billing.
-2. **Gym & Fitness Club:** Membership plans, recurring renewals, daily check-ins, automated receipts.
-3. **Laundry & Dry-Cleaning:** Tag number tracking, wash/iron/ready statuses, customer SMS/alerts, thermal receipts.
-4. **Repair Shop & Service Center:** Electronic/vehicle job cards, spare parts consumption, technician assignments, invoice generation.
+### Hospitality, Food & Dining
+1. **Restaurant POS (`restaurant_pos`):** Dine-in tables, Kitchen Order Tickets (KOT), split billing, daily cashier settlement.
+2. **Hotel Management (`hotel_management`):** Room allocation, reservations, check-in/out folios, guest ID verification.
+3. **Cloud Kitchen & Tiffin (`cloud_kitchen_tiffin`):** Daily meal planning, delivery pause/resume, monthly subscriptions, prep sheets.
+4. **Event & Banquet Hall (`banquet_hall`):** Date availability, catering packages, advance deposits, settlement invoices.
+5. **Table Reservation & Queue (`table_waitlist`):** Walk-in queue tracker, table assignment, live SMS/notification.
 
-### Food, Hospitality & Events
-5. **Hotel / Restaurant Order & POS:** Real-time table/room orders, Kitchen Order Tickets (KOT), split billing, daily revenue settlement.
-6. **Cloud Kitchen & Tiffin Subscription:** Daily meal planning, delivery pause/resume, monthly billing, kitchen prep sheets.
-7. **Event & Banquet Hall Booking:** Calendar availability, catering packages, advance deposits, settlement invoices.
-8. **Table Reservation & Waitlist Queue:** Walk-in queue tracker, table assignment, live notification.
+### Retail, Pharmacy & Inventory
+6. **Pharmacy & Medical (`pharmacy`):** Batch numbers, FEFO expiry tracking, drug schedules, GST tax slabs.
+7. **Retail Grocery & FMCG (`retail_grocery`):** Barcode POS checkout, unit conversions (kg/g/pack), low-stock reorder triggers.
+8. **Dairy & Daily Delivery (`dairy_milk_delivery`):** Route delivery logs, recurring subscriptions, milk fat/snf testing.
 
-### Freelance, Office & Operations
-9. **Freelancer Invoice & Expense:** Client management, billable hour tracking, expense ledger, PDF invoices.
-10. **PG / Hostel Rent & Utility Splitter:** Room allocation, electricity meter reading logs, split utility calculation, tenant receipts.
-11. **Visitor & Gate Pass Management:** Visitor log, badge/pass printing, check-in/out tracking.
+### Health, Wellness & Services
+9. **Clinic & Doctor OPD (`clinic_opd`):** Patient queuing, doctor consultation appointments, vitals recording, prescription slips.
+10. **Salon, Spa & Wellness (`salon_spa`):** Stylist scheduling, chair reservations, service packages, tipping ledgers.
+11. **Gym & Fitness Club (`gym_fitness`):** Membership plans, attendance check-ins, auto-renewals, automated receipts.
+12. **Coworking Space (`coworking_space`):** Hot desk booking, meeting room credits, recurring monthly tenant billing.
+
+### Service, Repair & Field Operations
+13. **Repair Shop & Job Cards (`repair_shop`):** Electronics/vehicle job cards, spare parts consumption, technician notes.
+14. **Field Service & HVAC (`field_service`):** Dispatch scheduling, on-site service reports, technician time tracking.
+15. **Laundry & Dry-Cleaning (`laundry`):** Garment tag tracking, wash/iron/ready statuses, customer pickup alerts.
+16. **Courier & Local Fleet (`courier_fleet`):** Parcel waybills, delivery proof signatures, dispatch manifest logs.
+
+### Rental, Education & Manufacturing
+17. **Equipment Rental (`equipment_rental`):** Heavy equipment dispatch, security deposit holds, duration billing.
+18. **Education & Coaching (`education_coaching`):** Student enrollment, batch schedules, course fee installments.
+19. **Manufacturing Jobwork (`manufacturing_jobwork`):** Bill of Materials (BOM), raw material consumption, batch production runs.
+
+### Professional & Property Management
+20. **Freelance Invoice & Expense (`freelance_invoice`):** Billable hours, milestone billing, multi-currency invoices.
+21. **PG & Hostel Rent (`pg_hostel`):** Room/bed allocation, electricity meter reading splits, rent receipts.
+22. **Visitor & Gate Pass (`visitor_pass`):** Visitor badge generation, photo capture logs, check-in/out timestamps.
 
 ---
 
 ## 3. Technology Stack
 
-- **Language:** Rust (2021/2024 edition)
-- **Web Framework:** `axum` (high-performance, tower middleware, async ecosystem)
-- **Database & ORM:** `sea-orm` (Multi-database: PostgreSQL, MySQL, and SQLite with single entity definitions and migration engine)
+- **Language:** Rust (2021 edition)
+- **Web Framework:** `axum` 0.7 (high-performance, tower middleware, async Tokio ecosystem)
+- **Database & ORM:** `sea-orm` 1.1 (Multi-database: PostgreSQL, MySQL, and SQLite with single entity definitions and migration engine)
 - **Dynamic Field Validation:** `jsonschema` + `serde_json` (tenant-configurable custom attributes validated per tenant/business type)
-- **Authentication & RBAC:** `jsonwebtoken` (JWT) + `argon2` password hashing (Role permissions: SuperAdmin, Admin, Manager, Cashier, Technician/Kitchen)
-- **API Documentation:** `utoipa` + `utoipa-swagger-ui` (auto-generating OpenAPI 3.0 specs for seamless frontend client generation)
-- **Real-Time Communication:** `axum` WebSockets / SSE (live updates for KOT, waitlists, job cards)
-- **Document & Receipt Generation:** PDF generation (`printpdf` or `typst`) + ESC/POS thermal receipt formatting
+- **Authentication & RBAC:** `jsonwebtoken` (JWT locked to HS256) + `argon2` (Argon2id password hashing) + RFC 6238 TOTP MFA
+- **API Documentation:** `utoipa` + `utoipa-swagger-ui` (auto-generating OpenAPI 3.1 specifications)
+- **Real-Time Communication:** `axum` WebSockets with RFC 6455 30s heartbeats (`/api/v1/ws/events`)
+- **Document & Receipt Generation:** HTML printable invoices (`/invoice.html`) + ESC/POS thermal receipt formatting
 
 ---
 
 ## 4. Multi-Database & Container Strategy
 
 Deployable in three distinct profiles via `DATABASE_URL`:
-- **SQLite (`sqlite://data/app.db?mode=rwc`):** Zero-dependency, single-container mode for single-store offline setups, local shops, cafes.
-- **PostgreSQL (`postgres://...`):** High-concurrency, multi-tenant cloud SaaS, enterprise branch networks.
-- **MySQL / MariaDB (`mysql://...`):** Compatibility mode for standard hosting environments.
+- **SQLite (`sqlite://data/app.db?mode=rwc`):** Zero-dependency, single-container mode for single-store offline setups, local shops, cafes with WAL mode.
+- **PostgreSQL (`postgres://...`):** High-concurrency, multi-tenant cloud SaaS, enterprise branch networks with read replica round-robin routing.
+- **MySQL / MariaDB (`mysql://...`):** Compatibility mode for standard enterprise hosting environments.
 
 ---
 
@@ -67,23 +84,23 @@ Deployable in three distinct profiles via `DATABASE_URL`:
 
 ```text
 open-business-application-framework/
-├── Cargo.toml                 # Cargo workspace definition
-├── docker-compose.yml         # Container profiles (App + Postgres / MySQL / SQLite)
-├── Dockerfile                 # Multi-stage distroless/alpine build
+├── Cargo.toml                 # Cargo virtual workspace definition
+├── Dockerfile                 # Multi-stage optimized Alpine container build
+├── docker-compose.yml         # Container profiles (App + PostgreSQL / MySQL / SQLite)
 ├── config/
 │   ├── default.toml           # Base configuration
-│   └── presets/               # Business domain setup seed templates
-│       ├── restaurant_pos.json
-│       ├── pharmacy.json
-│       ├── gym_fitness.json
-│       └── repair_shop.json
-└── crates/
-    ├── core-engine/           # Auth, RBAC, Multi-tenancy, Dynamic schemas, Events
-    ├── catalog-inventory/     # Items, Variants, Batches, Expiry, Units, Stock alerts
-    ├── order-workflow/        # Orders, Tickets, Configurable State Machines, KOT/Queues
-    ├── booking-subscription/  # Resources/Units, Calendars, Time slots, Subscriptions
-    ├── billing-tax/           # Tax engines (GST/VAT slabs), Split bills, PDF/Thermal printing
-    └── api-server/            # Axum HTTP routes, WebSockets, OpenAPI/Swagger docs
+│   └── presets/               # 22 Out-of-the-box industry domain presets
+├── crates/
+│   ├── obaf-core/             # Tenancy, Money, Auth/RBAC, dynamic schemas, events, rules
+│   ├── obaf-database/         # Unified connection pool (TenantPoolRouter), SeaORM migrations
+│   └── obaf-api/              # Axum HTTP & WebSocket routes, Super Admin SPA, OpenAPI 3.1
+├── binaries/
+│   ├── obaf-server/           # Production API daemon with embedded SPA & telemetry
+│   ├── obaf-cli/              # CLI developer tool, preset generator, diagnostics, token utility
+│   └── obaf-worker/           # Dedicated background worker daemon for sweeps and SSL renewal
+└── sdk/
+    ├── python/                # Official zero-dependency Python SDK (obaf-sdk)
+    └── typescript/            # Official zero-dependency TypeScript SDK (@obaf/sdk)
 ```
 
 ---

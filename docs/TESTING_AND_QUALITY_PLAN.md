@@ -34,11 +34,12 @@ Every pull request and commit must pass:
 - **`tests/test_flow.py`**: Restaurant POS table management, KOT workflow, split bills, thermal receipt generation.
 - **`tests/test_pharmacy.py`**: Batch numbers, medicine expiry tracking, GST tax slabs, prescription dispensing.
 - **`tests/test_services_gym_bookings.py`**: Gym subscriptions, check-in attendance, session reservations, EOD settlement summaries.
-- **`tests/test_webhooks_and_invoices.py`**: Real-time webhook dispatch, HMAC signatures, HTML printable invoice rendering.
+- **`tests/test_webhooks_and_invoices.py`**: Repair shop preset bootstrap, service ticketing, real-time webhook dispatch with HMAC signatures, and HTML printable invoice rendering.
 - **`tests/test_retail_and_hotel.py`**: Barcode FMCG retail POS checkout, hotel suite reservations, guest check-in/out lifecycles.
-- **`tests/test_repair_shop_and_extensions.py`**: Service ticketing, diagnostic workflows, inventory spare parts consumption, custom dynamic schema extension attributes.
 - **`tests/test_procurement_and_promotions_e2e.py`**: Purchase order procurement, inward stock receipts, coupon validations/redemptions, multi-currency conversions.
 - **`tests/test_python_sdk.py`**: Official Python Client SDK initialization and endpoint method coverage.
+- **`examples/quickstart_python/main.py`**: Python SDK end-to-end quickstart client workflow validation.
+- **`examples/quickstart_typescript/index.ts`**: TypeScript SDK end-to-end quickstart client workflow validation.
 - **`tests/benchmark_concurrency.py`**: Multi-worker concurrent load verification.
 
 ---
