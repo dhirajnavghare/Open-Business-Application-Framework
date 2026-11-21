@@ -98,3 +98,54 @@ pub fn constant_time_compare(a: &str, b: &str) -> bool {
     }
     diff == 0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_password_hash_and_verify() {
+        let password = "SuperSecretPassword123!";
+        let hash = hash_password(password).unwrap();
+        assert!(hash.starts_with("$argon2"));
+
+        // Correct password verifies successfully
+        assert!(verify_password(password, &hash).unwrap());
+
+        // Incorrect password fails verification
+        assert!(!verify_password("WrongPassword!", &hash).unwrap());
+
+        // Malformed hash returns error
+        assert!(verify_password(password, "invalid_hash").is_err());
+    }
+
+    #[test]
+    fn test_jwt_token_roundtrip_and_bounds() {
+        let user_id = Uuid::new_v4();
+        let tenant_id = TenantId(Uuid::new_v4());
+        let secret = "jwt_signing_secret_for_unit_tests_123456789";
+
+        let token = generate_token(user_id, tenant_id, "admin", secret, 24).unwrap();
+        let claims = verify_token(&token, secret).unwrap();
+
+        assert_eq!(claims.sub, user_id);
+        assert_eq!(claims.tenant_id, tenant_id);
+        assert_eq!(claims.role, "admin");
+
+        // Wrong secret fails validation
+        assert!(verify_token(&token, "wrong_secret_123").is_err());
+
+        // Excessive expiry hours clamped safely without panicking
+        let clamped_token = generate_token(user_id, tenant_id, "admin", secret, u64::MAX);
+        assert!(clamped_token.is_ok());
+    }
+
+    #[test]
+    fn test_constant_time_comparison() {
+        assert!(constant_time_compare("abc123XYZ", "abc123XYZ"));
+        assert!(!constant_time_compare("abc123XYZ", "abc123xyZ"));
+        assert!(!constant_time_compare("abc", "abcdef"));
+        assert!(!constant_time_compare("", "a"));
+        assert!(constant_time_compare("", ""));
+    }
+}

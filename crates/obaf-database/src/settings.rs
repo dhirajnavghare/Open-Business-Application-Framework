@@ -105,3 +105,42 @@ pub async fn get_or_create_jwt_secret(db: &DatabaseConnection) -> Result<String>
 
     Ok(secret_64.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::migration::run_migrations;
+    use crate::pool::establish_connection;
+
+    #[tokio::test]
+    async fn test_system_settings_crud_and_jwt_secret() {
+        let db = establish_connection("sqlite::memory:").await.unwrap();
+        run_migrations(&db).await.unwrap();
+
+        // 1. Initially setting is None
+        let val = get_system_setting(&db, "test_key").await.unwrap();
+        assert_eq!(val, None);
+
+        // 2. Set setting
+        set_system_setting(&db, "test_key", "test_val", Some("Test description"))
+            .await
+            .unwrap();
+        let val2 = get_system_setting(&db, "test_key").await.unwrap();
+        assert_eq!(val2, Some("test_val".to_string()));
+
+        // 3. Update existing setting
+        set_system_setting(&db, "test_key", "updated_val", None)
+            .await
+            .unwrap();
+        let val3 = get_system_setting(&db, "test_key").await.unwrap();
+        assert_eq!(val3, Some("updated_val".to_string()));
+
+        // 4. get_or_create_jwt_secret creates 64-char secret
+        let secret1 = get_or_create_jwt_secret(&db).await.unwrap();
+        assert_eq!(secret1.len(), 64);
+
+        // 5. Subsequent call returns identical secret
+        let secret2 = get_or_create_jwt_secret(&db).await.unwrap();
+        assert_eq!(secret1, secret2);
+    }
+}
