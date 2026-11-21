@@ -115,3 +115,7 @@ This document details the milestone ordering, acceptance criteria, and delivered
 - [x] **Zero-Trust Role-Based Access Control (RBAC)**: Strict permission boundaries preventing read-only `viewer` accounts from mutating state, and restricting credit notes, reports, and currency rates to administrators.
 - [x] **BOLA / IDOR Cashier Shift Isolation**: Bounded cashier shift closures to the shift owner with administrative override support.
 - [x] **Comprehensive Denial-of-Service Defense**: Bounded memory limits on `TokenBucketRateLimiter` and `TtlCache` (50,000 max), 2MB request body ceiling, pagination limit clamping (200 max), and `CatchPanicLayer` resilience.
+- [x] **Sensitive Headers Redaction (OWASP API3 / CWE-312)**: `SetSensitiveRequestHeadersLayer` masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+- [x] **Sanitized Database Backup Exports (CWE-312)**: Automated redaction of user `password_hash` to `[REDACTED]` and exclusion of MFA secrets and recovery codes in `/api/v1/superadmin/database/backup`.
+- [x] **RFC 6455 WebSocket Heartbeat Keep-Alive**: Periodic 30-second ping/pong frames preventing reverse proxy connection drops and mitigating ghost socket leaks.
+- [x] **Panic-Free Authentication & Resilience**: Eliminated unchecked `.unwrap()` in login flows and HMAC initialization.

@@ -146,6 +146,14 @@ In accordance with Brewer's CAP Theorem and the PACELC extension:
 - Automatically activates SQLite Write-Ahead Logging (`PRAGMA journal_mode = WAL;`), busy timeout (`PRAGMA busy_timeout = 5000;`), and normal synchronous flush (`PRAGMA synchronous = NORMAL;`) on SQLite databases.
 - Prevents database lock contention under concurrent load, enabling single-node edge POS and embedded installations to achieve 6,000+ operations/sec.
 
+### 5.10 Sensitive Headers Masking & Observability Redaction
+- Configured via Tower HTTP's `SetSensitiveRequestHeadersLayer`.
+- Sensitive authentication headers (`Authorization`, `Cookie`, `X-API-Key`, `X-OBAF-Signature`) are masked with `[REDACTED]` prior to trace layer emission, preventing credentials from leaking into log aggregators.
+
+### 5.11 RFC 6455 WebSocket Heartbeats & Long-Lived Connection Management
+- Embedded 30-second `tokio::time::interval` heartbeats on `/api/v1/ws/events`.
+- Automatically emits `Message::Ping` frames and handles client `Message::Pong` responses, mitigating gateway timeout disconnections behind L7 proxies (Cloudflare, AWS ALB, Nginx) and reclaiming ghost connection resources.
+
 ---
 
 ## 6. System Design Primer Concept Mapping

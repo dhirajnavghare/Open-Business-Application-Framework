@@ -25,6 +25,9 @@
 | **Google SSO Audience Confusion**| Strict audience (`aud`) claim verification against configured Google client ID; unconfigured server returns `403 Forbidden` without external network calls; mock tokens gated strictly to debug/test builds. |
 | **Broken Object Level Authorization (BOLA/IDOR)**| POS cashier shift closure restricted to the owning cashier or administrative override; cross-tenant usage metrics and billing records strictly isolated. |
 | **Role Privilege Escalation (RBAC)**| Read-only `viewer` accounts blocked from mutating operations; anonymous registration locked down once users exist; superadmin role blocked from self-registration. |
+| **Sensitive Headers Exposure (OWASP API3 / CWE-312)**| `SetSensitiveRequestHeadersLayer` masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs. |
+| **Credential & Secret Leakage in Backups (CWE-312)**| Automated redaction of `password_hash` to `[REDACTED]` and exclusion of MFA secrets and recovery codes in database backup downloads. |
+| **WebSocket Connection Drops & Ghost Sockets**| RFC 6455 30-second heartbeat keep-alives and ping/pong processing prevent proxy timeouts and memory leakage. |
 
 ---
 
@@ -120,9 +123,13 @@ Every HTTP response from `obaf-server` is hardened with security headers:
 - **Host Header Injection / Poisoning Defense**: The HTTP middleware strictly validates `Host` and `X-Forwarded-Host` headers against allowable RFC character sets (`[a-zA-Z0-9.:\-\[\]]`) with length limits ($\le 255$ chars), rejecting malformed headers, CRLF injection, and cache poisoning attempts with `400 Bad Request`.
 - **Panic Resilience Shield (`CatchPanicLayer`)**: The Axum HTTP pipeline is protected by Tower's `CatchPanicLayer`, which intercepts unhandled panics, unwinds gracefully, logs the event internally, and returns a sanitized HTTP 500 status rather than crashing worker threads or aborting connections.
 - **Database Error Masking & Information Disclosure Prevention**: Database driver errors and constraint violations are logged internally via `tracing::error!` and masked into generic error messages for client responses, preventing internal SQL schemas, database versions, and table structures from being leaked to attackers.
+- **Sensitive Headers Redaction (`SetSensitiveRequestHeadersLayer`)**: The Axum HTTP layer masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` headers with `[REDACTED]` prior to trace layer logging, eliminating accidental credential and session token leakage in structured logs or observability collectors.
+- **Backup Sanitization (OWASP API3 / CWE-312)**: Database backups downloaded via `GET /api/v1/superadmin/database/backup` automatically replace user `password_hash` with `"[REDACTED]"` and filter out sensitive platform keys (`superadmin_totp_secret`, recovery codes, passwords) to protect credentials against offline dictionary and brute-force attacks.
+- **WebSocket RFC 6455 Heartbeat Keep-Alive**: The `/api/v1/ws/events` stream issues periodic 30-second `Message::Ping` frames and handles client `Message::Pong` responses, maintaining persistent connectivity across intermediate proxies and automatically closing stale/dead connections.
+- **Zero Unchecked Panics**: Handlers avoid `.unwrap()` and `.expect()` in authentication and webhook cryptographic hashing, mapping errors to structured `401 Unauthorized` or returning empty signatures gracefully.
 - **Bounded Resource Ceilings**:
   - `TokenBucketRateLimiter`: Max 50,000 buckets with automatic LRU and idle eviction.
   - `TtlCache`: Hard maximum capacity enforcement to eliminate unbounded memory growth.
   - Request Body Limits: 2MB hard ceiling via `DefaultBodyLimit::max(2 * 1024 * 1024)`.
   - Query Pagination Clamping: All list endpoints clamp user-requested limits to a maximum of 200 records.
-  - WebSocket Lifecycles: 64KB max message size and active disconnect monitoring.
+  - WebSocket Lifecycles: 64KB max message size, 16KB max frame size, and active disconnect monitoring.

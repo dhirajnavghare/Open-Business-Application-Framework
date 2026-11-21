@@ -36,6 +36,17 @@ Every pull request and commit must pass:
 - **`tests/test_services_gym_bookings.py`**: Gym subscriptions, check-in attendance, session reservations, EOD settlement summaries.
 - **`tests/test_webhooks_and_invoices.py`**: Real-time webhook dispatch, HMAC signatures, HTML printable invoice rendering.
 - **`tests/test_retail_and_hotel.py`**: Barcode FMCG retail POS checkout, hotel suite reservations, guest check-in/out lifecycles.
+- **`tests/test_repair_shop_and_extensions.py`**: Service ticketing, diagnostic workflows, inventory spare parts consumption, custom dynamic schema extension attributes.
 - **`tests/test_procurement_and_promotions_e2e.py`**: Purchase order procurement, inward stock receipts, coupon validations/redemptions, multi-currency conversions.
 - **`tests/test_python_sdk.py`**: Official Python Client SDK initialization and endpoint method coverage.
 - **`tests/benchmark_concurrency.py`**: Multi-worker concurrent load verification.
+
+---
+
+## 4. Rust Integration & Security Test Suites
+
+- **`crates/obaf-api/tests/security_audit_test.rs`**: 35 automated security assertions covering zero-trust RBAC, BOLA cashier shift isolation, DoS rate limiting, sensitive headers masking (`[REDACTED]`), and RFC 6455 WebSocket handshakes.
+- **`crates/obaf-api/tests/openapi_verification_test.rs`**: Automated parity check validating that the generated OpenAPI schema matches `docs/openapi.json`, health probes (`/ready`, `/live`), Prometheus metrics (`/metrics`), and AI manifest (`/llms.txt`).
+- **`crates/obaf-core` Unit Tests**: Financial rounding, currency constructors, constant-time comparisons, Argon2id password hashing, and JWT claim round-trips.
+- **`crates/obaf-database` Unit Tests**: Settings repository persistence, dynamic configuration, and auto-generated cryptographic JWT secrets.
+- **`sdk/typescript`**: Vitest test suites verifying TypeScript SDK client generation, authentication, and API operations.

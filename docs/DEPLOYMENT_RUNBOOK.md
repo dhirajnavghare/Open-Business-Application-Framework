@@ -32,7 +32,7 @@ Designed for multi-tenant SaaS, enterprise retail chains, and high-concurrency b
 * **Database Tier**: Clustered PostgreSQL 16+ (Primary for writes, optional Read Replicas, Multi-AZ automated failover).
 * **Tenant Isolation**: Shared schema with logical tenant isolation by default, with dynamic switching to dedicated database pools via `TenantPoolRouter` for enterprise tiers.
 * **Background Worker Tier**: Dedicated `obaf-worker` daemons running periodic maintenance sweeps and webhook dispatch reconciliations.
-* **Observability**: Prometheus scraping `/metrics` and `/health`, distributed tracing via `x-request-id`.
+* **Observability**: Prometheus scraping `/metrics` and `/health` (with `/ready` and `/live` Kubernetes probes), distributed tracing via `x-request-id`, and zero-leak sensitive header masking (`[REDACTED]`).
 
 ```
                          ┌─────────────────────────────────┐
@@ -603,6 +603,16 @@ groups:
         annotations:
           summary: "HTTP 5xx error rate exceeds 2% over 5m window"
 ```
+
+### 7.4 Log Hygiene & Sensitive Header Masking
+
+OBAF automatically attaches `tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer` to all incoming requests. The following HTTP headers are marked as sensitive and automatically redacted to `[REDACTED]` in tracing logs and stdout/stderr:
+- `Authorization`
+- `Cookie`
+- `X-API-Key`
+- `X-OBAF-Signature`
+
+This guarantees that token credentials, session cookies, API keys, and HMAC signatures are never leaked into log collectors (Datadog, Loki, CloudWatch, or Splunk).
 
 ---
 

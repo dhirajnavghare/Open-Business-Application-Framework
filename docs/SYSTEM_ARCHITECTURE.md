@@ -43,12 +43,15 @@ OBAF follows strict inward-pointing dependencies to ensure compile-time boundary
    - `TenantPoolRouter`: Supports shared database clusters as well as dedicated per-tenant databases.
 
 3. **`crates/obaf-api`**:
-   - Axum 0.7 HTTP and WebSocket router.
+   - Axum 0.7 HTTP and WebSocket router with RFC 6455 30-second heartbeats.
    - Embedded Super Admin Single-Page Application (`/admin`, `/superadmin`).
+   - Sensitive headers masking via `SetSensitiveRequestHeadersLayer` (`Authorization`, `Cookie`, `X-API-Key`, `X-OBAF-Signature`).
    - Dynamic API Module Gating middleware (`module_gating_middleware`).
    - Hardened defense-in-depth security headers (`nosniff`, `DENY`, `HSTS`, `CSP`, `CORP`, `COOP`, `Permissions-Policy`).
    - Let's Encrypt automated ACME HTTP-01 challenge responder (`/.well-known/acme-challenge/:token`).
    - Interactive OpenAPI/Swagger documentation (`ApiDoc`).
+   - Sanitized database backup JSON downloads (`password_hash` redaction and secret filtering).
+   - Standard Kubernetes health probes (`/health`, `/live`, `/ready`) and Prometheus metrics (`/metrics`).
    - Background HMAC-SHA256 webhook dispatcher with private IPv4 SSRF blocking.
    - Offline edge synchronization engine (`/api/v1/sync`).
    - Real-time SHA-256 cryptographic JWT token revocation store (`token_blacklist`).

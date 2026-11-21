@@ -63,3 +63,13 @@ For enterprise PostgreSQL multi-node clusters, `crates/obaf-database` provides t
 - Directs write mutations (`writer()`) exclusively to primary PostgreSQL instances.
 - Seamlessly distributes read-only queries (`reader()`) across registered read replicas using lock-free atomic round-robin load balancing.
 - Safely falls back to the primary database when no read replicas are configured.
+
+---
+
+## 8. Persistent System Settings & Secret Management
+
+The `system_settings` table provides persistent key-value configuration across cluster restarts:
+- Dynamic platform configuration keys: `platform_name`, `default_currency`, `token_expiry_hours`, and `google_client_id`.
+- Auto-generated 64-character high-entropy cryptographic JWT signing secret persisted on initial boot (`get_or_create_jwt_secret`).
+- CRUD helpers: `get_system_setting` and `set_system_setting`.
+- Automated backup sanitization: database snapshot exports filter out sensitive keys (e.g. `superadmin_totp_secret`, recovery codes).

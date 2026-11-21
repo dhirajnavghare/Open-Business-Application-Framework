@@ -157,6 +157,10 @@ To deploy OBAF on any single server, VPS (e.g. Hostinger, Hetzner, DigitalOcean)
   - **Anti-Brute Force & Anti-Enumeration**: Progressive 15-minute account lockout after 5 consecutive failed logins, with dummy Argon2id hash timing equalization to eliminate user enumeration side-channels.
   - **Financial Math Bounds**: Strict non-negative constraints on pricing and strictly positive constraints on order quantities and payments.
   - **Production Credential Guard**: Refuses to launch in production (`OBAF_ENV=production`) with default credentials (`admin123`).
+  - **Sensitive Headers Redaction**: `SetSensitiveRequestHeadersLayer` masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+  - **Sanitized Backup Exports**: Automatic redaction of user `password_hash` to `[REDACTED]` and exclusion of MFA secrets in database backups.
+  - **RFC 6455 WebSocket Heartbeats**: 30-second ping/pong intervals preventing proxy timeouts and ghost socket leaks.
+  - **Zero-Panic Resilience**: Complete elimination of `.unwrap()` in authentication and webhook hashing workflows.
 
 ---
 

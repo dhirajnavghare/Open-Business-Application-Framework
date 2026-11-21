@@ -51,6 +51,10 @@ All public REST endpoints follow standard versioning:
 | `Cross-Origin-Resource-Policy` | Response | Set to `same-origin` |
 | `Cross-Origin-Opener-Policy` | Response | Set to `same-origin-allow-popups` |
 
+> **Sensitive Headers Redaction (OWASP API3 / CWE-312):** Incoming `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` headers are automatically classified as sensitive via `SetSensitiveRequestHeadersLayer` and masked with `[REDACTED]` in tracing logs and error output.
+>
+> **WebSocket Heartbeats (RFC 6455):** Connections to `/api/v1/ws/events` emit periodic 30-second `Message::Ping` frames and reply with `Message::Pong`, preventing reverse proxy idle drops and detecting stale client connections.
+
 ---
 
 ## 3. HTTP Status Code Conventions
