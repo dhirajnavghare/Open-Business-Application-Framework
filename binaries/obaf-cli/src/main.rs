@@ -729,8 +729,8 @@ python3 client.py
                 .collect();
             let password_hash = obaf_core::hash_password(&generated_password)?;
             println!(
-                "Seeded admin credentials for {} => email: {}, password: {}",
-                preset_id, admin_email, generated_password
+                "Seeded admin credentials for {} => email: {}",
+                preset_id, admin_email
             );
 
             let new_user = obaf_database::entities::user::ActiveModel {
