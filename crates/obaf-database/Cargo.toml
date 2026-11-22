@@ -17,4 +17,6 @@ serde_json.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 rust_decimal.workspace = true
+
+[dev-dependencies]
 static_assertions.workspace = true
