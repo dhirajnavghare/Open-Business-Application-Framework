@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{header::AUTHORIZATION, request::Parts, StatusCode},
     Json,
@@ -65,7 +64,6 @@ impl AuthUser {
     }
 }
 
-#[async_trait]
 impl FromRequestParts<SharedState> for AuthUser {
     type Rejection = (StatusCode, Json<AuthErrorResponse>);
 

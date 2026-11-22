@@ -101,7 +101,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/superadmin", get(serve_admin_ui))
         // Let's Encrypt Automated ACME HTTP-01 Challenge Responder
         .route(
-            "/.well-known/acme-challenge/:token",
+            "/.well-known/acme-challenge/{token}",
             get(crate::superadmin::ssl::acme_challenge_handler),
         )
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)

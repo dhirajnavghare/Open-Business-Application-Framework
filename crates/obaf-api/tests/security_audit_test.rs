@@ -738,8 +738,8 @@ async fn test_token_logout_revocation_blacklist() {
     };
     org.insert(&state.db).await.unwrap();
 
-    let test_password = std::env::var("OBAF_TEST_PASSWORD")
-        .unwrap_or_else(|_| Uuid::new_v4().to_string());
+    let test_password =
+        std::env::var("OBAF_TEST_PASSWORD").unwrap_or_else(|_| Uuid::new_v4().to_string());
 
     let user = obaf_database::entities::user::ActiveModel {
         id: Set(user_id),

@@ -11,16 +11,16 @@ pub fn billing_routes() -> Router<SharedState> {
         .route("/calculate-tax", post(handlers::calculate_tax))
         .route("/apply-rules", post(handlers::apply_rules))
         .route("/split-bill", post(handlers::split_bill))
-        .route("/orders/:id/receipt", get(handlers::generate_receipt))
+        .route("/orders/{id}/receipt", get(handlers::generate_receipt))
         .route(
-            "/orders/:id/invoice.html",
+            "/orders/{id}/invoice.html",
             get(handlers::render_html_invoice),
         )
         .route(
             "/credit-notes",
             post(handlers::issue_credit_note).get(handlers::list_credit_notes),
         )
-        .route("/credit-notes/:id", get(handlers::get_credit_note))
+        .route("/credit-notes/{id}", get(handlers::get_credit_note))
         .route(
             "/exchange-rates",
             post(handlers::set_exchange_rate).get(handlers::list_exchange_rates),

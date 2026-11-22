@@ -17,5 +17,5 @@ pub fn admin_routes() -> Router<SharedState> {
             "/tenants",
             post(tenants::provision_tenant).get(tenants::list_tenants),
         )
-        .route("/tenants/:id/usage", get(tenants::get_tenant_usage))
+        .route("/tenants/{id}/usage", get(tenants::get_tenant_usage))
 }

@@ -20,5 +20,5 @@ pub fn auth_routes() -> Router<SharedState> {
             "/api-keys",
             post(api_keys::create_api_key).get(api_keys::list_api_keys),
         )
-        .route("/api-keys/:id", delete(api_keys::revoke_api_key))
+        .route("/api-keys/{id}", delete(api_keys::revoke_api_key))
 }
