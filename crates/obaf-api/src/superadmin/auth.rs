@@ -724,12 +724,19 @@ pub async fn superadmin_google_login(
         ));
     }
 
-    #[cfg(any(test, debug_assertions))]
-    let is_mock_token = credential.starts_with("mock_google_token:")
-        || credential.starts_with("mock_google_token_");
+    let is_production = std::env::var("OBAF_ENV")
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("production")
+        || std::env::var("APP_ENV")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("production")
+        || std::env::var("ENV")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("production");
 
-    #[cfg(not(any(test, debug_assertions)))]
-    let is_mock_token = false;
+    let is_mock_token = !is_production
+        && (credential.starts_with("mock_google_token:")
+            || credential.starts_with("mock_google_token_"));
 
     let verified_email: String = if is_mock_token {
         credential
