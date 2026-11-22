@@ -105,8 +105,8 @@ mod tests {
 
     #[test]
     fn test_password_hash_and_verify() {
-        let password = "SuperSecretPassword123!";
-        let hash = hash_password(password).unwrap();
+        let password = Uuid::new_v4().to_string();
+        let hash = hash_password(&password).unwrap();
         assert!(hash.starts_with("$argon2"));
 
         // Correct password verifies successfully
