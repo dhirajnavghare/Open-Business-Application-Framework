@@ -15,6 +15,7 @@
 use clap::{Parser, Subcommand};
 use obaf_core::{generate_token, TenantId};
 use obaf_database::{establish_connection, run_migrations};
+use rand::{distributions::Alphanumeric, Rng};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -721,7 +722,16 @@ python3 client.py
 
             let user_id = Uuid::new_v4();
             let admin_email = format!("admin@demo-{}.test", preset_id);
-            let password_hash = obaf_core::hash_password("DemoPassword123!")?;
+            let generated_password: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(24)
+                .map(char::from)
+                .collect();
+            let password_hash = obaf_core::hash_password(&generated_password)?;
+            println!(
+                "Seeded admin credentials for {} => email: {}, password: {}",
+                preset_id, admin_email, generated_password
+            );
 
             let new_user = obaf_database::entities::user::ActiveModel {
                 id: sea_orm::Set(user_id),
