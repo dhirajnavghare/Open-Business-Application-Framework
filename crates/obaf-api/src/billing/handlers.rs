@@ -153,11 +153,25 @@ pub async fn calculate_tax(
 pub async fn split_bill(
     Json(payload): Json<SplitBillRequest>,
 ) -> Result<Json<SplitBillResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    const MAX_SPLIT_BILL_PARTIES: usize = 10_000;
+
     if payload.num_parties == 0 {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(AuthErrorResponse {
                 error: "num_parties must be greater than 0".to_string(),
+            }),
+        ));
+    }
+
+    if payload.num_parties > MAX_SPLIT_BILL_PARTIES {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "num_parties must be less than or equal to {}",
+                    MAX_SPLIT_BILL_PARTIES
+                ),
             }),
         ));
     }
