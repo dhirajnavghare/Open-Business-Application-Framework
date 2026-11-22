@@ -110,10 +110,11 @@ mod tests {
         assert!(hash.starts_with("$argon2"));
 
         // Correct password verifies successfully
-        assert!(verify_password(password, &hash).unwrap());
+        assert!(verify_password(password.clone(), &hash).unwrap());
 
         // Incorrect password fails verification
-        assert!(!verify_password("WrongPassword!", &hash).unwrap());
+        let wrong_password = format!("{password}_wrong");
+        assert!(!verify_password(wrong_password, &hash).unwrap());
 
         // Malformed hash returns error
         assert!(verify_password(password, "invalid_hash").is_err());
