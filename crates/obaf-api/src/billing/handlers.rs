@@ -178,7 +178,7 @@ pub async fn split_bill(
 
     let divisor = Decimal::from(payload.num_parties as i64);
     let base_share = (payload.total_amount / divisor).round_dp(2);
-    let mut shares = Vec::with_capacity(payload.num_parties);
+    let mut shares = Vec::new();
     let mut allocated = Decimal::ZERO;
 
     for i in 1..payload.num_parties {
