@@ -13,7 +13,7 @@ pub fn supplier_routes() -> Router<SharedState> {
             post(handlers::create_supplier).get(handlers::list_suppliers),
         )
         .route(
-            "/:id",
+            "/{id}",
             get(handlers::get_supplier)
                 .patch(handlers::update_supplier)
                 .delete(handlers::delete_supplier),

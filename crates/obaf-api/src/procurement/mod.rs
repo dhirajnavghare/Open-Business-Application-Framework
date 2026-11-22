@@ -17,7 +17,10 @@ pub fn procurement_routes() -> Router<SharedState> {
             "/purchase-orders",
             post(create_purchase_order).get(list_purchase_orders),
         )
-        .route("/purchase-orders/:id", get(get_purchase_order))
-        .route("/purchase-orders/:id/receive", post(receive_purchase_order))
-        .route("/purchase-orders/:id/cancel", post(cancel_purchase_order))
+        .route("/purchase-orders/{id}", get(get_purchase_order))
+        .route(
+            "/purchase-orders/{id}/receive",
+            post(receive_purchase_order),
+        )
+        .route("/purchase-orders/{id}/cancel", post(cancel_purchase_order))
 }

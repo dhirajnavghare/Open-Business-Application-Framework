@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use axum::{
-    async_trait,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         FromRequestParts, State,
@@ -32,7 +31,6 @@ pub struct WsAuthUser {
     pub is_superadmin: bool,
 }
 
-#[async_trait]
 impl FromRequestParts<SharedState> for WsAuthUser {
     type Rejection = (StatusCode, &'static str);
 
@@ -119,7 +117,7 @@ async fn handle_socket(
         tokio::select! {
             // Heartbeat keep-alive to prevent intermediate proxy / NAT timeouts and detect dead clients
             _ = ping_interval.tick() => {
-                if socket.send(Message::Ping(vec![])).await.is_err() {
+                if socket.send(Message::Ping(vec![].into())).await.is_err() {
                     break;
                 }
             }
@@ -151,7 +149,7 @@ async fn handle_socket(
                 match broadcast {
                     Ok(msg_text) => {
                         if is_superadmin {
-                            if socket.send(Message::Text(msg_text)).await.is_err() {
+                            if socket.send(Message::Text(msg_text.into())).await.is_err() {
                                 break;
                             }
                             continue;
@@ -173,7 +171,7 @@ async fn handle_socket(
                             }
                         }
 
-                        if socket.send(Message::Text(msg_text)).await.is_err() {
+                        if socket.send(Message::Text(msg_text.into())).await.is_err() {
                             break;
                         }
                     }

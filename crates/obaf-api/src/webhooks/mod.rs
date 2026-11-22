@@ -14,10 +14,10 @@ pub fn webhook_routes() -> Router<SharedState> {
             post(handlers::register_webhook).get(handlers::list_webhooks),
         )
         .route(
-            "/:id",
+            "/{id}",
             get(handlers::get_webhook)
                 .patch(handlers::update_webhook)
                 .delete(handlers::delete_webhook),
         )
-        .route("/:id/test", post(handlers::test_webhook))
+        .route("/{id}/test", post(handlers::test_webhook))
 }

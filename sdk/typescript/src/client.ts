@@ -23,7 +23,11 @@ export class ObafClient {
   public timeoutMs: number;
 
   constructor(config: ObafClientConfig = {}) {
-    this.baseUrl = (config.baseUrl || "http://127.0.0.1:8080").replace(/\/+$/, "");
+    let base = (config.baseUrl || "http://127.0.0.1:8080").trim();
+    while (base.endsWith("/")) {
+      base = base.slice(0, -1);
+    }
+    this.baseUrl = base;
     this.token = config.token;
     this.apiKey = config.apiKey;
     this.timeoutMs = config.timeoutMs ?? 30000;

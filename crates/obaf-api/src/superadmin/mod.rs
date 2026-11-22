@@ -59,7 +59,7 @@ pub fn superadmin_routes() -> Router<SharedState> {
             get(organizations::list_organizations).post(organizations::create_organization),
         )
         .route(
-            "/organizations/:id",
+            "/organizations/{id}",
             get(organizations::get_organization)
                 .put(organizations::update_organization)
                 .delete(organizations::delete_organization),
@@ -77,7 +77,7 @@ pub fn superadmin_routes() -> Router<SharedState> {
         .route("/ssl/proxy-config", get(ssl::get_proxy_config))
         // Super Admin Miracle Power Tools
         .route(
-            "/organizations/:id/impersonate",
+            "/organizations/{id}/impersonate",
             post(miracles::impersonate_tenant_admin),
         )
         .route(

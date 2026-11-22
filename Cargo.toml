@@ -26,7 +26,7 @@ obaf-api = { path = "crates/obaf-api" }
 # Async & Web
 tokio = { version = "1.41", features = ["full"] }
 clap = { version = "4.5", features = ["derive", "env"] }
-axum = { version = "0.7", features = ["macros", "ws"] }
+axum = { version = "0.8", features = ["macros", "ws"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "catch-panic", "sensitive-headers"] }
 
@@ -43,8 +43,8 @@ sea-orm = { version = "1.1", features = [
 ] }
 
 # OpenAPI & Swagger
-utoipa = { version = "5.2", features = ["axum_extras", "chrono", "uuid", "decimal"] }
-utoipa-swagger-ui = { version = "8.1", features = ["axum", "vendored"] }
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid", "decimal"] }
+utoipa-swagger-ui = { version = "10.0", features = ["axum", "vendored"] }
 
 # Serialization & Primitives
 serde = { version = "1.0", features = ["derive"] }
@@ -62,9 +62,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Configuration & Security
+rand = "0.8"
 config = "0.14"
 argon2 = { version = "0.5", features = ["std", "password-hash"] }
-jsonwebtoken = "=10.3.0"
+jsonwebtoken = "=9.3.1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 hmac = "0.12"
 sha1 = "0.10"
