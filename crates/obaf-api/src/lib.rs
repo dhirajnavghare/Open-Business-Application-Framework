@@ -33,6 +33,7 @@ pub mod router;
 pub mod search;
 pub mod state;
 pub mod subscriptions;
+pub mod superadmin;
 pub mod suppliers;
 pub mod sync;
 pub mod webhooks;

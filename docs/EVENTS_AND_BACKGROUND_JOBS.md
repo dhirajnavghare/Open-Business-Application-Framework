@@ -31,7 +31,9 @@ Standard domain event types:
 
 1. Handlers publish events into a Tokio `broadcast::channel`.
 2. Clients subscribe to real-time events via WebSockets at `/api/v1/ws/events?token=<JWT>`.
-3. Events are filtered so each client receives only events matching its `tenant_id`.
+3. Events are filtered so each client receives only events matching its `tenant_id` (Super Admin receives global events).
+4. **RFC 6455 Heartbeat Keep-Alive:** The server emits periodic 30-second `Message::Ping` frames and responds to client `Message::Ping` frames with `Message::Pong`, preventing reverse proxy idle drops and detecting stale clients.
+5. **Frame & Message Limits:** Maximum frame size 16KB, maximum message size 64KB for denial-of-service resilience.
 
 ---
 
@@ -39,8 +41,10 @@ Standard domain event types:
 
 Background workers dispatch HTTP webhooks asynchronously to external automation endpoints (WhatsApp, Zapier, accounting software):
 - Each request carries headers:
-  - `X-Obaf-Signature-256`: Hex-encoded HMAC-SHA256 signature calculated over the JSON payload using the webhook secret.
-  - `X-Obaf-Event`: The event type string.
+  - `X-OBAF-Signature`: `sha256=<hex_hmac>` calculated over the JSON payload using the webhook secret.
+  - `X-OBAF-Event`: The event type string.
+  - `X-OBAF-Timestamp`: Epoch timestamp of dispatch.
+- **SSRF Network Boundary:** Destination URLs are resolved and verified; requests to private RFC 1918, link-local, and loopback IPs are blocked.
 - Automatic retries with exponential backoff on HTTP 5xx or connection timeouts.
 
 ---

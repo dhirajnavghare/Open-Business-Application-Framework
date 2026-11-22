@@ -4,8 +4,8 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use obaf_database::entities::booking;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use obaf_database::entities::{booking, customer};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -72,6 +72,34 @@ pub async fn create_booking(
     auth: AuthUser,
     Json(payload): Json<CreateBookingRequest>,
 ) -> Result<(StatusCode, Json<BookingResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff"])?;
+
+    // BOLA/IDOR Defense: Verify customer belongs to current tenant if provided
+    if let Some(cid) = payload.customer_id {
+        let cust_exists = customer::Entity::find_by_id(cid)
+            .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+            .one(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database query error verifying customer: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: "A database error occurred".to_string(),
+                    }),
+                )
+            })?;
+
+        if cust_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!("Customer '{}' not found for current tenant", cid),
+                }),
+            ));
+        }
+    }
+
     let booking_id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -88,10 +116,11 @@ pub async fn create_booking(
     };
 
     let inserted = new_booking.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to create booking: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to create booking: {}", e),
+                error: "Failed to create booking".to_string(),
             }),
         )
     })?;
@@ -115,6 +144,7 @@ pub async fn list_bookings(
 ) -> Result<Json<Vec<BookingResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
     let bookings = booking::Entity::find()
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| {
@@ -148,6 +178,8 @@ pub async fn check_in_booking(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff"])?;
+
     let booking_model = booking::Entity::find()
         .filter(booking::Column::Id.eq(id))
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -163,7 +195,8 @@ pub async fn check_in_booking(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.checked_in",
         serde_json::json!({
             "booking_id": updated.id,
@@ -193,6 +226,8 @@ pub async fn check_out_booking(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff"])?;
+
     let booking_model = booking::Entity::find()
         .filter(booking::Column::Id.eq(id))
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -208,7 +243,8 @@ pub async fn check_out_booking(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.checked_out",
         serde_json::json!({
             "booking_id": updated.id,
@@ -269,6 +305,8 @@ pub async fn update_booking_status(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateBookingStatusRequest>,
 ) -> Result<Json<BookingResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff"])?;
+
     let booking_model = booking::Entity::find()
         .filter(booking::Column::Id.eq(id))
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -284,7 +322,8 @@ pub async fn update_booking_status(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "booking.status_updated",
         serde_json::json!({
             "booking_id": updated.id,
@@ -314,6 +353,8 @@ pub async fn delete_booking(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let booking_model = booking::Entity::find()
         .filter(booking::Column::Id.eq(id))
         .filter(booking::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -335,9 +376,12 @@ pub async fn delete_booking(
 }
 
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
+    tracing::error!("Internal error in bookings: {}", msg);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(AuthErrorResponse { error: msg }),
+        Json(AuthErrorResponse {
+            error: "A database error occurred".to_string(),
+        }),
     )
 }
 

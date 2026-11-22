@@ -5,7 +5,7 @@ use tracing::info;
 use crate::entities::{
     api_key, audit_log, booking, coupon, credit_note, currency_exchange_rate, customer, order,
     order_item, organization, payment, pos_shift, product, purchase_order, purchase_order_item,
-    stock_location, stock_movement, subscription, supplier, user, webhook,
+    stock_location, stock_movement, subscription, supplier, system_setting, user, webhook,
 };
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
@@ -13,7 +13,8 @@ pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
     let backend = db.get_database_backend();
     let schema = Schema::new(backend);
 
-    // Platform, Tenant, Credentials, Audit & Webhooks
+    // Platform, Tenant, Credentials, Audit, Settings & Webhooks
+    create_table_if_not_exists(db, backend, &schema, system_setting::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, organization::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, user::Entity).await?;
     create_table_if_not_exists(db, backend, &schema, api_key::Entity).await?;

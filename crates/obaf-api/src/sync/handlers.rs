@@ -6,7 +6,9 @@ use axum::{
 use chrono::{DateTime, Utc};
 use obaf_database::entities::{booking, order, payment, product};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use utoipa::{IntoParams, ToSchema};
@@ -78,6 +80,8 @@ pub async fn sync_push(
     State(state): State<SharedState>,
     Json(payload): Json<SyncPushRequest>,
 ) -> Result<Json<SyncPushResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let mut results = Vec::with_capacity(payload.actions.len());
 
     for action in payload.actions {
@@ -330,13 +334,15 @@ pub async fn sync_pull(
     }
 
     let products = prod_query
+        .limit(200)
         .all(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error fetching sync products: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: e.to_string(),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?
@@ -345,13 +351,15 @@ pub async fn sync_pull(
         .collect::<Vec<_>>();
 
     let orders = ord_query
+        .limit(200)
         .all(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error fetching sync orders: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: e.to_string(),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?
@@ -360,13 +368,15 @@ pub async fn sync_pull(
         .collect::<Vec<_>>();
 
     let bookings = book_query
+        .limit(200)
         .all(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database error fetching sync bookings: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: e.to_string(),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?

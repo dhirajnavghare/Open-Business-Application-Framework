@@ -56,10 +56,21 @@ impl<K: Eq + Hash + Clone, V: Clone> TtlCache<K, V> {
     pub fn insert_with_ttl(&self, key: K, value: V, ttl: Duration) {
         let mut lock = self.entries.write().unwrap_or_else(|e| e.into_inner());
 
-        // Capacity protection: purge expired items if over capacity
+        // Capacity protection (DoS): purge expired items if over capacity
         if lock.len() >= self.max_capacity {
             let now = Instant::now();
             lock.retain(|_, entry| entry.expires_at > now);
+
+            // If still at capacity after purging expired items, evict the entry closest to expiration
+            if lock.len() >= self.max_capacity {
+                if let Some(earliest_key) = lock
+                    .iter()
+                    .min_by_key(|(_, entry)| entry.expires_at)
+                    .map(|(k, _)| k.clone())
+                {
+                    lock.remove(&earliest_key);
+                }
+            }
         }
 
         lock.insert(

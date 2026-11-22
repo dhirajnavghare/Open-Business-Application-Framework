@@ -10,6 +10,9 @@
     "orders",
     "billing",
     "payments",
+    "suppliers",
+    "procurement",
+    "promotions",
     "webhooks"
   ],
   "default_tax_slabs": [

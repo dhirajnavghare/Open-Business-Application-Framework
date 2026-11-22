@@ -58,7 +58,8 @@ cargo run -p obaf-server
 ```
 
 Once running, navigate to:
-* 🚀 **Server Health Check:** [http://127.0.0.1:8080/health](http://127.0.0.1:8080/health)
+* 👑 **Super Admin Console:** [http://127.0.0.1:8080/admin](http://127.0.0.1:8080/admin) (Default email: `admin@obaf.local`, password configured via `SUPERADMIN_PASSWORD`)
+* 🚀 **Server Health Check:** [http://127.0.0.1:8080/health](http://127.0.0.1:8080/health) (Liveness probe: `/live`, Readiness probe: `/ready`)
 * 📖 **Interactive Swagger UI:** [http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)
 * ⚡ **OpenAPI 3.1 Spec:** [http://127.0.0.1:8080/api/v1/openapi.json](http://127.0.0.1:8080/api/v1/openapi.json)
 * 🤖 **AI Agent Context (`llms.txt`):** [http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)

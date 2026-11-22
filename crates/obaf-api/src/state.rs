@@ -18,6 +18,9 @@ pub struct AppState {
     pub cache: TtlCache<String, String>,
     pub idempotency_cache: TtlCache<String, (StatusCode, serde_json::Value)>,
     pub rate_limiter: TokenBucketRateLimiter,
+    pub superadmin: crate::superadmin::SuperAdminConfig,
+    pub login_guard: crate::superadmin::security::LoginAttemptGuard,
+    pub token_blacklist: TtlCache<String, ()>,
 }
 
 impl AppState {
@@ -46,6 +49,9 @@ impl AppState {
         // System Design Primer: Token Bucket Rate Limiter (burst 100 requests, 50 req/sec refill)
         let rate_limiter = TokenBucketRateLimiter::new(100.0, 50.0);
 
+        // Platform Super Administrator single-user root credentials
+        let superadmin = crate::superadmin::SuperAdminConfig::from_env();
+
         Self {
             db,
             router,
@@ -56,7 +62,34 @@ impl AppState {
             cache,
             idempotency_cache,
             rate_limiter,
+            superadmin,
+            login_guard: crate::superadmin::security::LoginAttemptGuard::new(),
+            token_blacklist: TtlCache::new(Duration::from_secs(86_400), 100_000),
         }
+    }
+
+    /// Revoke a JWT token by storing its SHA-256 fingerprint in the blacklist.
+    pub fn revoke_token(&self, token: &str) {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(token.trim().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        self.token_blacklist.insert(hash, ());
+    }
+
+    /// Check if a JWT token has been explicitly revoked or logged out.
+    pub fn is_token_revoked(&self, token: &str) -> bool {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(token.trim().as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        self.token_blacklist.get(&hash).is_some()
+    }
+
+    /// Set custom Super Admin configuration (useful for testing)
+    pub fn with_superadmin(mut self, config: crate::superadmin::SuperAdminConfig) -> Self {
+        self.superadmin = config;
+        self
     }
 
     /// Access database connection pool for read operations (queries, reports, searches).
@@ -70,23 +103,59 @@ impl AppState {
         self.router.writer()
     }
 
-    pub fn broadcast_event(&self, event_type: &str, payload: serde_json::Value) {
-        // 1. Broadcast to internal WebSocket listeners
+    /// Broadcast a real-time event scoped to a specific tenant (WebSocket + Webhooks)
+    pub fn broadcast_tenant_event(
+        &self,
+        tenant_id: uuid::Uuid,
+        event_type: &str,
+        payload: serde_json::Value,
+    ) {
+        // 1. Broadcast to internal WebSocket listeners with tenant tagging
         let msg = serde_json::json!({
             "event": event_type,
+            "tenant_id": tenant_id,
             "data": payload,
             "timestamp": chrono::Utc::now().to_rfc3339()
         })
         .to_string();
         let _ = self.event_sender.send(msg);
 
-        // 2. Dispatch to registered HTTP webhooks in the background
+        // 2. Dispatch to registered HTTP webhooks in the background (tenant isolated)
         let db = self.db.clone();
         let client = self.http_client.clone();
         let event_type_owned = event_type.to_string();
         tokio::spawn(async move {
-            dispatch_webhooks_background(db, client, event_type_owned, payload).await;
+            dispatch_webhooks_background(db, client, Some(tenant_id), event_type_owned, payload)
+                .await;
         });
+    }
+
+    pub fn broadcast_event(&self, event_type: &str, payload: serde_json::Value) {
+        let tenant_id = payload
+            .get("tenant_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| uuid::Uuid::parse_str(s).ok());
+
+        if let Some(tid) = tenant_id {
+            self.broadcast_tenant_event(tid, event_type, payload);
+        } else {
+            // 1. Broadcast to internal WebSocket listeners
+            let msg = serde_json::json!({
+                "event": event_type,
+                "data": payload,
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            })
+            .to_string();
+            let _ = self.event_sender.send(msg);
+
+            // 2. Dispatch to registered HTTP webhooks in the background
+            let db = self.db.clone();
+            let client = self.http_client.clone();
+            let event_type_owned = event_type.to_string();
+            tokio::spawn(async move {
+                dispatch_webhooks_background(db, client, None, event_type_owned, payload).await;
+            });
+        }
     }
 }
 

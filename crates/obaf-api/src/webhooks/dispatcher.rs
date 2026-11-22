@@ -9,24 +9,35 @@ type HmacSha256 = Hmac<Sha256>;
 
 /// Computes an HMAC-SHA256 hex digest for webhook payload verification.
 pub fn compute_hmac_signature(secret: &str, body: &str) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can accept key of any size");
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return String::new(),
+    };
     mac.update(body.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }
 
-/// Dispatches an event asynchronously to all active registered webhooks matching the event type.
+/// Constant-time verification of HMAC-SHA256 signature to mitigate timing attacks.
+pub fn verify_hmac_signature(secret: &str, body: &str, provided_sig: &str) -> bool {
+    let expected = compute_hmac_signature(secret, body);
+    obaf_core::constant_time_compare(&expected, provided_sig)
+}
+
+/// Dispatches an event asynchronously to registered webhooks matching the event type and tenant.
 pub async fn dispatch_webhooks_background(
     db: obaf_database::DatabaseConnection,
     client: reqwest::Client,
+    tenant_id: Option<uuid::Uuid>,
     event_type: String,
     payload: serde_json::Value,
 ) {
-    let active_hooks = match webhook::Entity::find()
-        .filter(webhook::Column::IsActive.eq(true))
-        .all(&db)
-        .await
-    {
+    let mut query = webhook::Entity::find().filter(webhook::Column::IsActive.eq(true));
+
+    if let Some(tid) = tenant_id {
+        query = query.filter(webhook::Column::TenantId.eq(tid));
+    }
+
+    let active_hooks = match query.all(&db).await {
         Ok(hooks) => hooks,
         Err(e) => {
             error!(

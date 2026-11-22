@@ -1,0 +1,3100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBAF Super Admin Console</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: #111827;
+      --bg-card-hover: #1e293b;
+      --bg-input: #0f172a;
+      --border-color: #1f2937;
+      --border-focus: #6366f1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-glow: rgba(79, 70, 229, 0.35);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.25);
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--primary), #a855f7);
+      color: white;
+      padding: 0.35rem 0.65rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-pulse {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--emerald);
+      font-weight: 500;
+      padding: 0.2rem 0.6rem;
+      background: var(--emerald-glow);
+      border-radius: 999px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pulse::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-tab.active {
+      color: white;
+      background: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .admin-email-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--rose);
+      padding: 0.35rem 0.85rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .btn-logout:hover {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--rose);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Auth Overlay / Modal */
+    #auth-view {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 120px);
+    }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 30px var(--primary-glow);
+      position: relative;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .auth-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      display: inline-block;
+    }
+
+    .auth-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .env-notice {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.15s;
+    }
+
+    .form-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .auth-divider::before, .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .auth-divider span {
+      padding: 0 0.75rem;
+    }
+
+    .google-btn-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 0.5rem;
+    }
+
+    .google-custom-btn {
+      width: 100%;
+      background: white;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .google-custom-btn:hover {
+      background: #f9fafb;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Dashboard & Tabs View */
+    .view-section {
+      display: none;
+    }
+
+    .view-section.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 0.4rem;
+    }
+
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.6rem 1rem 0.6rem 2.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .btn-action {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s;
+    }
+
+    .btn-action:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Organizations Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 0.85rem 1.25rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .org-title {
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .org-slug {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .preset-pill {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .modules-cell {
+      max-width: 380px;
+    }
+
+    .module-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+    }
+
+    .module-badge {
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-sm);
+      background: rgba(16, 185, 129, 0.12);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .module-badge.more {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dim);
+      border-color: var(--border-color);
+    }
+
+    .table-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.4rem 0.65rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
+    }
+
+    .btn-icon:hover {
+      color: var(--text-main);
+      background: var(--bg-card-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-icon.btn-manage-api {
+      background: rgba(99, 102, 241, 0.15);
+      color: #c7d2fe;
+      border-color: rgba(99, 102, 241, 0.4);
+      font-weight: 600;
+    }
+
+    .btn-icon.btn-manage-api:hover {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-icon.btn-danger:hover {
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.1);
+      border-color: var(--rose);
+    }
+
+    /* Security Controls & Audit Styles */
+    .status-badge-inactive {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .status-badge-active {
+      font-size: 0.75rem;
+      color: var(--emerald);
+      background: var(--emerald-glow);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+    }
+
+    .recovery-code-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.5rem;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      color: #e2e8f0;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .audit-action-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-sm);
+      display: inline-block;
+    }
+
+    .audit-action-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .audit-action-badge.danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .audit-action-badge.warning {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .audit-action-badge.info {
+      background: rgba(99, 102, 241, 0.15);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      animation: modalScale 0.2s ease;
+    }
+
+    @keyframes modalScale {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      padding: 1.75rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 1.25rem 1.75rem;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.6rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    /* Modules Checkbox Grid */
+    .module-selector-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .module-category-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      font-weight: 700;
+      margin: 1.25rem 0 0.5rem 0;
+    }
+
+    .module-category-title:first-child {
+      margin-top: 0;
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .module-card-choice {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .module-card-choice:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .module-card-choice.checked {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: var(--primary);
+    }
+
+    .module-card-choice input[type="checkbox"] {
+      margin-top: 0.2rem;
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .module-choice-info {
+      flex: 1;
+    }
+
+    .module-choice-name {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .module-choice-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .module-choice-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      line-height: 1.3;
+    }
+
+    /* Toast */
+    #toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 9999;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--text-main);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      animation: slideIn 0.2s ease;
+      max-width: 380px;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast.success { border-color: var(--emerald); }
+    .toast.error { border-color: var(--rose); color: #fecdd3; }
+
+    /* Modules Catalog Tab View */
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .catalog-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      transition: all 0.15s;
+    }
+
+    .catalog-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .catalog-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      margin-bottom: 0.75rem;
+    }
+
+    .catalog-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .catalog-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--emerald);
+      margin-bottom: 0.75rem;
+    }
+
+    .catalog-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar (visible when authenticated) -->
+  <header id="main-header" style="display: none;">
+    <div class="brand">
+      <span class="brand-badge">OBAF</span>
+      <span>Super Admin Console</span>
+      <span class="status-pulse">PLATFORM ACTIVE</span>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-tab="organizations" onclick="switchTab('organizations')">
+        🏢 Organizations
+      </button>
+      <button class="nav-tab" data-tab="modules" onclick="switchTab('modules')">
+        🧩 API Modules
+      </button>
+      <button class="nav-tab" data-tab="ssl" onclick="switchTab('ssl')">
+        🌐 Domain & SSL
+      </button>
+      <button class="nav-tab" data-tab="miracles" onclick="switchTab('miracles')">
+        ✨ Miracle Tools
+      </button>
+      <button class="nav-tab" data-tab="audit" onclick="switchTab('audit')">
+        📜 Security Audit
+      </button>
+      <button class="nav-tab" data-tab="system" onclick="switchTab('system')">
+        ⚙️ Settings
+      </button>
+    </div>
+
+    <div class="user-pill">
+      <span class="admin-email-tag" id="header-admin-email">admin@obaf.local</span>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Super Admin Authentication View -->
+    <div id="auth-view">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-icon">👑</div>
+          <h1 class="auth-title">Super Admin Login</h1>
+          <p class="auth-subtitle">Platform Super Administrator console for Open Business Application Framework</p>
+        </div>
+
+        <div class="env-notice">
+          <span>ℹ️</span>
+          <div>Single designated platform root user. Configured via <code>OBAF_SUPERADMIN_EMAIL</code> and <code>OBAF_SUPERADMIN_PASSWORD</code>.</div>
+        </div>
+
+        <!-- Google SSO Container -->
+        <div id="google-sso-section" style="display: none; margin-bottom: 1.25rem;">
+          <div id="google-btn" class="google-btn-container"></div>
+          <div class="auth-divider"><span>OR EMAIL & PASSWORD</span></div>
+        </div>
+
+        <!-- Email & Password Form -->
+        <form id="login-form" onsubmit="handleEmailLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Super Admin Email</label>
+            <input type="email" id="login-email" class="form-input" required placeholder="admin@obaf.local" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="login-password" class="form-input" required placeholder="••••••••••••" autocomplete="current-password">
+          </div>
+          <button type="submit" id="login-submit-btn" class="btn-primary">
+            <span>Sign In to Super Admin</span>
+          </button>
+        </form>
+
+        <!-- 2FA / TOTP Challenge Form -->
+        <div id="mfa-challenge-section" style="display: none;">
+          <div style="text-align: center; margin-bottom: 1.25rem;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔐</div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Two-Factor Authentication</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">
+              Enter the 6-digit TOTP code from your authenticator app or an 8-character emergency backup recovery code.
+            </p>
+          </div>
+          <form id="mfa-verify-form" onsubmit="handleMfaVerify(event)">
+            <div class="form-group">
+              <label class="form-label" style="text-align: center;">Authentication Code / Backup Code</label>
+              <input type="text" id="mfa-verify-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; letter-spacing: 0.25em; text-align: center; font-weight: 600;" placeholder="123456" maxlength="16" required autocomplete="one-time-code">
+            </div>
+            <button type="submit" id="mfa-verify-btn" class="btn-primary" style="margin-top: 0.5rem;">
+              <span>Verify & Complete Sign In</span>
+            </button>
+            <button type="button" class="btn-icon" style="width: 100%; margin-top: 0.75rem; justify-content: center; padding: 0.65rem;" onclick="cancelMfaChallenge()">
+              ← Back to Login
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Default Password Warning Banner -->
+    <div id="security-default-pw-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; color: #fca5a5; font-size: 0.85rem; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 1.25rem;">⚠️</span>
+        <div>
+          <strong style="color: #fff;">Security Warning:</strong> Platform Super Admin is using the default initial password (<code style="background: rgba(0,0,0,0.4); padding: 0.15rem 0.4rem; border-radius: 4px; color: #f87171;">admin123</code>). Set <code style="background: rgba(0,0,0,0.4); padding: 0.15rem 0.4rem; border-radius: 4px; color: #f87171;">OBAF_SUPERADMIN_PASSWORD</code> in your environment or Docker configuration before exposing this server to production!
+        </div>
+      </div>
+      <button onclick="document.getElementById('security-default-pw-banner').style.display='none'" style="background: transparent; border: none; color: #fca5a5; cursor: pointer; font-size: 1.25rem; padding: 0.25rem 0.5rem; line-height: 1;">&times;</button>
+    </div>
+
+    <!-- 2. Dashboard: Organizations View -->
+    <section id="view-organizations" class="view-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Organizations</div>
+          <div class="stat-value" id="stat-orgs">-</div>
+          <div class="stat-sub">Multi-tenant instances</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Products</div>
+          <div class="stat-value" id="stat-products">-</div>
+          <div class="stat-sub">Across all organizations</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Orders</div>
+          <div class="stat-value" id="stat-orders">-</div>
+          <div class="stat-sub">Processed transactions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-value" id="stat-users">-</div>
+          <div class="stat-sub">Tenant admins & staff</div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="org-search-input" placeholder="Search organizations by name or slug..." oninput="filterOrganizations()">
+        </div>
+        <button class="btn-action" onclick="openCreateOrgModal()">
+          <span>+</span> Create Organization
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Organization</th>
+              <th>Preset Template</th>
+              <th>Supported APIs & Modules</th>
+              <th>Usage Stats</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="orgs-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+                Loading organizations...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. Dashboard: Modules Catalog View -->
+    <section id="view-modules" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Supported OBAF API Engines</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          The platform super administrator can dynamically enable or disable any of these API modules for each organization.
+        </p>
+      </div>
+      <div class="catalog-grid" id="catalog-grid-container">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+    <!-- 4. Dashboard: Domain & Let's Encrypt Automated SSL View -->
+    <section id="view-ssl" class="view-section">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">🌐 Custom Domain & Let's Encrypt SSL/TLS</h2>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Configure your custom domain pointing to this server IP and manage automated, zero-maintenance Let's Encrypt SSL certificates.
+          </p>
+        </div>
+        <button class="btn-action" onclick="loadSslStatus()" style="padding: 0.6rem 1rem;">
+          ↻ Refresh SSL Status
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Configured Domain</div>
+          <div class="stat-value" style="font-size: 1.25rem; font-family: monospace;" id="ssl-stat-domain">None</div>
+          <div class="stat-sub" id="ssl-stat-dns-sub">DNS A-record pointing status</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">SSL Certificate Status</div>
+          <div class="stat-value" style="font-size: 1.25rem;" id="ssl-stat-status">Not Configured</div>
+          <div class="stat-sub" id="ssl-stat-expiry-sub">90-day Let's Encrypt X.509</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Auto-Renewal Engine</div>
+          <div class="stat-value" style="font-size: 1.25rem; color: var(--emerald);" id="ssl-stat-autorenew">Active</div>
+          <div class="stat-sub">Automated 30-day pre-expiry renewal</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ACME Challenge Gate</div>
+          <div class="stat-value" style="font-size: 1.25rem; color: var(--emerald);">HTTP-01 Ready</div>
+          <div class="stat-sub">Port 80 RFC 8555 responder active</div>
+        </div>
+      </div>
+
+      <!-- Domain Configuration & Certificate Manager -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-bottom: 1.75rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.85rem;">
+          <h3 style="font-size: 1.15rem; font-weight: 600;">⚙️ Domain Configuration & SSL Issuer</h3>
+          <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            AUTOMATED LET'S ENCRYPT
+          </span>
+        </div>
+
+        <form id="domain-config-form" onsubmit="handleConfigureDomain(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+            <div class="form-group">
+              <label class="form-label">Primary Platform Domain (FQDN) *</label>
+              <input type="text" id="ssl-input-domain" class="form-input" placeholder="e.g. api.yourcompany.com" required style="font-family: monospace;">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Point an <code>A</code> record in your DNS provider (Cloudflare, Hostinger, GoDaddy, Route53) to your server's public IP address.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Let's Encrypt Administrator Contact Email *</label>
+              <input type="email" id="ssl-input-email" class="form-input" placeholder="admin@yourcompany.com" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Used by Let's Encrypt CA to send certificate expiration alerts and critical notifications.
+              </small>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+            <input type="checkbox" id="ssl-input-autorenew" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+            <label for="ssl-input-autorenew" style="font-size: 0.875rem; font-weight: 500; cursor: pointer;">
+              Enable Automated Background SSL Renewal (Renews certificate automatically 30 days before expiration)
+            </label>
+          </div>
+
+          <!-- DNS Preflight Result Box -->
+          <div id="dns-preflight-box" style="display: none; padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; font-size: 0.85rem;"></div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" class="btn-icon" onclick="handleTestDns()" id="btn-test-dns" style="padding: 0.65rem 1.25rem;">
+              🔍 Test DNS Preflight
+            </button>
+            <button type="submit" class="btn-secondary" id="btn-save-domain" style="padding: 0.65rem 1.25rem;">
+              💾 Save Domain Settings
+            </button>
+            <button type="button" class="btn-action" onclick="handleProvisionSsl()" id="btn-provision-ssl" style="padding: 0.65rem 1.5rem;">
+              ⚡ Provision Let's Encrypt SSL
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live Certificate Inspector & Reverse Proxy Guides -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <!-- Certificate Inspector -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            📜 Active Certificate Inspector
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Certificate Authority</span>
+              <span id="cert-issuer" style="font-weight: 500;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Issued / Valid From</span>
+              <span id="cert-from" style="font-family: monospace;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Valid Until / Expiration</span>
+              <span id="cert-until" style="font-family: monospace;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">
+              <span style="color: var(--text-muted);">Days Remaining</span>
+              <span id="cert-days" style="font-weight: 700; color: var(--emerald);">-</span>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <span style="color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Last Renewal Audit Log:</span>
+              <div id="cert-log" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.6rem 0.75rem; font-family: monospace; font-size: 0.75rem; color: #94a3b8; line-height: 1.4;">
+                No renewal events recorded yet.
+              </div>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <button class="btn-icon" onclick="handleRenewSsl()" id="btn-force-renew" style="width: 100%; justify-content: center; padding: 0.6rem;">
+                🔄 Force Renew SSL Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reverse Proxy & Edge TLS Configuration -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🚀 Production Web Server Setup</span>
+            <button class="btn-icon" onclick="copyProxySnippet()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">📋 Copy Config</button>
+          </h4>
+          <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+            Ready-to-deploy reverse proxy configurations with automatic Let's Encrypt TLS:
+          </p>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <button type="button" class="btn-icon active" id="tab-btn-caddy" onclick="showProxyTab('caddy')">Caddy (Automatic TLS)</button>
+            <button type="button" class="btn-icon" id="tab-btn-nginx" onclick="showProxyTab('nginx')">Nginx</button>
+            <button type="button" class="btn-icon" id="tab-btn-docker" onclick="showProxyTab('docker')">Docker Compose</button>
+          </div>
+          <pre id="proxy-code-block" style="background: #070a13; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1; overflow-x: auto; max-height: 230px;"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Dashboard: Miracle Power Tools View -->
+    <section id="view-miracles" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">✨ Super Admin Miracle Power Tools</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          High-privilege platform controls, emergency panic switches, live database operations, and platform-wide broadcasts.
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <!-- Miracle Card 1: Emergency Platform Controls -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">🚨 Emergency Controls</h3>
+              <span id="miracle-maint-badge" class="status-badge-inactive">Normal Service</span>
+            </div>
+            
+            <!-- Maintenance Mode -->
+            <div style="margin-bottom: 1.25rem;">
+              <label class="form-label">Platform Maintenance Mode</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                When active, all tenant requests return <code>503 Service Unavailable</code> with custom message. Super Admin retains full console access.
+              </p>
+              <textarea id="maint-msg-input" class="form-input" rows="2" style="font-size: 0.8rem; margin-bottom: 0.5rem;" placeholder="Platform is undergoing scheduled maintenance..."></textarea>
+              <button type="button" class="btn-action" id="btn-toggle-maint" onclick="handleSetMaintenance()" style="width: 100%; justify-content: center;">
+                🚨 Toggle Maintenance Mode
+              </button>
+            </div>
+
+            <!-- Global Mutation Lockdown -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <label class="form-label" style="margin-bottom: 0;">Emergency Mutation Lockdown</label>
+                <span id="miracle-lock-badge" class="status-badge-inactive">Disabled</span>
+              </div>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+                Instantly freezes all POST/PUT/DELETE mutations across all tenants (HTTP 423 Locked) during active security incidents.
+              </p>
+              <button type="button" class="btn-icon btn-danger" id="btn-toggle-lockdown" onclick="handleToggleLockdown()" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                🔒 Toggle Mutation Freeze
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Miracle Card 2: Database Operations Center -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">💾 Database Operations Center</h3>
+              <span style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">OPERATIONS</span>
+            </div>
+
+            <!-- Instant Database Snapshot Backup -->
+            <div style="margin-bottom: 1.25rem;">
+              <label class="form-label">1-Click Platform Snapshot Backup</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Exports consistent snapshot containing all tenants, users, catalog items, orders, and system settings.
+              </p>
+              <button type="button" class="btn-action" onclick="handleDownloadBackup()" style="width: 100%; justify-content: center;">
+                💾 Download Platform Backup (.json)
+              </button>
+            </div>
+
+            <!-- Database Optimization -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-bottom: 1.25rem;">
+              <label class="form-label">Database Optimization & Vacuum</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Runs <code>PRAGMA optimize</code> / <code>VACUUM ANALYZE</code> and updates query planner statistics.
+              </p>
+              <button type="button" class="btn-secondary" id="btn-optimize-db" onclick="handleOptimizeDb()" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                ⚡ Optimize Database & Query Planner
+              </button>
+              <div id="optimize-result-box" style="display: none; margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); font-size: 0.75rem; font-family: monospace;"></div>
+            </div>
+
+            <!-- Cache & Rate Limiter Flush -->
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+              <label class="form-label">Cache & Rate Limiter Flush</label>
+              <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">
+                Purges global TTL cache, idempotency keys, and resets rate limiter token buckets.
+              </p>
+              <button type="button" class="btn-icon" onclick="handleFlushCache()" id="btn-flush-cache" style="width: 100%; justify-content: center; padding: 0.65rem;">
+                🧹 Flush In-Memory Cache
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Miracle Card 3: Global System Announcement -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+              <h3 style="font-size: 1.05rem; font-weight: 600;">📢 Platform Broadcast</h3>
+              <span style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">BROADCAST</span>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+              Broadcast a message banner displayed across all connected tenant apps, POS terminals, and portals:
+            </p>
+            <div class="form-group">
+              <textarea id="announcement-input" class="form-input" rows="4" placeholder="e.g. Scheduled platform upgrade tonight from 02:00 to 02:30 UTC."></textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <button type="button" class="btn-action" onclick="handleSaveAnnouncement()" style="flex: 1; justify-content: center;">
+                📢 Broadcast
+              </button>
+              <button type="button" class="btn-secondary" onclick="handleClearAnnouncement()" style="padding: 0.65rem 1rem;">
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Dashboard: Security Audit Log View -->
+    <section id="view-audit" class="view-section">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">📜 Platform Security Audit Log</h2>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Immutable zero-trust audit trail of administrative access, authentication attempts, and platform security events.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="audit-filter-input" placeholder="Filter by action or IP..." oninput="filterAuditLogs(this.value)">
+          </div>
+          <button class="btn-action" onclick="loadAuditLogs()" style="padding: 0.6rem 1rem;">
+            ↻ Refresh Logs
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 180px;">Timestamp (UTC)</th>
+              <th style="width: 230px;">Security Event / Action</th>
+              <th style="width: 170px;">Target Entity</th>
+              <th style="width: 140px;">Client IP</th>
+              <th>Audit Event Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+                Loading security audit log...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. Dashboard: System & Platform Settings View -->
+    <section id="view-system" class="view-section">
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.35rem;">Platform Diagnostics & Settings</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">
+          Configure global platform parameters, branding, security limits, and inspect architecture diagnostics.
+        </p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Database Backend</div>
+          <div class="stat-value" style="font-size: 1.35rem;" id="sys-db">-</div>
+          <div class="stat-sub">Connection pooling with read/write routing</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Server Version</div>
+          <div class="stat-value" id="sys-version">-</div>
+          <div class="stat-sub">Zero-downtime Rust Axum runtime</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Google SSO</div>
+          <div class="stat-value" style="font-size: 1.35rem;" id="sys-google">-</div>
+          <div class="stat-sub" id="sys-google-sub">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Security & Rate Limiting</div>
+          <div class="stat-value" style="font-size: 1.35rem; color: var(--emerald);">Active</div>
+          <div class="stat-sub">Token Bucket + Module Gate Shield</div>
+        </div>
+      </div>
+
+      <!-- Security & Access Controls Card -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 600;">🛡️ Super Admin Zero-Trust Security Controls</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+              World-class, bank-grade defense with Multi-Factor Authentication, Brute-Force lockout, and IP/CIDR access control gates.
+            </p>
+          </div>
+          <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            BANK-GRADE HARDENED
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+          <!-- 2FA Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="font-weight: 600; font-size: 0.95rem;">🔐 Multi-Factor Authentication (2FA)</span>
+                <span id="mfa-status-badge" class="status-badge-inactive">Disabled</span>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 1rem;">
+                RFC 6238 Time-based One-Time Password (TOTP) standard. Compatible with Google Authenticator, Microsoft Authenticator, and 1Password.
+              </p>
+            </div>
+            <div>
+              <button type="button" id="mfa-action-btn" class="btn-action" style="width: 100%; justify-content: center;" onclick="openMfaSetupModal()">
+                ⚡ Enable 2FA Authenticator
+              </button>
+            </div>
+          </div>
+
+          <!-- Brute-Force Defense Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.95rem;">🛡️ Brute-Force Shield</span>
+              <span style="font-size: 0.75rem; color: var(--emerald); background: var(--emerald-glow); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">Enforced</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">
+              Automatic progressive lockout: 5 consecutive failed attempts trigger an immediate 15-minute IP/account freeze with HTTP 429 Too Many Requests.
+            </p>
+          </div>
+
+          <!-- Inactivity Session Lock Card -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.95rem;">⏱️ Inactivity Auto-Lock</span>
+              <span style="font-size: 0.75rem; color: var(--emerald); background: var(--emerald-glow); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600;">15 Minutes</span>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">
+              Any idle administrative session is terminated automatically after 15 minutes of inactivity to protect against unauthorized physical access.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Platform Settings Form -->
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.75rem; margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 600;">⚙️ Global Platform Configuration</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+              Managed dynamically by the Platform Super Administrator. Saved directly to the database.
+            </p>
+          </div>
+          <span style="font-size: 0.75rem; background: rgba(79, 70, 229, 0.2); color: #818cf8; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 600;">
+            SUPER ADMIN ONLY
+          </span>
+        </div>
+
+        <form id="platform-settings-form" onsubmit="handleSavePlatformSettings(event)">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label">Platform Display Name</label>
+              <input type="text" id="setting-platform-name" class="form-input" placeholder="Open Business Application Framework" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Top-level platform branding displayed across headers and public endpoints.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Default Base Currency (3-Letter ISO)</label>
+              <input type="text" id="setting-default-currency" class="form-input" placeholder="USD" maxlength="3" required style="text-transform: uppercase;">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Standard base currency for transactions and ledger billing (e.g. USD, EUR, INR, GBP).</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">JWT Token Expiry (Hours)</label>
+              <input type="number" id="setting-token-expiry" class="form-input" placeholder="24" min="1" max="8760" required>
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Lifespan of tenant administrative authentication tokens.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Google OAuth 2.0 Client ID (for Google SSO)</label>
+              <input type="text" id="setting-google-client-id" class="form-input" placeholder="e.g. 123456789-abcdef.apps.googleusercontent.com">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">Enable one-click Google SSO on the Super Admin login screen without container restarts.</small>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label">Super Admin Allowed IP Whitelist (Optional)</label>
+              <input type="text" id="setting-allowed-ips" class="form-input" placeholder="e.g. 192.168.1.100, 10.0.0.0/8, 2001:db8::/32 (leave blank for unrestricted)">
+              <small style="color: var(--text-dim); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+                Comma-separated IPv4, IPv6, or CIDR network blocks. If configured, any login or API request from an unlisted IP address is immediately rejected with HTTP 403 Forbidden.
+              </small>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="submit" id="btn-save-settings" class="btn-action" style="padding: 0.65rem 1.5rem;">
+              💾 Save Platform Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Create Organization -->
+  <div class="modal-backdrop" id="create-org-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Organization</h3>
+        <button class="modal-close" onclick="closeModal('create-org-modal')">&times;</button>
+      </div>
+      <form id="create-org-form" onsubmit="handleCreateOrganization(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Organization Name *</label>
+            <input type="text" id="new-org-name" class="form-input" required placeholder="Acme Global Retail" oninput="autoSlugify(this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL Slug * (Unique Tenant Identifier)</label>
+            <input type="text" id="new-org-slug" class="form-input" required placeholder="acme-global">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Domain Preset Template</label>
+            <select id="new-org-preset" class="form-input" onchange="onPresetChange(this.value)">
+              <option value="retail_grocery">Retail & Grocery (Catalog, Inventory, Orders, POS, Billing)</option>
+              <option value="restaurant_pos">Restaurant & POS (Tables, KOT, POS, Orders, Billing)</option>
+              <option value="pharmacy">Pharmacy & Healthcare (Batches, Expiry, Billing, Inventory)</option>
+              <option value="clinic_opd">Clinic & OPD (Bookings, Patients, Billing, Prescriptions)</option>
+              <option value="coworking_space">Coworking Space (Subscriptions, Bookings, Billing)</option>
+              <option value="hotel_management">Hotel & Hospitality (Rooms, Bookings, POS, Billing)</option>
+              <option value="equipment_rental">Equipment Rental (Inventory, Bookings, Billing)</option>
+              <option value="gym_fitness">Gym & Fitness (Subscriptions, Bookings, Customers)</option>
+              <option value="salon_spa">Salon & Spa (Bookings, POS, Customers, Billing)</option>
+              <option value="manufacturing_jobwork">Manufacturing & Job Work (Procurement, Inventory, Orders)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial Tenant Administrator Name</label>
+            <input type="text" id="new-org-admin-name" class="form-input" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial Tenant Administrator Email</label>
+            <input type="email" id="new-org-admin-email" class="form-input" required placeholder="admin@acmeglobal.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Initial Tenant Administrator Password (min 8 chars)</label>
+            <input type="password" id="new-org-admin-password" class="form-input" required minlength="8" placeholder="Enter secure password">
+          </div>
+
+          <!-- Supported Modules Selector -->
+          <div style="margin-top: 1.5rem;">
+            <div class="module-selector-toolbar">
+              <label class="form-label" style="margin-bottom: 0;">Select Supported APIs & Modules</label>
+              <div>
+                <button type="button" class="btn-icon" onclick="toggleAllModules('create', true)">Select All</button>
+                <button type="button" class="btn-icon" onclick="toggleAllModules('create', false)">Clear</button>
+              </div>
+            </div>
+            <div id="create-modules-container" class="modules-grid">
+              <!-- Checkboxes injected by JS -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('create-org-modal')">Cancel</button>
+          <button type="submit" class="btn-action">Provision Organization</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Configure Supported APIs -->
+  <div class="modal-backdrop" id="manage-apis-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Supported APIs & Module Gating</h3>
+          <p style="font-size: 0.8rem; color: var(--text-dim);" id="manage-apis-org-subtitle">Organization: -</p>
+        </div>
+        <button class="modal-close" onclick="closeModal('manage-apis-modal')">&times;</button>
+      </div>
+      <form id="manage-apis-form" onsubmit="handleSaveSupportedApis(event)">
+        <input type="hidden" id="manage-apis-org-id">
+        <div class="modal-body">
+          <div class="env-notice" style="margin-bottom: 1rem;">
+            <span>⚡</span>
+            <div>Enabling or disabling an API module applies immediately. Unselected modules will return <code>403 MODULE_DISABLED</code> to tenant callers.</div>
+          </div>
+          <div class="module-selector-toolbar">
+            <span style="font-size: 0.85rem; font-weight: 600;">API Engine Modules</span>
+            <div>
+              <button type="button" class="btn-icon" onclick="toggleAllModules('manage', true)">Select All</button>
+              <button type="button" class="btn-icon" onclick="toggleAllModules('manage', false)">Deselect All</button>
+            </div>
+          </div>
+          <div id="manage-modules-container" class="modules-grid">
+            <!-- Checkboxes injected by JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('manage-apis-modal')">Cancel</button>
+          <button type="submit" class="btn-action">Save Supported APIs</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: MFA Setup -->
+  <div class="modal-backdrop" id="mfa-setup-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔐 Set Up Two-Factor Authentication (TOTP)</h3>
+        <button class="modal-close" onclick="closeModal('mfa-setup-modal')">&times;</button>
+      </div>
+      <form id="mfa-activate-form" onsubmit="handleMfaActivate(event)">
+        <div class="modal-body">
+          <div style="margin-bottom: 1.25rem;">
+            <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem;">1. Add to Authenticator App</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Open Google Authenticator, Authy, or 1Password and add an account using this Secret Key:
+            </p>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="mfa-setup-secret" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; letter-spacing: 0.1em; background: rgba(0,0,0,0.3); font-weight: 600; color: #a5b4fc;">
+              <button type="button" class="btn-icon" onclick="copyMfaSecret()" style="padding: 0.65rem 1rem;">📋 Copy</button>
+            </div>
+            <div style="margin-top: 0.5rem;">
+              <small style="font-size: 0.75rem; color: var(--text-dim);">Account URI: </small>
+              <input type="text" id="mfa-setup-uri" class="form-input" readonly style="font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); padding: 0.35rem 0.5rem; margin-top: 0.2rem;">
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.25rem; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <span style="font-weight: 600; font-size: 0.85rem; color: var(--amber);">⚠️ 2. Emergency Backup Recovery Codes</span>
+              <button type="button" class="btn-icon" onclick="copyRecoveryCodes()" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">📋 Copy All</button>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+              Save these one-time recovery codes in a safe place. If you lose your phone, each code can be used once to log in:
+            </p>
+            <div id="mfa-recovery-codes-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+              <!-- Recovery codes injected by JS -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">3. Enter Confirmation Code from Authenticator App *</label>
+            <input type="text" id="mfa-activate-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; letter-spacing: 0.2em; text-align: center;" placeholder="123456" maxlength="6" required autocomplete="one-time-code">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('mfa-setup-modal')">Cancel</button>
+          <button type="submit" id="btn-activate-mfa" class="btn-action">Confirm & Activate 2FA</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: MFA Disable -->
+  <div class="modal-backdrop" id="mfa-disable-modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--rose);">Disable Two-Factor Authentication</h3>
+        <button class="modal-close" onclick="closeModal('mfa-disable-modal')">&times;</button>
+      </div>
+      <form id="mfa-disable-form" onsubmit="handleMfaDisable(event)">
+        <div class="modal-body">
+          <div class="env-notice" style="margin-bottom: 1.25rem; border-color: rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.08);">
+            <span>⚠️</span>
+            <div style="color: #fda4af;">Disabling 2FA lowers platform security. You will only need email and password to log in.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Enter current 6-digit TOTP code to confirm:</label>
+            <input type="text" id="mfa-disable-code" class="form-input" style="font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; letter-spacing: 0.2em; text-align: center;" placeholder="123456" maxlength="6" required autocomplete="one-time-code">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('mfa-disable-modal')">Cancel</button>
+          <button type="submit" id="btn-disable-mfa" class="btn-icon btn-danger" style="padding: 0.65rem 1.25rem;">Disable 2FA</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Tenant Magic Impersonation -->
+  <div class="modal-backdrop" id="impersonate-modal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">✨ Tenant Administrator Magic Login</h3>
+        <button class="modal-close" onclick="closeModal('impersonate-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="env-notice" style="margin-bottom: 1rem; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+          <span>✨</span>
+          <div>Impersonation active for <strong id="impersonate-org-name" style="color: #6ee7b7;">-</strong>. Valid for 15 minutes.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Single-Use Tenant Admin Bearer JWT Token</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="impersonate-token-input" class="form-input" readonly style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: rgba(0,0,0,0.3); color: #a5b4fc;">
+            <button type="button" class="btn-icon" onclick="copyImpersonateToken()" style="padding: 0.65rem 1rem;">📋 Copy</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 1rem;">
+          <label class="form-label">cURL API Test Snippet</label>
+          <pre id="impersonate-curl-snippet" style="background: #070a13; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #cbd5e1; overflow-x: auto;"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-action" onclick="closeModal('impersonate-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script>
+    // State
+    let authToken = localStorage.getItem('obaf_superadmin_token') || null;
+    let currentAdmin = null;
+    let modulesCatalog = [];
+    let organizationsList = [];
+    let pendingMfaTempToken = null;
+    let currentMfaSetupData = null;
+    let auditLogsList = [];
+    let inactivityTimer = null;
+    let proxyConfigData = null;
+    let currentProxyTab = 'caddy';
+    let currentImpersonateToken = '';
+
+    // DOM Elements
+    const authView = document.getElementById('auth-view');
+    const mainHeader = document.getElementById('main-header');
+    const headerAdminEmail = document.getElementById('header-admin-email');
+
+    // Inactivity Auto-Logout Shield (15 minutes)
+    function resetInactivityTimer() {
+      clearTimeout(inactivityTimer);
+      if (authToken) {
+        inactivityTimer = setTimeout(() => {
+          logout();
+          showToast('Administrative session expired due to 15 minutes of inactivity for security.', 'info');
+        }, 15 * 60 * 1000);
+      }
+    }
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, resetInactivityTimer, { passive: true });
+    });
+
+    // Bootstrap
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadSuperAdminConfig();
+      if (authToken) {
+        verifySession();
+      } else {
+        showAuthView();
+      }
+    });
+
+    async function loadSuperAdminConfig() {
+      try {
+        const res = await fetch('/api/v1/superadmin/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          document.getElementById('login-email').value = cfg.superadmin_email;
+          if (cfg.default_password_warning) {
+            const banner = document.getElementById('security-default-pw-banner');
+            if (banner) banner.style.display = 'flex';
+          }
+          if (cfg.google_auth_enabled && cfg.google_client_id) {
+            initGoogleSso(cfg.google_client_id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load superadmin config:', err);
+      }
+    }
+
+    function initGoogleSso(clientId) {
+      document.getElementById('google-sso-section').style.display = 'block';
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.google) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+          });
+          window.google.accounts.id.renderButton(
+            document.getElementById('google-btn'),
+            { theme: 'outline', size: 'large', width: '380', shape: 'rectangular' }
+          );
+        }
+      };
+      document.head.appendChild(script);
+    }
+
+    async function handleGoogleCredentialResponse(response) {
+      try {
+        const res = await fetch('/api/v1/superadmin/google-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSession(data.token, data.user);
+          showToast('Google Sign-In successful', 'success');
+        } else {
+          showToast(data.error || 'Google Sign-In failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during Google Sign-In', 'error');
+      }
+    }
+
+    async function handleEmailLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-submit-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          if (data.mfa_required) {
+            // Two-Factor Authentication required
+            pendingMfaTempToken = data.temp_token;
+            document.getElementById('login-form').style.display = 'none';
+            const googleSec = document.getElementById('google-sso-section');
+            if (googleSec) googleSec.style.display = 'none';
+            document.getElementById('mfa-challenge-section').style.display = 'block';
+            const codeInput = document.getElementById('mfa-verify-code');
+            codeInput.value = '';
+            codeInput.focus();
+            showToast('Two-Factor Authentication required. Enter your 6-digit TOTP code.', 'info');
+          } else {
+            setSession(data.token, data.user);
+            showToast('Welcome, Super Administrator', 'success');
+          }
+        } else {
+          showToast(data.error || 'Invalid credentials', 'error');
+        }
+      } catch (err) {
+        showToast('Login request failed', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign In to Super Admin';
+      }
+    }
+
+    async function handleMfaVerify(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-verify-code').value.trim();
+      const btn = document.getElementById('mfa-verify-btn');
+
+      if (!code) return;
+      btn.disabled = true;
+      btn.textContent = 'Verifying Code...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temp_token: pendingMfaTempToken,
+            code: code,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          pendingMfaTempToken = null;
+          document.getElementById('mfa-challenge-section').style.display = 'none';
+          document.getElementById('login-form').style.display = 'block';
+          setSession(data.token, data.user);
+          showToast('Two-Factor Authentication verified. Welcome!', 'success');
+        } else {
+          showToast(data.error || 'Invalid authentication code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error verifying 2FA code', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify & Complete Sign In';
+      }
+    }
+
+    function cancelMfaChallenge() {
+      pendingMfaTempToken = null;
+      document.getElementById('mfa-challenge-section').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+      loadSuperAdminConfig();
+    }
+
+    function setSession(token, user) {
+      authToken = token;
+      currentAdmin = user;
+      localStorage.setItem('obaf_superadmin_token', token);
+      resetInactivityTimer();
+      showDashboard();
+    }
+
+    async function verifySession() {
+      try {
+        const res = await fetch('/api/v1/superadmin/me', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          currentAdmin = await res.json();
+          resetInactivityTimer();
+          showDashboard();
+        } else {
+          logout();
+        }
+      } catch (err) {
+        logout();
+      }
+    }
+
+    function logout() {
+      authToken = null;
+      currentAdmin = null;
+      clearTimeout(inactivityTimer);
+      localStorage.removeItem('obaf_superadmin_token');
+      cancelMfaChallenge();
+      showAuthView();
+      showToast('Signed out successfully', 'info');
+    }
+
+    function showAuthView() {
+      authView.style.display = 'flex';
+      mainHeader.style.display = 'none';
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+    }
+
+    async function showDashboard() {
+      authView.style.display = 'none';
+      mainHeader.style.display = 'flex';
+      headerAdminEmail.textContent = currentAdmin ? currentAdmin.email : 'admin@obaf.local';
+
+      await loadModulesCatalog();
+      switchTab('organizations');
+      await refreshOrganizations();
+      await refreshStats();
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.nav-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.view-section').forEach(s => {
+        s.classList.toggle('active', s.id === `view-${tabName}`);
+      });
+      if (tabName === 'system') {
+        refreshStats();
+        loadPlatformSettings();
+      } else if (tabName === 'audit') {
+        loadAuditLogs();
+      } else if (tabName === 'ssl') {
+        loadSslStatus();
+        loadProxyConfig();
+      } else if (tabName === 'miracles') {
+        loadMiraclesStatus();
+      }
+    }
+
+    async function loadModulesCatalog() {
+      try {
+        const res = await fetch('/api/v1/superadmin/modules', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          modulesCatalog = await res.json();
+          renderCatalogTab();
+          renderModuleCheckboxes('create-modules-container', 'create');
+          renderModuleCheckboxes('manage-modules-container', 'manage');
+        }
+      } catch (err) {
+        console.error('Failed to load modules catalog:', err);
+      }
+    }
+
+    function renderCatalogTab() {
+      const container = document.getElementById('catalog-grid-container');
+      container.innerHTML = modulesCatalog.map(m => `
+        <div class="catalog-card">
+          <div class="catalog-badge">${escapeHtml(m.category)}</div>
+          <div class="catalog-name">${escapeHtml(m.name)}</div>
+          <div class="catalog-id">Module ID: /api/v1/${escapeHtml(m.id)}/*</div>
+          <div class="catalog-desc">${escapeHtml(m.description)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderModuleCheckboxes(containerId, prefix) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = modulesCatalog.map(m => `
+        <label class="module-card-choice ${m.default_enabled ? 'checked' : ''}" id="${prefix}-label-${m.id}">
+          <input type="checkbox" name="${prefix}-module" value="${m.id}" ${m.default_enabled ? 'checked' : ''} onchange="onModuleCheckboxChange('${prefix}', '${m.id}', this.checked)">
+          <div class="module-choice-info">
+            <div class="module-choice-name">
+              <span>${escapeHtml(m.name)}</span>
+              <span class="module-choice-code">${m.id}</span>
+            </div>
+            <div class="module-choice-desc">${escapeHtml(m.description)}</div>
+          </div>
+        </label>
+      `).join('');
+    }
+
+    function onModuleCheckboxChange(prefix, modId, isChecked) {
+      const label = document.getElementById(`${prefix}-label-${modId}`);
+      if (label) {
+        label.classList.toggle('checked', isChecked);
+      }
+    }
+
+    function toggleAllModules(prefix, enable) {
+      const checkboxes = document.querySelectorAll(`input[name="${prefix}-module"]`);
+      checkboxes.forEach(cb => {
+        cb.checked = enable;
+        onModuleCheckboxChange(prefix, cb.value, enable);
+      });
+    }
+
+    async function refreshOrganizations() {
+      try {
+        const res = await fetch('/api/v1/superadmin/organizations', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          organizationsList = await res.json();
+          renderOrganizationsTable(organizationsList);
+        }
+      } catch (err) {
+        showToast('Failed to fetch organizations', 'error');
+      }
+    }
+
+    async function refreshStats() {
+      try {
+        const res = await fetch('/api/v1/superadmin/stats', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const stats = await res.json();
+          document.getElementById('stat-orgs').textContent = stats.total_organizations;
+          document.getElementById('stat-products').textContent = stats.total_products;
+          document.getElementById('stat-orders').textContent = stats.total_orders;
+          document.getElementById('stat-users').textContent = stats.total_users;
+
+          document.getElementById('sys-db').textContent = stats.database_backend;
+          document.getElementById('sys-version').textContent = `v${stats.server_version}`;
+          document.getElementById('sys-google').textContent = stats.google_auth_enabled ? 'Configured' : 'Not Configured';
+          document.getElementById('sys-google-sub').textContent = stats.google_auth_enabled ? `Audience checked` : 'OBAF_GOOGLE_CLIENT_ID unset';
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    async function loadPlatformSettings() {
+      try {
+        const res = await fetch('/api/v1/superadmin/settings', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const cfg = await res.json();
+          document.getElementById('setting-platform-name').value = cfg.platform_name || '';
+          document.getElementById('setting-default-currency').value = cfg.default_currency || 'USD';
+          document.getElementById('setting-token-expiry').value = cfg.token_expiry_hours || 24;
+          document.getElementById('setting-google-client-id').value = cfg.google_client_id || '';
+          document.getElementById('setting-allowed-ips').value = cfg.allowed_ips || '';
+
+          // Update MFA Status Pill and Action Button
+          const badge = document.getElementById('mfa-status-badge');
+          const actionBtn = document.getElementById('mfa-action-btn');
+          if (cfg.mfa_enabled) {
+            badge.className = 'status-badge-active';
+            badge.textContent = 'Active (Enforced)';
+            actionBtn.className = 'btn-icon btn-danger';
+            actionBtn.style.padding = '0.65rem 1.25rem';
+            actionBtn.textContent = 'Disable 2FA';
+            actionBtn.onclick = openMfaDisableModal;
+          } else {
+            badge.className = 'status-badge-inactive';
+            badge.textContent = 'Disabled';
+            actionBtn.className = 'btn-action';
+            actionBtn.style.padding = '0.65rem 1.25rem';
+            actionBtn.textContent = '⚡ Enable 2FA Authenticator';
+            actionBtn.onclick = openMfaSetupModal;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load platform settings:', err);
+      }
+    }
+
+    async function handleSavePlatformSettings(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-save-settings');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const payload = {
+        platform_name: document.getElementById('setting-platform-name').value.trim(),
+        default_currency: document.getElementById('setting-default-currency').value.trim().toUpperCase(),
+        token_expiry_hours: parseInt(document.getElementById('setting-token-expiry').value, 10),
+        google_client_id: document.getElementById('setting-google-client-id').value.trim() || null,
+        allowed_ips: document.getElementById('setting-allowed-ips').value.trim() || null
+      };
+
+      try {
+        const res = await fetch('/api/v1/superadmin/settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Platform settings saved successfully to database', 'success');
+          await refreshStats();
+          await loadPlatformSettings();
+        } else {
+          showToast(data.error || 'Failed to save settings', 'error');
+        }
+      } catch (err) {
+        showToast('Network error saving settings', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save Platform Settings';
+      }
+    }
+
+    // --- MFA Management Functions ---
+    async function openMfaSetupModal() {
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-setup', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          currentMfaSetupData = await res.json();
+          document.getElementById('mfa-setup-secret').value = currentMfaSetupData.secret;
+          document.getElementById('mfa-setup-uri').value = currentMfaSetupData.otpauth_uri;
+          
+          const grid = document.getElementById('mfa-recovery-codes-grid');
+          grid.innerHTML = currentMfaSetupData.recovery_codes.map(c => `
+            <div class="recovery-code-pill">${escapeHtml(c)}</div>
+          `).join('');
+          
+          document.getElementById('mfa-activate-code').value = '';
+          openModal('mfa-setup-modal');
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Failed to initialize MFA setup', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to reach server for MFA setup', 'error');
+      }
+    }
+
+    function copyMfaSecret() {
+      const secret = document.getElementById('mfa-setup-secret').value;
+      navigator.clipboard.writeText(secret).then(() => {
+        showToast('Secret key copied to clipboard', 'info');
+      });
+    }
+
+    function copyRecoveryCodes() {
+      if (currentMfaSetupData && currentMfaSetupData.recovery_codes) {
+        const text = currentMfaSetupData.recovery_codes.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('All recovery codes copied to clipboard', 'info');
+        });
+      }
+    }
+
+    async function handleMfaActivate(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-activate-code').value.trim();
+      const btn = document.getElementById('btn-activate-mfa');
+
+      btn.disabled = true;
+      btn.textContent = 'Activating...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-activate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            secret: currentMfaSetupData.secret,
+            code: code,
+            recovery_codes: currentMfaSetupData.recovery_codes,
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('mfa-setup-modal');
+          showToast('Two-Factor Authentication successfully activated!', 'success');
+          await loadPlatformSettings();
+        } else {
+          showToast(data.error || 'Invalid 6-digit confirmation code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error activating 2FA', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirm & Activate 2FA';
+      }
+    }
+
+    function openMfaDisableModal() {
+      document.getElementById('mfa-disable-code').value = '';
+      openModal('mfa-disable-modal');
+    }
+
+    async function handleMfaDisable(e) {
+      e.preventDefault();
+      const code = document.getElementById('mfa-disable-code').value.trim();
+      const btn = document.getElementById('btn-disable-mfa');
+
+      btn.disabled = true;
+      btn.textContent = 'Disabling...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/mfa-disable', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('mfa-disable-modal');
+          showToast('Two-Factor Authentication disabled', 'warning');
+          await loadPlatformSettings();
+        } else {
+          showToast(data.error || 'Invalid confirmation code', 'error');
+        }
+      } catch (err) {
+        showToast('Network error disabling 2FA', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Disable 2FA';
+      }
+    }
+
+    // --- Audit Log Functions ---
+    async function loadAuditLogs() {
+      const tbody = document.getElementById('audit-table-body');
+      try {
+        const res = await fetch('/api/v1/superadmin/audit-logs', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          auditLogsList = await res.json();
+          renderAuditLogs(auditLogsList);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--rose); padding: 2rem;">Failed to load audit logs</td></tr>`;
+        }
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--rose); padding: 2rem;">Network error fetching audit logs</td></tr>`;
+      }
+    }
+
+    function renderAuditLogs(logs) {
+      const tbody = document.getElementById('audit-table-body');
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">No security audit log records found yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        let badgeClass = 'info';
+        if (l.action.includes('SUCCESS') || l.action.includes('ACTIVATED')) {
+          badgeClass = 'success';
+        } else if (l.action.includes('FAILED') || l.action.includes('BLOCKED') || l.action.includes('DISABLED')) {
+          badgeClass = 'danger';
+        } else if (l.action.includes('UPDATE') || l.action.includes('SETTING')) {
+          badgeClass = 'warning';
+        }
+
+        const detailsStr = typeof l.details === 'object' ? JSON.stringify(l.details) : String(l.details);
+        const ipStr = l.ip_address || 'Internal/Local';
+
+        return `
+          <tr>
+            <td style="color: var(--text-dim); font-size: 0.8rem; font-family: 'JetBrains Mono', monospace;">
+              ${new Date(l.created_at).toISOString().replace('T', ' ').substring(0, 19)}
+            </td>
+            <td>
+              <span class="audit-action-badge ${badgeClass}">${escapeHtml(l.action)}</span>
+            </td>
+            <td>
+              <div style="font-weight: 500; font-size: 0.85rem;">${escapeHtml(l.entity_type)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); font-family: monospace;">${escapeHtml(l.entity_id || '-')}</div>
+            </td>
+            <td>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); color: #cbd5e1;">${escapeHtml(ipStr)}</span>
+            </td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); max-width: 400px; overflow-wrap: break-word;">
+              ${escapeHtml(detailsStr)}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterAuditLogs(query) {
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        renderAuditLogs(auditLogsList);
+        return;
+      }
+      const filtered = auditLogsList.filter(l => 
+        l.action.toLowerCase().includes(q) ||
+        (l.ip_address && l.ip_address.toLowerCase().includes(q)) ||
+        (l.entity_type && l.entity_type.toLowerCase().includes(q)) ||
+        (l.entity_id && l.entity_id.toLowerCase().includes(q))
+      );
+      renderAuditLogs(filtered);
+    }
+
+    // --- SSL & Domain Management Functions ---
+    async function loadSslStatus() {
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('ssl-stat-domain').textContent = data.domain || 'None';
+          document.getElementById('ssl-input-domain').value = data.domain || '';
+          document.getElementById('ssl-input-email').value = data.contact_email || '';
+          document.getElementById('ssl-input-autorenew').checked = data.auto_renew;
+
+          // Status & Expiry
+          const statusElem = document.getElementById('ssl-stat-status');
+          const expirySub = document.getElementById('ssl-stat-expiry-sub');
+          if (data.status === 'active') {
+            statusElem.textContent = 'Active 🟢';
+            statusElem.style.color = 'var(--emerald)';
+            expirySub.textContent = data.days_remaining != null ? `Valid for ${data.days_remaining} more days` : 'Active X.509';
+          } else if (data.status === 'expired') {
+            statusElem.textContent = 'Expired 🔴';
+            statusElem.style.color = 'var(--rose)';
+            expirySub.textContent = 'Renewal required immediately';
+          } else {
+            statusElem.textContent = 'Not Configured ⚪';
+            statusElem.style.color = 'var(--text-dim)';
+            expirySub.textContent = 'Point DNS to provision SSL';
+          }
+
+          document.getElementById('ssl-stat-autorenew').textContent = data.auto_renew ? 'Active 🟢' : 'Disabled ⚪';
+          document.getElementById('cert-issuer').textContent = data.issuer || 'Not Issued';
+          document.getElementById('cert-from').textContent = data.valid_from ? new Date(data.valid_from).toLocaleString() : '-';
+          document.getElementById('cert-until').textContent = data.valid_until ? new Date(data.valid_until).toLocaleString() : '-';
+          document.getElementById('cert-days').textContent = data.days_remaining != null ? `${data.days_remaining} Days` : '-';
+          document.getElementById('cert-log').textContent = data.last_renewal_log || 'No renewal events recorded yet.';
+
+          // DNS preflight
+          const dnsBox = document.getElementById('dns-preflight-box');
+          if (data.domain) {
+            dnsBox.style.display = 'block';
+            if (data.dns_check.resolves) {
+              dnsBox.style.background = 'rgba(16, 185, 129, 0.1)';
+              dnsBox.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+              dnsBox.style.color = '#34d399';
+              dnsBox.innerHTML = `✅ ${escapeHtml(data.dns_check.message)}`;
+            } else {
+              dnsBox.style.background = 'rgba(244, 63, 94, 0.1)';
+              dnsBox.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+              dnsBox.style.color = '#fb7185';
+              dnsBox.innerHTML = `⚠️ ${escapeHtml(data.dns_check.message)}`;
+            }
+          } else {
+            dnsBox.style.display = 'none';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load SSL status:', err);
+      }
+    }
+
+    async function handleTestDns() {
+      const domain = document.getElementById('ssl-input-domain').value.trim();
+      if (!domain) {
+        showToast('Please enter a domain name to test DNS', 'error');
+        return;
+      }
+      const btn = document.getElementById('btn-test-dns');
+      btn.disabled = true;
+      btn.textContent = 'Testing DNS...';
+
+      try {
+        await loadSslStatus();
+        showToast('DNS preflight verification completed', 'info');
+      } catch (err) {
+        showToast('DNS test request failed', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Test DNS Preflight';
+      }
+    }
+
+    async function handleConfigureDomain(e) {
+      e.preventDefault();
+      const domain = document.getElementById('ssl-input-domain').value.trim();
+      const contact_email = document.getElementById('ssl-input-email').value.trim();
+      const auto_renew = document.getElementById('ssl-input-autorenew').checked;
+      const btn = document.getElementById('btn-save-domain');
+
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/configure-domain', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ domain, contact_email, auto_renew })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Domain configuration saved successfully', 'success');
+          await loadSslStatus();
+          await loadProxyConfig();
+        } else {
+          showToast(data.error || 'Failed to configure domain', 'error');
+        }
+      } catch (err) {
+        showToast('Network error configuring domain', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save Domain Settings';
+      }
+    }
+
+    async function handleProvisionSsl() {
+      const btn = document.getElementById('btn-provision-ssl');
+      btn.disabled = true;
+      btn.textContent = 'Provisioning SSL...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/provision', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          await loadSslStatus();
+        } else {
+          showToast(data.error || 'SSL provisioning failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during SSL provisioning', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Provision Let\'s Encrypt SSL';
+      }
+    }
+
+    async function handleRenewSsl() {
+      const btn = document.getElementById('btn-force-renew');
+      btn.disabled = true;
+      btn.textContent = 'Renewing Certificate...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/renew', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          await loadSslStatus();
+        } else {
+          showToast(data.error || 'SSL renewal failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during renewal', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Force Renew SSL Now';
+      }
+    }
+
+    async function loadProxyConfig() {
+      try {
+        const res = await fetch('/api/v1/superadmin/ssl/proxy-config', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          proxyConfigData = await res.json();
+          showProxyTab(currentProxyTab);
+        }
+      } catch (err) {
+        console.error('Failed to load proxy config:', err);
+      }
+    }
+
+    function showProxyTab(tab) {
+      currentProxyTab = tab;
+      ['caddy', 'nginx', 'docker'].forEach(t => {
+        const b = document.getElementById(`tab-btn-${t}`);
+        if (b) b.classList.toggle('active', t === tab);
+      });
+      const codeBlock = document.getElementById('proxy-code-block');
+      if (!proxyConfigData || !codeBlock) return;
+      if (tab === 'caddy') codeBlock.textContent = proxyConfigData.caddyfile;
+      else if (tab === 'nginx') codeBlock.textContent = proxyConfigData.nginx_conf;
+      else if (tab === 'docker') codeBlock.textContent = proxyConfigData.docker_compose;
+    }
+
+    function copyProxySnippet() {
+      const codeBlock = document.getElementById('proxy-code-block');
+      if (codeBlock && codeBlock.textContent) {
+        navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+          showToast('Reverse proxy configuration copied to clipboard', 'info');
+        });
+      }
+    }
+
+    // --- Miracle Tools Functions ---
+    async function loadMiraclesStatus() {
+      try {
+        // 1. Maintenance & Lockdown
+        const resMaint = await fetch('/api/v1/superadmin/system/maintenance', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (resMaint.ok) {
+          const m = await resMaint.json();
+          const maintBadge = document.getElementById('miracle-maint-badge');
+          const btnMaint = document.getElementById('btn-toggle-maint');
+          if (m.maintenance_mode) {
+            maintBadge.className = 'status-badge-active';
+            maintBadge.style.color = 'var(--rose)';
+            maintBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+            maintBadge.textContent = 'Active (503 Enforced)';
+            btnMaint.textContent = '✅ Deactivate Maintenance Mode';
+            btnMaint.className = 'btn-secondary';
+          } else {
+            maintBadge.className = 'status-badge-inactive';
+            maintBadge.style.color = 'var(--emerald)';
+            maintBadge.style.background = 'var(--emerald-glow)';
+            maintBadge.textContent = 'Normal Service';
+            btnMaint.textContent = '🚨 Enable Maintenance Mode';
+            btnMaint.className = 'btn-action';
+          }
+          document.getElementById('maint-msg-input').value = m.maintenance_message || '';
+
+          const lockBadge = document.getElementById('miracle-lock-badge');
+          const btnLock = document.getElementById('btn-toggle-lockdown');
+          if (m.emergency_lockdown) {
+            lockBadge.className = 'status-badge-active';
+            lockBadge.style.color = 'var(--rose)';
+            lockBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+            lockBadge.textContent = 'FROZEN (Writes Blocked)';
+            btnLock.textContent = '🔓 Release Mutation Freeze';
+          } else {
+            lockBadge.className = 'status-badge-inactive';
+            lockBadge.textContent = 'Disabled (Writes Allowed)';
+            btnLock.textContent = '🔒 Freeze Mutations';
+          }
+        }
+
+        // 2. Global Announcement
+        const resAnn = await fetch('/api/v1/superadmin/system/announcement', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (resAnn.ok) {
+          const a = await resAnn.json();
+          document.getElementById('announcement-input').value = a.announcement || '';
+        }
+      } catch (err) {
+        console.error('Failed to load miracles status:', err);
+      }
+    }
+
+    async function handleSetMaintenance() {
+      const msg = document.getElementById('maint-msg-input').value.trim();
+      const currentText = document.getElementById('miracle-maint-badge').textContent;
+      const willEnable = !currentText.includes('Active');
+
+      try {
+        const res = await fetch('/api/v1/superadmin/system/maintenance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ enabled: willEnable, message: msg || null })
+        });
+        if (res.ok) {
+          showToast(willEnable ? 'Platform Maintenance Mode activated (HTTP 503)' : 'Platform returned to normal service', 'success');
+          await loadMiraclesStatus();
+        }
+      } catch (err) {
+        showToast('Error toggling maintenance mode', 'error');
+      }
+    }
+
+    async function handleToggleLockdown() {
+      const currentText = document.getElementById('miracle-lock-badge').textContent;
+      const willEnable = !currentText.includes('FROZEN');
+
+      try {
+        const res = await fetch('/api/v1/superadmin/system/emergency-lockdown', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ enabled: willEnable })
+        });
+        if (res.ok) {
+          showToast(willEnable ? 'Emergency Mutation Lockdown active (All writes frozen)' : 'Mutation lockdown lifted', 'warning');
+          await loadMiraclesStatus();
+        }
+      } catch (err) {
+        showToast('Error toggling mutation lockdown', 'error');
+      }
+    }
+
+    function handleDownloadBackup() {
+      showToast('Generating consistent database snapshot...', 'info');
+      fetch('/api/v1/superadmin/database/backup', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+      .then(resp => {
+        if (!resp.ok) throw new Error('Backup failed');
+        return resp.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `obaf_platform_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('Platform database backup downloaded successfully', 'success');
+      })
+      .catch(err => {
+        showToast('Failed to download database backup', 'error');
+      });
+    }
+
+    async function handleOptimizeDb() {
+      const btn = document.getElementById('btn-optimize-db');
+      const box = document.getElementById('optimize-result-box');
+      btn.disabled = true;
+      btn.textContent = 'Optimizing Database...';
+
+      try {
+        const res = await fetch('/api/v1/superadmin/database/optimize', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          box.style.display = 'block';
+          box.style.color = '#34d399';
+          box.textContent = `✅ [${data.database_backend}] ${data.message} (${data.duration_ms}ms) - Integrity: ${data.integrity_status}`;
+          showToast('Database optimization and integrity check passed', 'success');
+        } else {
+          showToast('Database optimization failed', 'error');
+        }
+      } catch (err) {
+        showToast('Network error during optimization', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Optimize Database & Query Planner';
+      }
+    }
+
+    async function handleFlushCache() {
+      const btn = document.getElementById('btn-flush-cache');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/v1/superadmin/system/flush-cache', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          showToast('In-memory TTL cache and rate limiters purged successfully', 'success');
+        } else {
+          showToast('Failed to flush cache', 'error');
+        }
+      } catch (err) {
+        showToast('Network error flushing cache', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleSaveAnnouncement() {
+      const text = document.getElementById('announcement-input').value.trim();
+      try {
+        const res = await fetch('/api/v1/superadmin/system/announcement', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ announcement: text || null })
+        });
+        if (res.ok) {
+          showToast('Global announcement broadcast updated', 'success');
+        } else {
+          showToast('Failed to update announcement', 'error');
+        }
+      } catch (err) {
+        showToast('Network error updating announcement', 'error');
+      }
+    }
+
+    async function handleClearAnnouncement() {
+      document.getElementById('announcement-input').value = '';
+      await handleSaveAnnouncement();
+    }
+
+    // --- Tenant Impersonation (Magic Login) ---
+    async function magicImpersonateOrg(orgId) {
+      const org = (organizationsList || []).find(o => o.id === orgId);
+      const orgName = org ? org.name : 'Organization';
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}/impersonate`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentImpersonateToken = data.token;
+          document.getElementById('impersonate-org-name').textContent = orgName;
+          document.getElementById('impersonate-token-input').value = data.token;
+          document.getElementById('impersonate-curl-snippet').textContent = 
+`curl -H "Authorization: Bearer ${data.token}" \\
+  http://localhost:8992/api/v1/catalog/products`;
+          openModal('impersonate-modal');
+          showToast(`Impersonating ${orgName} (Token valid for 15 mins)`, 'success');
+        } else {
+          showToast(data.error || 'Failed to impersonate tenant', 'error');
+        }
+      } catch (err) {
+        showToast('Network error initiating magic login', 'error');
+      }
+    }
+
+    function copyImpersonateToken() {
+      if (currentImpersonateToken) {
+        navigator.clipboard.writeText(currentImpersonateToken).then(() => {
+          showToast('Tenant Administrator JWT token copied to clipboard', 'info');
+        });
+      }
+    }
+
+    function renderOrganizationsTable(orgs) {
+      const tbody = document.getElementById('orgs-table-body');
+      if (orgs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2.5rem;">
+              No organizations found. Click "+ Create Organization" above to provision your first tenant.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = orgs.map(org => {
+        const modules = org.active_modules || [];
+        const badgesHtml = modules.slice(0, 5).map(m => `
+          <span class="module-badge">${escapeHtml(m)}</span>
+        `).join('') + (modules.length > 5 ? `<span class="module-badge more">+${modules.length - 5} more</span>` : '');
+
+        return `
+          <tr>
+            <td>
+              <div class="org-title">${escapeHtml(org.name)}</div>
+              <div class="org-slug">${escapeHtml(org.slug)} • <span style="color: var(--text-dim);">${org.id}</span></div>
+            </td>
+            <td>
+              <span class="preset-pill">${escapeHtml(org.preset)}</span>
+            </td>
+            <td class="modules-cell">
+              <div class="module-badges">${badgesHtml || '<span style="color: var(--rose);">None Enabled</span>'}</div>
+            </td>
+            <td>
+              <div style="font-size: 0.8rem; font-family: monospace;">
+                📦 ${org.products_count} prod | 🧾 ${org.orders_count} ord | 👥 ${org.users_count} users
+              </div>
+            </td>
+            <td style="color: var(--text-dim); font-size: 0.8rem;">
+              ${new Date(org.created_at).toLocaleDateString()}
+            </td>
+            <td>
+              <div class="table-actions">
+                <button class="btn-icon" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4);" onclick="magicImpersonateOrg('${org.id}')">
+                  ✨ Magic Login
+                </button>
+                <button class="btn-icon btn-manage-api" onclick="openManageApisModal('${org.id}')">
+                  ⚙️ Select APIs
+                </button>
+                <button class="btn-icon btn-danger" onclick="deleteOrganization('${org.id}')">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterOrganizations() {
+      const query = document.getElementById('org-search-input').value.toLowerCase().trim();
+      if (!query) {
+        renderOrganizationsTable(organizationsList);
+        return;
+      }
+      const filtered = organizationsList.filter(o => 
+        o.name.toLowerCase().includes(query) || o.slug.toLowerCase().includes(query)
+      );
+      renderOrganizationsTable(filtered);
+    }
+
+    function autoSlugify(name) {
+      const slugInput = document.getElementById('new-org-slug');
+      slugInput.value = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function onPresetChange(preset) {
+      // Auto-tune default modules based on preset selection
+      let selected = ["catalog", "orders", "billing"];
+      if (preset === 'restaurant_pos') {
+        selected = ["catalog", "orders", "pos", "billing", "customers"];
+      } else if (preset === 'pharmacy') {
+        selected = ["catalog", "inventory", "procurement", "billing", "suppliers"];
+      } else if (preset === 'clinic_opd') {
+        selected = ["bookings", "customers", "billing", "reports"];
+      } else if (preset === 'coworking_space') {
+        selected = ["bookings", "subscriptions", "billing", "customers"];
+      } else if (preset === 'gym_fitness') {
+        selected = ["subscriptions", "bookings", "customers", "billing"];
+      }
+      const checkboxes = document.querySelectorAll('input[name="create-module"]');
+      checkboxes.forEach(cb => {
+        const check = selected.includes(cb.value);
+        cb.checked = check;
+        onModuleCheckboxChange('create', cb.value, check);
+      });
+    }
+
+    function openCreateOrgModal() {
+      document.getElementById('create-org-form').reset();
+      toggleAllModules('create', false);
+      // default modules
+      ["catalog", "inventory", "orders", "billing", "customers", "payments"].forEach(id => {
+        const cb = document.querySelector(`input[name="create-module"][value="${id}"]`);
+        if (cb) {
+          cb.checked = true;
+          onModuleCheckboxChange('create', id, true);
+        }
+      });
+      document.getElementById('create-org-modal').classList.add('open');
+    }
+
+    async function handleCreateOrganization(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-org-name').value;
+      const slug = document.getElementById('new-org-slug').value;
+      const preset = document.getElementById('new-org-preset').value;
+      const adminName = document.getElementById('new-org-admin-name').value;
+      const adminEmail = document.getElementById('new-org-admin-email').value;
+      const adminPassword = document.getElementById('new-org-admin-password').value;
+      if (!adminPassword || adminPassword.length < 8) {
+        showToast('Admin password is required and must be at least 8 characters', 'error');
+        return;
+      }
+
+      const selectedModules = Array.from(document.querySelectorAll('input[name="create-module"]:checked'))
+        .map(cb => cb.value);
+
+      try {
+        const res = await fetch('/api/v1/superadmin/organizations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            name,
+            slug,
+            preset,
+            active_modules: selectedModules,
+            admin_name: adminName,
+            admin_email: adminEmail,
+            admin_password: adminPassword,
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('create-org-modal');
+          showToast(`Organization "${name}" provisioned successfully`, 'success');
+          await refreshOrganizations();
+          await refreshStats();
+        } else {
+          showToast(data.error || 'Failed to create organization', 'error');
+        }
+      } catch (err) {
+        showToast('Network error creating organization', 'error');
+      }
+    }
+
+    function openManageApisModal(orgId) {
+      const org = organizationsList.find(o => o.id === orgId);
+      if (!org) return;
+
+      document.getElementById('manage-apis-org-id').value = org.id;
+      document.getElementById('manage-apis-org-subtitle').textContent = `Organization: ${org.name} (${org.slug})`;
+
+      const active = org.active_modules || [];
+      const checkboxes = document.querySelectorAll('input[name="manage-module"]');
+      checkboxes.forEach(cb => {
+        const check = active.includes(cb.value) || active.includes('*');
+        cb.checked = check;
+        onModuleCheckboxChange('manage', cb.value, check);
+      });
+
+      document.getElementById('manage-apis-modal').classList.add('open');
+    }
+
+    async function handleSaveSupportedApis(e) {
+      e.preventDefault();
+      const orgId = document.getElementById('manage-apis-org-id').value;
+      const selectedModules = Array.from(document.querySelectorAll('input[name="manage-module"]:checked'))
+        .map(cb => cb.value);
+
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            active_modules: selectedModules
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          closeModal('manage-apis-modal');
+          showToast(`Supported APIs updated for ${data.name}! Gating is active.`, 'success');
+          await refreshOrganizations();
+        } else {
+          showToast(data.error || 'Failed to update supported APIs', 'error');
+        }
+      } catch (err) {
+        showToast('Network error updating APIs', 'error');
+      }
+    }
+
+    async function deleteOrganization(orgId) {
+      const org = (organizationsList || []).find(o => o.id === orgId);
+      const orgName = org ? org.name : 'Organization';
+      if (!confirm(`Are you sure you want to permanently delete organization "${orgName}"? This will remove all its users and data.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/v1/superadmin/organizations/${orgId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (res.ok) {
+          showToast(`Organization "${orgName}" deleted`, 'success');
+          await refreshOrganizations();
+          await refreshStats();
+        } else {
+          const data = await res.json();
+          showToast(data.error || 'Failed to delete organization', 'error');
+        }
+      } catch (err) {
+        showToast('Network error deleting organization', 'error');
+      }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+      toast.innerHTML = `<span>${icon}</span> <span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

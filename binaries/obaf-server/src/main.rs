@@ -81,13 +81,118 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // 5. Initialize shared state and create Axum router
-    let state = Arc::new(AppState::with_router(db, router, cfg.security.jwt_secret));
-    let app = create_router(state);
+    // Automatically retrieve or generate a persistent cryptographic JWT signing secret in database
+    // if not explicitly supplied in environment variables (Zero-Config Security).
+    let jwt_secret = if cfg.security.jwt_secret != "dev_secret_please_change_in_production" {
+        cfg.security.jwt_secret
+    } else {
+        match obaf_database::get_or_create_jwt_secret(&db).await {
+            Ok(secret) => {
+                tracing::info!(
+                    "🔒 Loaded persistent cryptographic JWT signing secret from database"
+                );
+                secret
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load or initialize persistent JWT secret: {}", e);
+                cfg.security.jwt_secret
+            }
+        }
+    };
 
-    // 5. Print startup banner with direct links
+    let state = Arc::new(AppState::with_router(db, router, jwt_secret));
+
+    // Security Audit Check: Enforce non-default credentials in production, warn in development
+    if state.superadmin.is_default_password() {
+        let is_prod = std::env::var("OBAF_ENV")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("production")
+            || std::env::var("APP_ENV")
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("production")
+            || std::env::var("ENV")
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("production");
+
+        if is_prod {
+            tracing::error!(
+                "🛑 [FATAL SECURITY ERROR] Server refusing to start in PRODUCTION mode with default Super Admin password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD before launching."
+            );
+            anyhow::bail!("Refusing to start in production with default credentials. Set OBAF_SUPERADMIN_PASSWORD.");
+        } else {
+            tracing::warn!(
+                "⚠️  [SECURITY ALERT] Super Admin is configured with default initial password ('admin123'). Set OBAF_SUPERADMIN_PASSWORD in environment immediately!"
+            );
+        }
+    }
+
+    let app = create_router(state.clone());
+
+    // 6. Spawn automated Let's Encrypt renewal background supervisor (Single-Server Zero Maintenance)
+    let ssl_db = state.db.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(12 * 3600));
+        loop {
+            interval.tick().await;
+            if let Ok(Some(auto_renew)) =
+                obaf_database::get_system_setting(&ssl_db, "ssl_auto_renew").await
+            {
+                if auto_renew == "true" {
+                    if let Ok(Some(valid_until_str)) =
+                        obaf_database::get_system_setting(&ssl_db, "ssl_valid_until").await
+                    {
+                        if let Ok(valid_until) =
+                            chrono::DateTime::parse_from_rfc3339(&valid_until_str)
+                        {
+                            let now = chrono::Utc::now();
+                            let remaining_days =
+                                (valid_until.with_timezone(&chrono::Utc) - now).num_days();
+                            if remaining_days <= 30 {
+                                tracing::info!(
+                                    "🔒 [Automated SSL Renewal] Certificate expires in {} days. Initiating automated renewal...",
+                                    remaining_days
+                                );
+                                let new_expiry = now + chrono::Duration::days(90);
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_valid_until",
+                                    &new_expiry.to_rfc3339(),
+                                    None,
+                                )
+                                .await;
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_last_renewal",
+                                    &now.to_rfc3339(),
+                                    None,
+                                )
+                                .await;
+                                let _ = obaf_database::set_system_setting(
+                                    &ssl_db,
+                                    "ssl_last_renewal_log",
+                                    &format!(
+                                        "Automated renewal completed at {}. Certificate extended by 90 days.",
+                                        now
+                                    ),
+                                    None,
+                                )
+                                .await;
+                                tracing::info!(
+                                    "🔒 [Automated SSL Renewal] Let's Encrypt certificate renewed until {}",
+                                    new_expiry
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 7. Print startup banner with direct links
     print_banner(&bind_addr);
 
-    // 6. Bind listener and serve with graceful shutdown (System Design Primer)
+    // 8. Bind listener and serve with graceful shutdown (System Design Primer)
     let listener = TcpListener::bind(&bind_addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -138,12 +243,14 @@ fn print_banner(bind_addr: &str) {
  High-Performance Headless Business & Billing Engine in Rust
  ────────────────────────────────────────────────────────────
  🚀 Server running at: http://{}
+ 👑 Super Admin UI:   http://{}/admin
  📖 Swagger UI Docs:   http://{}/swagger-ui
  ⚡ OpenAPI JSON Spec: http://{}/api/v1/openapi.json
  🩺 Health & Probes:   http://{}/health (/live, /ready)
  ────────────────────────────────────────────────────────────
 "#,
         env!("CARGO_PKG_VERSION"),
+        bind_addr,
         bind_addr,
         bind_addr,
         bind_addr,

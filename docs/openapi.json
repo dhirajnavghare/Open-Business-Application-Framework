@@ -3,6 +3,10 @@
   "info": {
     "title": "Open Business Application Framework (OBAF) API",
     "description": "High-performance headless business operations, billing, and workflow engine in Rust.",
+    "contact": {
+      "name": "Dhiraj Navghare",
+      "email": "dhirajnavghare@gmail.com"
+    },
     "license": {
       "name": "Apache-2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0"
@@ -167,8 +171,33 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: admin role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -248,6 +277,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: cross-tenant access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Tenant not found",
             "content": {
@@ -258,7 +307,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
       }
     },
     "/api/v1/auth/api-keys": {
@@ -423,6 +477,34 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Logged out successfully; session token revoked"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
       }
     },
     "/api/v1/auth/me": {
@@ -2269,6 +2351,32 @@
                 "null"
               ]
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64",
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -3980,6 +4088,1378 @@
         ]
       }
     },
+    "/api/v1/superadmin/audit-logs": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "operationId": "list_audit_logs",
+        "responses": {
+          "200": {
+            "description": "Recent platform security audit logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditLogEntryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: superadmin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/config": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Retrieve public Super Admin UI configuration (Google Client ID, auth status).",
+        "operationId": "get_superadmin_config",
+        "responses": {
+          "200": {
+            "description": "Superadmin configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/database/backup": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "💾 Miracle 4: Instant 1-Click Database Snapshot Backup\nGenerates and streams an instantaneous JSON export of the entire platform state.",
+        "operationId": "download_database_backup",
+        "responses": {
+          "200": {
+            "description": "Platform database JSON snapshot backup",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: requires superadmin role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/database/optimize": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "⚡ Miracle 5: Database Maintenance, Vacuum & Optimizer",
+        "operationId": "optimize_database",
+        "responses": {
+          "200": {
+            "description": "Optimization completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseOptimizeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/google-login": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Login as Platform Super Admin using Google SSO (Google Identity Services ID Token).",
+        "operationId": "superadmin_google_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminGoogleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Google login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Google ID token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "IP not allowed or unauthorized Google account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/login": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Login as Platform Super Admin using configured email and password.",
+        "operationId": "superadmin_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Superadmin login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid superadmin credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "IP not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed attempts (locked out)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/logout": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Revoke current Super Administrator session token and log out.",
+        "operationId": "superadmin_logout",
+        "responses": {
+          "200": {
+            "description": "Logged out successfully; session token revoked"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: requires superadmin role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/me": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Retrieve currently authenticated Super Admin user profile.",
+        "operationId": "get_superadmin_me",
+        "responses": {
+          "200": {
+            "description": "Current superadmin profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminUserInfo"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: requires superadmin role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/mfa-activate": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Activate 2FA TOTP by confirming the 6-digit code.",
+        "operationId": "superadmin_mfa_activate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminMfaActivateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MFA activated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid confirmation code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/mfa-disable": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Disable 2FA TOTP after confirming the current 6-digit code.",
+        "operationId": "superadmin_mfa_disable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminMfaDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MFA disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/mfa-setup": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Generate new 2FA TOTP setup parameters (secret, QR URI, recovery codes).",
+        "operationId": "superadmin_mfa_setup",
+        "responses": {
+          "200": {
+            "description": "MFA setup parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminMfaSetupResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: superadmin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/mfa-verify": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Verify 2FA TOTP code or emergency recovery code.",
+        "operationId": "superadmin_mfa_verify",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuperAdminMfaVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MFA verification successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuperAdminLoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid MFA code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "IP not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/modules": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Retrieve the full catalog of supported API modules.",
+        "operationId": "list_supported_modules",
+        "responses": {
+          "200": {
+            "description": "List of all supported modules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleCatalogItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/organizations": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "List all organizations with usage statistics and active modules.",
+        "operationId": "list_organizations",
+        "responses": {
+          "200": {
+            "description": "List of all organizations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Create a new organization with custom supported API modules and initial admin user.",
+        "operationId": "create_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Organization created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Slug or admin email already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/organizations/:id": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Retrieve specific organization details including users and active modules.",
+        "operationId": "get_organization",
+        "responses": {
+          "200": {
+            "description": "Organization detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Update an organization's configuration and dynamically toggle its supported API modules.",
+        "operationId": "update_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Organization updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Delete an organization and its associated records.",
+        "operationId": "delete_organization",
+        "responses": {
+          "204": {
+            "description": "Organization deleted successfully"
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/organizations/{id}/impersonate": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "✨ Miracle 1: Magic Tenant Impersonation (God Mode)\nAllows Platform Super Administrator to impersonate any tenant organization\nwith a short-lived (15 minutes) high-privilege token for instant customer support.",
+        "operationId": "impersonate_tenant_admin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Impersonation token generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/settings": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "operationId": "get_platform_settings",
+        "responses": {
+          "200": {
+            "description": "Current platform settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: superadmin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "operationId": "update_platform_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlatformSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated platform settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid settings data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: superadmin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/ssl": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Query current domain and Let's Encrypt SSL status",
+        "operationId": "get_ssl_status",
+        "responses": {
+          "200": {
+            "description": "Current SSL certificate status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SslStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: superadmin required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/ssl/configure-domain": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Configure custom domain pointing to platform IP",
+        "operationId": "configure_domain",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureDomainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Domain configuration saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SslStatusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid domain format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/ssl/provision": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Provision or issue Let's Encrypt SSL certificate for configured domain",
+        "operationId": "provision_ssl",
+        "responses": {
+          "200": {
+            "description": "SSL certificate provisioned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SslActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Domain not configured or DNS failing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/ssl/proxy-config": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Generates ready-to-run zero-downtime reverse proxy configurations (Caddy, Nginx, Docker)",
+        "operationId": "get_proxy_config",
+        "responses": {
+          "200": {
+            "description": "Production reverse proxy snippets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/ssl/renew": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Renew the existing Let's Encrypt SSL certificate",
+        "operationId": "renew_ssl",
+        "responses": {
+          "200": {
+            "description": "SSL certificate renewed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SslActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Domain not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/stats": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Retrieve platform-wide system and operational statistics for the Super Admin.",
+        "operationId": "get_platform_stats",
+        "responses": {
+          "200": {
+            "description": "Platform statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/superadmin/system/announcement": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "📢 Miracle 7: Global Platform Announcement Broadcast",
+        "operationId": "get_global_announcement",
+        "responses": {
+          "200": {
+            "description": "Current announcement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "operationId": "set_global_announcement",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAnnouncementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Announcement updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/system/emergency-lockdown": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "🚨 Miracle 3: Emergency Global Mutation Lockdown\nInstantly freezes all POST/PUT/DELETE mutations across all tenant APIs in case of an ongoing incident.",
+        "operationId": "set_emergency_lockdown",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmergencyLockdownRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Emergency lockdown toggled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/system/flush-cache": {
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "🧹 Miracle 6: Flush Memory Cache & Rate Limiter Buckets",
+        "operationId": "flush_system_cache",
+        "responses": {
+          "200": {
+            "description": "Cache flushed",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/superadmin/system/maintenance": {
+      "get": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "Query current global platform maintenance and lockdown status",
+        "operationId": "get_maintenance_status",
+        "responses": {
+          "200": {
+            "description": "Current maintenance status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "SuperAdmin"
+        ],
+        "summary": "🚨 Miracle 2: Toggle Global Platform Maintenance Mode\nWhen enabled, all tenant API endpoints return 503 Service Unavailable,\nwhile Super Admin console remains operational.",
+        "operationId": "set_maintenance_mode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Maintenance mode toggled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
     "/api/v1/suppliers": {
       "get": {
         "tags": [
@@ -4427,6 +5907,16 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid webhook URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -4740,6 +6230,17 @@
   },
   "components": {
     "schemas": {
+      "AnnouncementResponse": {
+        "type": "object",
+        "properties": {
+          "announcement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "ApiErrorResponse": {
         "type": "object",
         "required": [
@@ -4815,6 +6316,45 @@
           },
           "subtotal": {
             "type": "string"
+          }
+        }
+      },
+      "AuditLogEntryResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "entity_type",
+          "details",
+          "created_at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "details": {},
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -5020,6 +6560,28 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ConfigureDomainRequest": {
+        "type": "object",
+        "description": "Request to configure custom domain for Let's Encrypt SSL",
+        "required": [
+          "domain",
+          "contact_email"
+        ],
+        "properties": {
+          "auto_renew": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "contact_email": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
           }
         }
       },
@@ -5393,6 +6955,52 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "CreateOrganizationRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "slug",
+          "admin_name",
+          "admin_email"
+        ],
+        "properties": {
+          "active_modules": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit list of enabled API module IDs for this organization.\nIf omitted, defaults based on preset or standard core modules."
+          },
+          "admin_email": {
+            "type": "string"
+          },
+          "admin_name": {
+            "type": "string"
+          },
+          "admin_password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "preset": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settings": {},
+          "slug": {
+            "type": "string"
           }
         }
       },
@@ -5835,6 +7443,77 @@
           }
         }
       },
+      "DatabaseOptimizeResponse": {
+        "type": "object",
+        "description": "Response after running database optimization & integrity diagnostics",
+        "required": [
+          "success",
+          "database_backend",
+          "duration_ms",
+          "message",
+          "integrity_status"
+        ],
+        "properties": {
+          "database_backend": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "integrity_status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DnsCheckResult": {
+        "type": "object",
+        "description": "DNS resolution status result for a domain name",
+        "required": [
+          "resolves",
+          "resolved_ips",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "resolved_ips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resolves": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmergencyLockdownRequest": {
+        "type": "object",
+        "description": "Request to toggle emergency global mutation lockdown",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "EngineInfoResponse": {
         "type": "object",
         "required": [
@@ -5904,6 +7583,28 @@
             }
           },
           "primary_key": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorMessage": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
             "type": "string"
           }
         }
@@ -6001,6 +7702,37 @@
             "type": "string"
           },
           "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ImpersonateResponse": {
+        "type": "object",
+        "description": "Response when Super Admin impersonates a tenant organization",
+        "required": [
+          "token",
+          "tenant_id",
+          "organization_name",
+          "role",
+          "expires_in_seconds"
+        ],
+        "properties": {
+          "expires_in_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "organization_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
             "type": "string"
           }
         }
@@ -6118,6 +7850,78 @@
           "user_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "MaintenanceModeRequest": {
+        "type": "object",
+        "description": "Request to toggle global maintenance mode",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MaintenanceStatusResponse": {
+        "type": "object",
+        "description": "Status of platform maintenance mode and emergency locks",
+        "required": [
+          "maintenance_mode",
+          "maintenance_message",
+          "emergency_lockdown"
+        ],
+        "properties": {
+          "emergency_lockdown": {
+            "type": "boolean"
+          },
+          "lockdown_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maintenance_message": {
+            "type": "string"
+          },
+          "maintenance_mode": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ModuleCatalogItem": {
+        "type": "object",
+        "description": "Catalog descriptor for an individual OBAF API module",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "default_enabled"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "default_enabled": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -6274,6 +8078,85 @@
           }
         }
       },
+      "OrganizationDetail": {
+        "type": "object",
+        "required": [
+          "organization",
+          "users"
+        ],
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationSummary"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            }
+          }
+        }
+      },
+      "OrganizationSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "preset",
+          "active_modules",
+          "settings",
+          "created_at",
+          "updated_at",
+          "products_count",
+          "orders_count",
+          "users_count"
+        ],
+        "properties": {
+          "active_modules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "orders_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "preset": {
+            "type": "string"
+          },
+          "products_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "settings": {},
+          "slug": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "users_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "PaymentMethodSummary": {
         "type": "object",
         "required": [
@@ -6345,6 +8228,109 @@
           "tenant_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "PlatformSettingsResponse": {
+        "type": "object",
+        "required": [
+          "platform_name",
+          "default_currency",
+          "token_expiry_hours",
+          "google_sso_active",
+          "database_type",
+          "server_version",
+          "superadmin_email",
+          "allowed_ips",
+          "mfa_enabled"
+        ],
+        "properties": {
+          "allowed_ips": {
+            "type": "string"
+          },
+          "database_type": {
+            "type": "string"
+          },
+          "default_currency": {
+            "type": "string"
+          },
+          "google_client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "google_sso_active": {
+            "type": "boolean"
+          },
+          "mfa_enabled": {
+            "type": "boolean"
+          },
+          "platform_name": {
+            "type": "string"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "superadmin_email": {
+            "type": "string"
+          },
+          "token_expiry_hours": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "PlatformStatsResponse": {
+        "type": "object",
+        "required": [
+          "total_organizations",
+          "total_products",
+          "total_orders",
+          "total_users",
+          "database_backend",
+          "server_version",
+          "superadmin_email",
+          "google_auth_enabled",
+          "supported_modules_count"
+        ],
+        "properties": {
+          "database_backend": {
+            "type": "string"
+          },
+          "google_auth_enabled": {
+            "type": "boolean"
+          },
+          "server_version": {
+            "type": "string"
+          },
+          "superadmin_email": {
+            "type": "string"
+          },
+          "supported_modules_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_orders": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total_organizations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total_products": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "total_users": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },
@@ -6553,6 +8539,15 @@
           "admin_name"
         ],
         "properties": {
+          "active_modules": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
           "admin_email": {
             "type": "string"
           },
@@ -6625,6 +8620,30 @@
           "tenant_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "ProxyConfigResponse": {
+        "type": "object",
+        "description": "Reverse proxy production configuration snippets for edge SSL termination",
+        "required": [
+          "domain",
+          "caddyfile",
+          "nginx_conf",
+          "docker_compose"
+        ],
+        "properties": {
+          "caddyfile": {
+            "type": "string"
+          },
+          "docker_compose": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "nginx_conf": {
+            "type": "string"
           }
         }
       },
@@ -7220,6 +9239,18 @@
           }
         }
       },
+      "SetAnnouncementRequest": {
+        "type": "object",
+        "description": "Request to set platform-wide announcement banner",
+        "properties": {
+          "announcement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "SetExchangeRateRequest": {
         "type": "object",
         "required": [
@@ -7291,6 +9322,104 @@
           },
           "share_amount": {
             "type": "string"
+          }
+        }
+      },
+      "SslActionResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "domain"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SslStatusResponse": {
+        "type": "object",
+        "description": "Comprehensive SSL/TLS certificate status response",
+        "required": [
+          "auto_renew",
+          "status",
+          "dns_check"
+        ],
+        "properties": {
+          "auto_renew": {
+            "type": "boolean"
+          },
+          "contact_email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "days_remaining": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "dns_check": {
+            "$ref": "#/components/schemas/DnsCheckResult"
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_renewal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_renewal_log": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "valid_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -7444,6 +9573,185 @@
             "type": "string"
           },
           "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SuperAdminConfigResponse": {
+        "type": "object",
+        "required": [
+          "google_auth_enabled",
+          "superadmin_email",
+          "mfa_enabled",
+          "default_password_warning"
+        ],
+        "properties": {
+          "default_password_warning": {
+            "type": "boolean"
+          },
+          "google_auth_enabled": {
+            "type": "boolean"
+          },
+          "google_client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mfa_enabled": {
+            "type": "boolean"
+          },
+          "superadmin_email": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminGoogleLoginRequest": {
+        "type": "object",
+        "required": [
+          "credential"
+        ],
+        "properties": {
+          "credential": {
+            "type": "string",
+            "description": "Google ID Token (credential) returned by Google Identity Services SDK"
+          }
+        }
+      },
+      "SuperAdminLoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminLoginResponse": {
+        "type": "object",
+        "required": [
+          "mfa_required"
+        ],
+        "properties": {
+          "mfa_required": {
+            "type": "boolean"
+          },
+          "temp_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SuperAdminUserInfo"
+              }
+            ]
+          }
+        }
+      },
+      "SuperAdminMfaActivateRequest": {
+        "type": "object",
+        "required": [
+          "secret",
+          "code",
+          "recovery_codes"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "secret": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminMfaDisableRequest": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminMfaSetupResponse": {
+        "type": "object",
+        "required": [
+          "secret",
+          "otpauth_uri",
+          "recovery_codes"
+        ],
+        "properties": {
+          "otpauth_uri": {
+            "type": "string"
+          },
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "secret": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminMfaVerifyRequest": {
+        "type": "object",
+        "required": [
+          "temp_token",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "temp_token": {
+            "type": "string"
+          }
+        }
+      },
+      "SuperAdminUserInfo": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "user_id": {
             "type": "string",
             "format": "uuid"
           }
@@ -7947,6 +10255,65 @@
           }
         }
       },
+      "UpdateOrganizationRequest": {
+        "type": "object",
+        "properties": {
+          "active_modules": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Dynamically update which API modules are enabled/supported for this organization."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settings": {}
+        }
+      },
+      "UpdatePlatformSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "allowed_ips": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "google_client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platform_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token_expiry_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "UpdateProductRequest": {
         "type": "object",
         "properties": {
@@ -8153,6 +10520,39 @@
           }
         }
       },
+      "UserSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "full_name",
+          "role",
+          "is_active",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
       "ValidateCouponRequest": {
         "type": "object",
         "required": [
@@ -8333,6 +10733,10 @@
     {
       "name": "Admin",
       "description": "Platform management and domain preset bootstrapping"
+    },
+    {
+      "name": "SuperAdmin",
+      "description": "Platform root super administrator management and module configuration"
     }
   ]
 }

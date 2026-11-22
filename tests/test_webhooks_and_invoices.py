@@ -1,6 +1,7 @@
 import urllib.request
 import json
 import time
+import html
 
 BASE_URL = "http://127.0.0.1:8080"
 
@@ -53,7 +54,7 @@ def main():
 
     print("\n--- 3. Webhooks: Register Automation Webhook (WhatsApp / Zapier) ---")
     webhook = post(f"{BASE_URL}/api/v1/webhooks", {
-        "url": "https://api.whatsapp-gateway.internal/webhook/obaf",
+        "url": "https://api.whatsapp-gateway.example.com/webhook/obaf",
         "secret": "wh_sec_abc123xyz",
         "event_types": ["order.created", "order.status_updated", "stock.low"]
     }, token=token)
@@ -97,7 +98,7 @@ def main():
     html_invoice = get(f"{BASE_URL}/api/v1/billing/orders/{order['id']}/invoice.html", token=token)
     print(f"HTML Invoice successfully generated ({len(html_invoice)} bytes).")
     assert "<!DOCTYPE html>" in html_invoice
-    assert "SPEEDY TECH & AUTO SERVICE" in html_invoice.upper()
+    assert "SPEEDY TECH & AUTO SERVICE" in html.unescape(html_invoice).upper()
     assert order["order_number"] in html_invoice
     assert "Grand Total" in html_invoice
     print("Preview snippet of HTML Invoice:")

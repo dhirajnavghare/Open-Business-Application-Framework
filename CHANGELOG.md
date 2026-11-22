@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-11-21
+
+### 🛡️ Super Admin Control Plane & Bank-Grade Security Hardening
+
+### Added
+- **Embedded Super Admin Web Console**: Zero-dependency SPA at `/admin` and `/superadmin` for organization management, API module toggles, telemetry, database diagnostics, and backup downloads.
+- **Dual-Engine Authentication**: Root administrator login via email/password or Google Identity Services (GIS) SSO with cryptographic JWKS caching, strict audience (`aud`) verification, and debug-only mock token isolation.
+- **RFC 6238 TOTP Multi-Factor Authentication**: Two-factor authentication with 30s time steps, 6-digit codes, Argon2id-hashed emergency backup codes, and intermediate `superadmin_mfa_pending` privilege isolation.
+- **Automated Let's Encrypt SSL & ACME Engine**: Domain DNS verification, ACME challenge token sanitization, and automated background SSL certificate renewal (`obaf-worker`).
+- **Real-Time Token Revocation Blacklisting**: SHA-256 fingerprint token revocation (`token_blacklist`) backed by a bounded in-memory `TtlCache` for instantaneous logout enforcement.
+- **Zero-Trust Role-Based Access Control (RBAC)**: Strict permission boundaries preventing read-only `viewer` accounts from mutating state, and restricting credit notes, reports, and currency rates to administrators.
+- **BOLA / IDOR Cashier Shift Isolation**: Bounded cashier shift closures to the shift owner with administrative override support.
+- **Comprehensive Denial-of-Service Defense**: Bounded memory limits on `TokenBucketRateLimiter` and `TtlCache` (50,000 max), 2MB request body ceiling, pagination limit clamping (200 max), and `CatchPanicLayer` resilience.
+
+### Security
+- **Elimination of Insecure Default Credentials (CWE-1188)**: Mandatory `admin_password` ($\ge 8$ chars) across all onboarding endpoints (`/organizations`, `/setup/preset`, `/tenants`). Removed hardcoded fallback passwords.
+- **Orphaned Organization Mitigation**: Pre-creation email validation and uniqueness checks against existing users, with automatic transactional rollback upon user creation failure.
+- **Google SSO Audience Confusion Defense**: Immediate rejection with `403 Forbidden` if Google Client ID is unconfigured, and strict token `aud` claim matching against the configured client ID.
+- **Anonymous Registration Lockdown**: Anonymous user registration is blocked once tenant users exist, preventing unauthorized account takeover.
+- **Sensitive Headers Redaction (OWASP API3 / CWE-312)**: Added `SetSensitiveRequestHeadersLayer` to mask `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+- **Database Backup Sanitization (CWE-312)**: Automated redaction of `password_hash` to `[REDACTED]` and exclusion of MFA TOTP secrets and recovery codes in `/api/v1/superadmin/database/backup`.
+- **RFC 6455 WebSocket Heartbeats**: Added periodic 30-second `Message::Ping` intervals and `Message::Pong` responses on `/api/v1/ws` to mitigate proxy timeouts and prevent ghost socket leaks.
+- **Panic-Free Authentication & Webhook Resilience**: Eliminated unchecked `.unwrap()` calls in login dispatchers and HMAC key initialization.
+
+---
+
 ## [0.1.0] - 2026-11-15
 
 ### 🚀 Initial Public Release

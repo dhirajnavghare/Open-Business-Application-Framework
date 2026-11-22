@@ -4,9 +4,9 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use obaf_database::entities::subscription;
+use obaf_database::entities::{customer, subscription};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -80,6 +80,44 @@ pub async fn create_subscription(
     auth: AuthUser,
     Json(payload): Json<CreateSubscriptionRequest>,
 ) -> Result<(StatusCode, Json<SubscriptionResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff"])?;
+
+    if payload.amount < Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Subscription amount cannot be negative".to_string(),
+            }),
+        ));
+    }
+
+    // BOLA/IDOR Defense: Verify customer belongs to current tenant
+    let cust_exists = customer::Entity::find_by_id(payload.customer_id)
+        .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database query error verifying customer: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: "A database error occurred".to_string(),
+                }),
+            )
+        })?;
+
+    if cust_exists.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Customer '{}' not found for current tenant",
+                    payload.customer_id
+                ),
+            }),
+        ));
+    }
+
     let sub_id = Uuid::new_v4();
     let now = Utc::now();
     let meta_str = payload
@@ -103,10 +141,11 @@ pub async fn create_subscription(
     };
 
     let inserted = new_sub.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to create subscription: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to create subscription: {}", e),
+                error: "Failed to create subscription".to_string(),
             }),
         )
     })?;
@@ -130,6 +169,7 @@ pub async fn list_subscriptions(
 ) -> Result<Json<Vec<SubscriptionResponse>>, (StatusCode, Json<AuthErrorResponse>)> {
     let subs = subscription::Entity::find()
         .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| {
@@ -165,6 +205,8 @@ pub async fn update_status(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateSubscriptionStatusRequest>,
 ) -> Result<Json<SubscriptionResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let sub = subscription::Entity::find()
         .filter(subscription::Column::Id.eq(id))
         .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -222,6 +264,8 @@ pub async fn check_in_member(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let sub = subscription::Entity::find()
         .filter(subscription::Column::Id.eq(id))
         .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -260,7 +304,8 @@ pub async fn check_in_member(
         .await
         .map_err(|e| internal_err(format!("Update failed: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "subscription.check_in",
         serde_json::json!({
             "subscription_id": sub.id,
@@ -328,6 +373,8 @@ pub async fn delete_subscription(
     auth: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let sub = subscription::Entity::find()
         .filter(subscription::Column::Id.eq(id))
         .filter(subscription::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -349,9 +396,12 @@ pub async fn delete_subscription(
 }
 
 fn internal_err(msg: String) -> (StatusCode, Json<AuthErrorResponse>) {
+    tracing::error!("Internal error in subscriptions: {}", msg);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(AuthErrorResponse { error: msg }),
+        Json(AuthErrorResponse {
+            error: "A database error occurred".to_string(),
+        }),
     )
 }
 

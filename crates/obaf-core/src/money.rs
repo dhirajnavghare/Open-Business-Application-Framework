@@ -80,3 +80,41 @@ impl fmt::Display for Money {
         write!(f, "{}", self.amount)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal::Decimal;
+
+    #[test]
+    fn test_currency_constructors_and_display() {
+        let usd = Currency::usd();
+        assert_eq!(usd.code(), "USD");
+        assert_eq!(format!("{}", usd), "USD");
+
+        let inr = Currency::inr();
+        assert_eq!(inr.code(), "INR");
+
+        let eur = Currency::eur();
+        assert_eq!(eur.code(), "EUR");
+
+        let custom = Currency::new("gbp");
+        assert_eq!(custom.code(), "GBP");
+
+        let def = Currency::default();
+        assert_eq!(def.code(), "USD");
+    }
+
+    #[test]
+    fn test_money_constructors_and_display() {
+        let zero = Money::zero();
+        assert_eq!(zero.amount, Decimal::ZERO);
+
+        let hundred = Money::from_i64(100);
+        assert_eq!(hundred.amount, Decimal::from(100));
+        assert_eq!(format!("{}", hundred), "100");
+
+        let custom = Money::new(Decimal::new(19950, 2));
+        assert_eq!(format!("{}", custom), "199.50");
+    }
+}

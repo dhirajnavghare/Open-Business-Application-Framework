@@ -7,7 +7,9 @@ use axum::{
 use chrono::Utc;
 use obaf_database::entities::{order, order_item, product, stock_movement};
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,6 +34,8 @@ pub struct CreateOrderRequest {
 #[derive(Deserialize, IntoParams)]
 pub struct OrderFilterQuery {
     pub status: Option<String>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -85,6 +89,8 @@ pub async fn create_order(
     headers: HeaderMap,
     Json(payload): Json<CreateOrderRequest>,
 ) -> Result<axum::response::Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     // Distributed Systems Pattern: Idempotency Key deduplication (System Design Primer)
     let idempotency_key = headers
         .get("idempotency-key")
@@ -112,6 +118,15 @@ pub async fn create_order(
         ));
     }
 
+    if payload.items.len() > 500 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Order items batch size exceeds maximum limit of 500 items".to_string(),
+            }),
+        ));
+    }
+
     let txn = state.db.begin().await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -132,6 +147,18 @@ pub async fn create_order(
     let mut stock_movements_to_insert = Vec::new();
 
     for item_req in &payload.items {
+        if item_req.quantity <= Decimal::ZERO {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!(
+                        "Order item quantity must be strictly greater than zero, got {}",
+                        item_req.quantity
+                    ),
+                }),
+            ));
+        }
+
         let p = product::Entity::find()
             .filter(product::Column::Id.eq(item_req.product_id))
             .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -262,7 +289,8 @@ pub async fn create_order(
     })?;
 
     // Real-time broadcast for Kitchen Display System (KDS) & POS screens
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "order.created",
         serde_json::json!({
             "order_id": order_id,
@@ -322,6 +350,13 @@ pub async fn list_orders(
 
     if let Some(status) = query.status {
         q = q.filter(order::Column::Status.eq(status));
+    }
+
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    q = q.limit(limit);
+
+    if let Some(offset) = query.offset {
+        q = q.offset(offset);
     }
 
     let orders = q.all(&state.db).await.map_err(|e| {
@@ -394,6 +429,8 @@ pub async fn update_status(
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateOrderStatusRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     let order_model = order::Entity::find()
         .filter(order::Column::Id.eq(id))
         .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
@@ -462,7 +499,8 @@ pub async fn update_status(
     }
 
     // Real-time broadcast for live kitchen & status updates
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "order.status_updated",
         serde_json::json!({
             "order_id": id,

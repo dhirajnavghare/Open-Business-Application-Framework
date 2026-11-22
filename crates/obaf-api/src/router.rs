@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{DefaultBodyLimit, State},
     http::{header, HeaderName, HeaderValue, StatusCode},
     middleware::{from_fn, from_fn_with_state, Next},
     response::{IntoResponse, Response},
@@ -7,7 +7,9 @@ use axum::{
     Json, Router,
 };
 use obaf_core::RateLimitResult;
+use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -32,6 +34,7 @@ use crate::reports::report_routes;
 use crate::search::search_routes;
 use crate::state::SharedState;
 use crate::subscriptions::subscription_routes;
+use crate::superadmin::{module_gating_middleware, serve_admin_ui, superadmin_routes};
 use crate::suppliers::supplier_routes;
 use crate::sync::sync_routes;
 use crate::webhooks::webhook_routes;
@@ -43,10 +46,48 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/info", get(engine_info))
         .route("/schema", get(schema_discovery));
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let allowed_methods = [
+        axum::http::Method::GET,
+        axum::http::Method::POST,
+        axum::http::Method::PUT,
+        axum::http::Method::PATCH,
+        axum::http::Method::DELETE,
+        axum::http::Method::OPTIONS,
+        axum::http::Method::HEAD,
+    ];
+
+    let cors = if let Ok(origins_str) = std::env::var("OBAF_CORS_ALLOWED_ORIGINS")
+        .or_else(|_| std::env::var("CORS_ALLOWED_ORIGINS"))
+    {
+        let origins: Vec<HeaderValue> = origins_str
+            .split(',')
+            .filter_map(|s| {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    HeaderValue::from_str(trimmed).ok()
+                }
+            })
+            .collect();
+
+        if origins.is_empty() || origins_str.trim() == "*" {
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(allowed_methods)
+                .allow_headers(Any)
+        } else {
+            CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods(allowed_methods)
+                .allow_headers(Any)
+        }
+    } else {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(allowed_methods)
+            .allow_headers(Any)
+    };
 
     Router::new()
         // Health, Metrics & AI Agent discovery endpoints
@@ -55,6 +96,14 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/ready", get(ready_check))
         .route("/metrics", get(metrics_check))
         .route("/llms.txt", get(llms_txt))
+        // Super Admin Single Page Application UI
+        .route("/admin", get(serve_admin_ui))
+        .route("/superadmin", get(serve_admin_ui))
+        // Let's Encrypt Automated ACME HTTP-01 Challenge Responder
+        .route(
+            "/.well-known/acme-challenge/:token",
+            get(crate::superadmin::ssl::acme_challenge_handler),
+        )
         // Swagger UI & OpenAPI specification endpoint (/api/v1/openapi.json is served by SwaggerUi)
         .merge(SwaggerUi::new("/swagger-ui").url("/api/v1/openapi.json", openapi))
         // API v1 routes
@@ -78,12 +127,44 @@ pub fn create_router(state: SharedState) -> Router {
         .nest("/api/v1/meta", meta_routes)
         .nest("/api/v1/sync", sync_routes())
         .nest("/api/v1/admin", admin_routes())
+        .nest("/api/v1/superadmin", superadmin_routes())
         // Global Middlewares
+        .layer(from_fn(request_timeout_middleware))
+        .layer(from_fn_with_state(state.clone(), module_gating_middleware))
         .layer(from_fn(request_id_and_security_middleware))
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
         .layer(cors)
+        .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http())
+        .layer(SetSensitiveRequestHeadersLayer::new([
+            header::AUTHORIZATION,
+            header::COOKIE,
+            HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("x-obaf-signature"),
+        ]))
         .with_state(state)
+}
+
+async fn request_timeout_middleware(request: axum::extract::Request, next: Next) -> Response {
+    let path = request.uri().path().to_string();
+    // Exclude long-lived WebSockets from HTTP request timeouts
+    if path.starts_with("/api/v1/ws") {
+        return next.run(request).await;
+    }
+
+    match tokio::time::timeout(std::time::Duration::from_secs(30), next.run(request)).await {
+        Ok(response) => response,
+        Err(_) => {
+            let body = serde_json::json!({
+                "error": "Request Timeout",
+                "message": "The server timed out waiting for the request to complete."
+            });
+            let mut res = Json(body).into_response();
+            *res.status_mut() = StatusCode::REQUEST_TIMEOUT;
+            res
+        }
+    }
 }
 
 async fn rate_limit_middleware(
@@ -98,31 +179,50 @@ async fn rate_limit_middleware(
         || path == "/ready"
         || path == "/metrics"
         || path == "/llms.txt"
+        || path == "/admin"
+        || path == "/superadmin"
         || path.starts_with("/swagger-ui")
         || path == "/api/v1/openapi.json"
     {
         return next.run(request).await;
     }
 
-    // Determine client rate limiting key (Token Bucket per client/tenant)
+    // Determine client rate limiting key (Token Bucket per tenant / API key / IP)
     let client_key = if let Some(auth) = request
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
     {
-        format!("auth:{}", &auth[..auth.len().min(32)])
-    } else if let Some(ip) = request
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            if let Ok(claims) = obaf_core::verify_token(token, &state.jwt_secret) {
+                format!("tenant:{}", claims.tenant_id.0)
+            } else {
+                format!("auth:{}", &token[token.len().saturating_sub(16)..])
+            }
+        } else {
+            format!("auth:{}", &auth[auth.len().saturating_sub(16)..])
+        }
+    } else if let Some(api_key) = request
         .headers()
-        .get("x-forwarded-for")
+        .get("x-api-key")
         .and_then(|v| v.to_str().ok())
     {
-        format!("ip:{}", ip.split(',').next().unwrap_or("unknown").trim())
+        format!("apikey:{}", &api_key[api_key.len().saturating_sub(16)..])
     } else if let Some(ip) = request
         .headers()
         .get("cf-connecting-ip")
         .and_then(|v| v.to_str().ok())
     {
         format!("ip:{}", ip.trim())
+    } else if let Some(ip) = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+    {
+        format!(
+            "ip:{}",
+            ip.split(',').next_back().unwrap_or("unknown").trim()
+        )
     } else {
         "client:default".to_string()
     };
@@ -163,6 +263,53 @@ async fn request_id_and_security_middleware(
     request: axum::extract::Request,
     next: Next,
 ) -> Response {
+    // 1. Host Header Injection & Poisoning Defense
+    if let Some(host_val) = request.headers().get(header::HOST) {
+        if let Ok(host_str) = host_val.to_str() {
+            let host_trimmed = host_str.trim();
+            if host_trimmed.is_empty()
+                || host_trimmed.len() > 255
+                || host_trimmed.chars().any(|c| {
+                    !c.is_ascii_alphanumeric()
+                        && c != '.'
+                        && c != '-'
+                        && c != ':'
+                        && c != '['
+                        && c != ']'
+                })
+            {
+                let mut res = Response::new(axum::body::Body::from("Invalid Host header"));
+                *res.status_mut() = StatusCode::BAD_REQUEST;
+                return res;
+            }
+        } else {
+            let mut res = Response::new(axum::body::Body::from("Malformed Host header"));
+            *res.status_mut() = StatusCode::BAD_REQUEST;
+            return res;
+        }
+    }
+    if let Some(fwd_host) = request.headers().get("x-forwarded-host") {
+        if let Ok(host_str) = fwd_host.to_str() {
+            let host_trimmed = host_str.trim();
+            if host_trimmed.is_empty()
+                || host_trimmed.len() > 255
+                || host_trimmed.chars().any(|c| {
+                    !c.is_ascii_alphanumeric()
+                        && c != '.'
+                        && c != '-'
+                        && c != ':'
+                        && c != '['
+                        && c != ']'
+                })
+            {
+                let mut res =
+                    Response::new(axum::body::Body::from("Invalid X-Forwarded-Host header"));
+                *res.status_mut() = StatusCode::BAD_REQUEST;
+                return res;
+            }
+        }
+    }
+
     let req_id = request
         .headers()
         .get("x-request-id")
@@ -195,6 +342,24 @@ async fn request_id_and_security_middleware(
     headers.insert(
         header::REFERRER_POLICY,
         HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self';",
+        ),
+    );
+    headers.insert(
+        HeaderName::from_static("permissions-policy"),
+        HeaderValue::from_static("geolocation=(), camera=(), microphone=(), payment=(), usb=()"),
+    );
+    headers.insert(
+        HeaderName::from_static("cross-origin-resource-policy"),
+        HeaderValue::from_static("same-origin"),
+    );
+    headers.insert(
+        HeaderName::from_static("cross-origin-opener-policy"),
+        HeaderValue::from_static("same-origin-allow-popups"),
     );
     response
 }

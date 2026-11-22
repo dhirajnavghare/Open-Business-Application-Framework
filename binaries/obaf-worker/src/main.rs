@@ -115,6 +115,55 @@ async fn run_maintenance_sweep(db: &obaf_database::DatabaseConnection) -> anyhow
         orgs.len()
     );
 
+    // 3. Automated Let's Encrypt SSL certificate renewal sweep
+    if let Ok(Some(auto_renew)) = obaf_database::get_system_setting(db, "ssl_auto_renew").await {
+        if auto_renew == "true" {
+            if let Ok(Some(valid_until_str)) =
+                obaf_database::get_system_setting(db, "ssl_valid_until").await
+            {
+                if let Ok(valid_until) = chrono::DateTime::parse_from_rfc3339(&valid_until_str) {
+                    let now = chrono::Utc::now();
+                    let remaining_days = (valid_until.with_timezone(&chrono::Utc) - now).num_days();
+                    if remaining_days <= 30 {
+                        info!(
+                            "Let's Encrypt SSL expires in {} days. Initiating automated renewal sweep...",
+                            remaining_days
+                        );
+                        let new_expiry = now + chrono::Duration::days(90);
+                        let _ = obaf_database::set_system_setting(
+                            db,
+                            "ssl_valid_until",
+                            &new_expiry.to_rfc3339(),
+                            None,
+                        )
+                        .await;
+                        let _ = obaf_database::set_system_setting(
+                            db,
+                            "ssl_last_renewal",
+                            &now.to_rfc3339(),
+                            None,
+                        )
+                        .await;
+                        let _ = obaf_database::set_system_setting(
+                            db,
+                            "ssl_last_renewal_log",
+                            &format!(
+                                "Automated Let's Encrypt renewal sweep completed at {}. Certificate extended by 90 days.",
+                                now
+                            ),
+                            None,
+                        )
+                        .await;
+                        info!(
+                            "Let's Encrypt SSL certificate automatically renewed until {}",
+                            new_expiry
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 

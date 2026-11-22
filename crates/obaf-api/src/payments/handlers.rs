@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use obaf_database::entities::payment;
+use obaf_database::entities::{customer, order, payment};
 use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -82,6 +82,8 @@ pub async fn record_payment(
     headers: HeaderMap,
     Json(payload): Json<RecordPaymentRequest>,
 ) -> Result<axum::response::Response, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     // Distributed Systems Pattern: Idempotency Key deduplication (System Design Primer)
     let idempotency_key = headers
         .get("idempotency-key")
@@ -97,6 +99,70 @@ pub async fn record_payment(
                 HeaderValue::from_static("true"),
             );
             return Ok((cached_status, res_headers, Json(cached_json)).into_response());
+        }
+    }
+
+    if payload.amount <= Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Payment amount must be strictly greater than zero, got {}",
+                    payload.amount
+                ),
+            }),
+        ));
+    }
+
+    // BOLA/IDOR Defense: Verify order_id belongs to current tenant if supplied
+    if let Some(oid) = payload.order_id {
+        let order_exists = order::Entity::find_by_id(oid)
+            .filter(order::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+            .one(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database query error verifying order: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: "A database error occurred".to_string(),
+                    }),
+                )
+            })?;
+
+        if order_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!("Order '{}' not found for current tenant", oid),
+                }),
+            ));
+        }
+    }
+
+    // BOLA/IDOR Defense: Verify customer_id belongs to current tenant if supplied
+    if let Some(cid) = payload.customer_id {
+        let cust_exists = customer::Entity::find_by_id(cid)
+            .filter(customer::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+            .one(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database query error verifying customer: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthErrorResponse {
+                        error: "A database error occurred".to_string(),
+                    }),
+                )
+            })?;
+
+        if cust_exists.is_none() {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthErrorResponse {
+                    error: format!("Customer '{}' not found for current tenant", cid),
+                }),
+            ));
         }
     }
 
@@ -116,10 +182,11 @@ pub async fn record_payment(
     };
 
     let inserted = new_payment.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to record payment: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to record payment: {}", e),
+                error: "Failed to record payment".to_string(),
             }),
         )
     })?;
@@ -152,16 +219,19 @@ pub async fn daily_settlement(
     State(state): State<SharedState>,
     auth: AuthUser,
 ) -> Result<Json<DailySettlementSummary>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let payments = payment::Entity::find()
         .filter(payment::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .filter(payment::Column::Status.eq("SUCCESS"))
         .all(&state.db)
         .await
         .map_err(|e| {
+            tracing::error!("Database query error fetching daily settlement: {:?}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(AuthErrorResponse {
-                    error: format!("Database error: {}", e),
+                    error: "A database error occurred".to_string(),
                 }),
             )
         })?;
@@ -353,7 +423,8 @@ pub async fn refund_payment(
     .await;
 
     // Real-time broadcast
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "payment.refunded",
         serde_json::json!({
             "payment_id": id,

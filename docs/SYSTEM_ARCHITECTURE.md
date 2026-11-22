@@ -43,15 +43,25 @@ OBAF follows strict inward-pointing dependencies to ensure compile-time boundary
    - `TenantPoolRouter`: Supports shared database clusters as well as dedicated per-tenant databases.
 
 3. **`crates/obaf-api`**:
-   - Axum 0.7 HTTP and WebSocket router.
-   - Security headers middleware (`nosniff`, `DENY`, `HSTS`, `XSS`).
+   - Axum 0.7 HTTP and WebSocket router with RFC 6455 30-second heartbeats.
+   - Embedded Super Admin Single-Page Application (`/admin`, `/superadmin`).
+   - Sensitive headers masking via `SetSensitiveRequestHeadersLayer` (`Authorization`, `Cookie`, `X-API-Key`, `X-OBAF-Signature`).
+   - Dynamic API Module Gating middleware (`module_gating_middleware`).
+   - Hardened defense-in-depth security headers (`nosniff`, `DENY`, `HSTS`, `CSP`, `CORP`, `COOP`, `Permissions-Policy`).
+   - Let's Encrypt automated ACME HTTP-01 challenge responder (`/.well-known/acme-challenge/:token`).
    - Interactive OpenAPI/Swagger documentation (`ApiDoc`).
-   - Background HMAC-SHA256 webhook dispatcher.
+   - Sanitized database backup JSON downloads (`password_hash` redaction and secret filtering).
+   - Standard Kubernetes health probes (`/health`, `/live`, `/ready`) and Prometheus metrics (`/metrics`).
+   - Background HMAC-SHA256 webhook dispatcher with private IPv4 SSRF blocking.
    - Offline edge synchronization engine (`/api/v1/sync`).
+   - Real-time SHA-256 cryptographic JWT token revocation store (`token_blacklist`).
 
 4. **`binaries/obaf-server`**:
    - Production HTTP and WebSocket daemon.
    - Hierarchical configuration loader (`config/default.toml`, environment variables, `DATABASE_URL`).
+   - Single-Root Super Administrator authentication with dual Google SSO and Argon2id password verification.
+   - Production Credential Guard: Fatal startup abort in production mode if default password is in use.
+   - Background Let's Encrypt automated SSL supervisor daemon (12-hour renewal interval).
 
 5. **`binaries/obaf-cli`**:
    - Operational CLI tool (`obaf doctor`, `obaf presets`, `obaf token`, `obaf backup`, `obaf restore`, `obaf new-preset`, `obaf worker`).

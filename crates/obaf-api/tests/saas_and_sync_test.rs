@@ -52,6 +52,12 @@ async fn test_security_headers_middleware() {
         .to_str()
         .unwrap()
         .contains("max-age=31536000"));
+    assert!(headers
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("default-src 'self'"));
 }
 
 #[tokio::test]
@@ -147,6 +153,7 @@ async fn test_saas_tenant_provisioning_and_usage() {
     let usage_req = Request::builder()
         .method("GET")
         .uri(format!("/api/v1/admin/tenants/{}/usage", tenant_id))
+        .header("Authorization", format!("Bearer {}", token))
         .body(Body::empty())
         .unwrap();
 

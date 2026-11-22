@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use obaf_database::entities::stock_movement;
+use obaf_database::entities::{product, stock_movement};
 use rust_decimal::Decimal;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -74,6 +74,42 @@ pub async fn record_movement(
 ) -> Result<(StatusCode, Json<StockMovementResponse>), (StatusCode, Json<AuthErrorResponse>)> {
     auth.require_role(&["admin", "manager", "staff"])?;
 
+    if payload.quantity == Decimal::ZERO {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: "Stock movement quantity cannot be zero".to_string(),
+            }),
+        ));
+    }
+
+    // BOLA/IDOR Defense: Verify product belongs to current tenant
+    let prod_exists = product::Entity::find_by_id(payload.product_id)
+        .filter(product::Column::TenantId.eq(auth.tenant_id.as_uuid()))
+        .one(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database query error verifying product: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthErrorResponse {
+                    error: "A database error occurred".to_string(),
+                }),
+            )
+        })?;
+
+    if prod_exists.is_none() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(AuthErrorResponse {
+                error: format!(
+                    "Product '{}' not found for current tenant",
+                    payload.product_id
+                ),
+            }),
+        ));
+    }
+
     let movement_id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -91,10 +127,11 @@ pub async fn record_movement(
     };
 
     let inserted = new_movement.insert(&state.db).await.map_err(|e| {
+        tracing::error!("Failed to record stock movement: {:?}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
-                error: format!("Failed to record stock movement: {}", e),
+                error: "Failed to record stock movement".to_string(),
             }),
         )
     })?;
@@ -139,9 +176,8 @@ pub async fn list_movements(
         q = q.filter(stock_movement::Column::MovementType.eq(m_type));
     }
 
-    if let Some(limit) = query.limit {
-        q = q.limit(limit);
-    }
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    q = q.limit(limit);
 
     if let Some(offset) = query.offset {
         q = q.offset(offset);
@@ -265,6 +301,8 @@ pub async fn create_stock_location(
     auth: AuthUser,
     Json(payload): Json<CreateStockLocationRequest>,
 ) -> Result<(StatusCode, Json<StockLocationResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     use obaf_database::entities::stock_location;
 
     let loc_id = Uuid::new_v4();

@@ -13,6 +13,8 @@ pub enum RateLimitResult {
     Rejected { retry_after_secs: f64 },
 }
 
+pub const DEFAULT_MAX_BUCKETS: usize = 50_000;
+
 /// High-performance thread-safe Token Bucket Rate Limiter
 /// Engineered following the System Design Primer pattern for traffic shaping and DoS mitigation.
 ///
@@ -31,15 +33,22 @@ pub struct TokenBucketRateLimiter {
     buckets: Arc<RwLock<HashMap<String, BucketState>>>,
     capacity: f64,
     refill_rate_per_sec: f64,
+    max_buckets: usize,
 }
 
 impl TokenBucketRateLimiter {
     /// Create a rate limiter with maximum burst capacity and continuous refill rate per second.
     pub fn new(capacity: f64, refill_rate_per_sec: f64) -> Self {
+        Self::with_max_buckets(capacity, refill_rate_per_sec, DEFAULT_MAX_BUCKETS)
+    }
+
+    /// Create a rate limiter with a custom maximum bucket capacity ceiling.
+    pub fn with_max_buckets(capacity: f64, refill_rate_per_sec: f64, max_buckets: usize) -> Self {
         Self {
             buckets: Arc::new(RwLock::new(HashMap::new())),
             capacity,
             refill_rate_per_sec,
+            max_buckets,
         }
     }
 
@@ -49,6 +58,23 @@ impl TokenBucketRateLimiter {
     pub fn check_and_consume(&self, key: &str, requested_tokens: f64) -> RateLimitResult {
         let now = Instant::now();
         let mut map = self.buckets.write().unwrap_or_else(|e| e.into_inner());
+
+        // State Exhaustion Protection (DoS): enforce maximum bucket capacity ceiling
+        if !map.contains_key(key) && map.len() >= self.max_buckets {
+            // 1. Purge buckets idle for > 60 seconds
+            map.retain(|_, state| now.duration_since(state.last_refill).as_secs_f64() < 60.0);
+
+            // 2. If still at capacity, evict the least recently touched bucket
+            if map.len() >= self.max_buckets {
+                if let Some(oldest_key) = map
+                    .iter()
+                    .min_by_key(|(_, state)| state.last_refill)
+                    .map(|(k, _)| k.clone())
+                {
+                    map.remove(&oldest_key);
+                }
+            }
+        }
 
         let state = map.entry(key.to_string()).or_insert_with(|| BucketState {
             tokens: self.capacity,
@@ -81,6 +107,12 @@ impl TokenBucketRateLimiter {
         let now = Instant::now();
         let mut map = self.buckets.write().unwrap_or_else(|e| e.into_inner());
         map.retain(|_, state| now.duration_since(state.last_refill).as_secs_f64() < max_idle_secs);
+    }
+
+    /// Return the current number of tracked buckets in memory.
+    pub fn buckets_len(&self) -> usize {
+        let map = self.buckets.read().unwrap_or_else(|e| e.into_inner());
+        map.len()
     }
 }
 

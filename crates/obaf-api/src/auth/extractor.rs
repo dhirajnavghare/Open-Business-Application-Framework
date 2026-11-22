@@ -28,11 +28,28 @@ pub struct AuthErrorResponse {
 }
 
 impl AuthUser {
+    pub fn is_superadmin(&self) -> bool {
+        self.role == "superadmin"
+    }
+
+    pub fn require_superadmin(&self) -> Result<(), (StatusCode, Json<AuthErrorResponse>)> {
+        if self.is_superadmin() {
+            Ok(())
+        } else {
+            Err((
+                StatusCode::FORBIDDEN,
+                Json(AuthErrorResponse {
+                    error: "Forbidden: Platform superadmin privileges required".to_string(),
+                }),
+            ))
+        }
+    }
+
     pub fn require_role(
         &self,
         allowed_roles: &[&str],
     ) -> Result<(), (StatusCode, Json<AuthErrorResponse>)> {
-        if allowed_roles.contains(&self.role.as_str()) {
+        if self.is_superadmin() || allowed_roles.contains(&self.role.as_str()) {
             Ok(())
         } else {
             Err((
@@ -72,10 +89,12 @@ impl FromRequestParts<SharedState> for AuthUser {
                 .one(&state.db)
                 .await
                 .map_err(|e| {
+                    tracing::error!("Database query error verifying API key: {:?}", e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(AuthErrorResponse {
-                            error: e.to_string(),
+                            error: "A database error occurred while verifying credentials"
+                                .to_string(),
                         }),
                     )
                 })?;
@@ -134,6 +153,28 @@ impl FromRequestParts<SharedState> for AuthUser {
                 }),
             )
         })?;
+
+        // Check if token has been revoked or logged out
+        if state.is_token_revoked(token) {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(AuthErrorResponse {
+                    error: "Authentication token has been revoked. Please log in again."
+                        .to_string(),
+                }),
+            ));
+        }
+
+        // Intermediate MFA challenge tokens are strictly prohibited from authenticating standard APIs
+        if claims.role == "superadmin_mfa_pending" {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(AuthErrorResponse {
+                    error: "MFA challenge pending: please complete TOTP 2FA verification before accessing platform endpoints."
+                        .to_string(),
+                }),
+            ));
+        }
 
         Ok(AuthUser {
             user_id: claims.sub,

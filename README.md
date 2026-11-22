@@ -107,6 +107,7 @@ You will see:
  High-Performance Headless Business & Billing Engine in Rust
  ────────────────────────────────────────────────────────────
  🚀 Server running at: http://127.0.0.1:8080
+ 👑 Super Admin UI:   http://127.0.0.1:8080/admin
  📖 Swagger UI Docs:   http://127.0.0.1:8080/swagger-ui
  ⚡ OpenAPI JSON Spec: http://127.0.0.1:8080/api/v1/openapi.json
  🤖 AI Agent Context:  http://127.0.0.1:8080/llms.txt
@@ -115,7 +116,53 @@ You will see:
  ────────────────────────────────────────────────────────────
 ```
 
-Open **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** in your browser to interactively test endpoints, or query **[http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)** with Cursor, Claude Code, or Copilot for instant AI context.
+Open **[http://127.0.0.1:8080/admin](http://127.0.0.1:8080/admin)** in your browser for the **Super Admin Console**, or **[http://127.0.0.1:8080/swagger-ui](http://127.0.0.1:8080/swagger-ui)** to interactively test endpoints, or query **[http://127.0.0.1:8080/llms.txt](http://127.0.0.1:8080/llms.txt)** with Cursor, Claude Code, or Copilot for instant AI context.
+
+---
+
+## 👑 Super Admin Web Console & API Module Gating
+
+OBAF includes an **embedded single-page Super Admin web console** served directly by `obaf-server` at `/admin` (and `/superadmin`) with **zero runtime external dependencies** (no Node.js or npm required).
+
+### Zero-Friction Deployment: Only 3 Environment Variables Required
+To deploy OBAF on any single server, VPS (e.g. Hostinger, Hetzner, DigitalOcean), Docker container, or Kubernetes cluster, **only 3 environment variables are required**:
+- `DATABASE_URL`: Target database connection string (SQLite file or PostgreSQL URL)
+- `SUPERADMIN_EMAIL`: Single designated root administrator email
+- `SUPERADMIN_PASSWORD`: Single designated root administrator password
+
+> **No complex configuration files or dozens of env vars:** Cryptographic JWT secrets are automatically generated and persisted in the database on first boot. Everything else—organizations, supported API modules, platform branding, default currency, session lifetimes, and Google SSO—is managed directly by the Super Admin in the web console at `/admin`!
+
+### Key Capabilities
+- **Single-Root Top-Level Administrator**: Exactly one top-level platform administrator exists, strictly configured through environment variables:
+  - `SUPERADMIN_EMAIL` / `OBAF_SUPERADMIN_EMAIL` (default: `admin@obaf.local`)
+  - `SUPERADMIN_PASSWORD` / `OBAF_SUPERADMIN_PASSWORD` (default: `admin123` - supports raw password or Argon2 hash)
+  - `GOOGLE_CLIENT_ID` / `OBAF_GOOGLE_CLIENT_ID` (optional, can also be configured dynamically in the Super Admin UI)
+- **Dual Authentication**: Login via **Google SSO** (Google Identity Services ID tokens) or **Email & Password**.
+- **Platform Settings Management**: Update platform name, base billing currency, token expiry duration, and Google SSO client ID directly from the console without restarting the server.
+- **Organization Management**: Provision new tenant organizations with industry presets, custom slugs, and dedicated tenant admin accounts.
+- **Dynamic API Module Gating**:
+  - The Super Admin can select which of the 15 API engines are supported for each organization (e.g. enabling `catalog` and `orders`, while disabling `bookings` or `pos`).
+  - Gated modules return `403 Forbidden` (`{"code": "MODULE_DISABLED", "error": "Module Disabled"}`) to tenant callers if disabled.
+  - Toggling supported APIs in the Super Admin UI takes effect immediately across all endpoints with zero server downtime via in-memory TTL cache invalidation.
+  - Platform Super Administrator possesses universal bypass across all modules.
+- **Let's Encrypt Automated SSL & Custom Domains**: Configure custom domains pointing to the server's IP, perform pre-flight DNS A-record resolution checks, automatically provision TLS certificates via Let's Encrypt ACME HTTP-01 challenge responder, and auto-renew every 12 hours with zero maintenance.
+- **Super Admin Miracle Power Tools**:
+  - **Tenant Impersonation**: Jump directly into any tenant organization's administration workspace with 1 click.
+  - **Scheduled Maintenance Mode**: Gracefully pause platform operations with custom downtime messaging (HTTP 503).
+  - **Emergency Mutation Lockdown**: Instantly freeze all write/mutate endpoints (HTTP 423) in case of an ongoing security incident.
+  - **Instant 1-Click Backup**: Download an instantaneous JSON snapshot export of all organizations, users, catalog items, orders, and audit logs.
+  - **Live Storage Optimizer**: Execute database VACUUM, analyze indexes, and checkpoint write-ahead logs with live status reporting.
+- **Bank-Grade Defense-in-Depth Hardening**:
+  - **Real-Time Token Revocation**: Instant cryptographic SHA-256 session blacklisting upon logout (`/api/v1/auth/logout` and `/api/v1/superadmin/logout`).
+  - **Anti-Brute Force & Anti-Enumeration**: Progressive 15-minute account lockout after 5 consecutive failed logins, with dummy Argon2id hash timing equalization to eliminate user enumeration side-channels.
+  - **Financial Math Bounds**: Strict non-negative constraints on pricing and strictly positive constraints on order quantities and payments.
+  - **Production Credential Guard**: Refuses to launch in production (`OBAF_ENV=production`) with default credentials (`admin123`).
+  - **Sensitive Headers Redaction**: `SetSensitiveRequestHeadersLayer` masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+  - **Sanitized Backup Exports**: Automatic redaction of user `password_hash` to `[REDACTED]` and exclusion of MFA secrets in database backups.
+  - **RFC 6455 WebSocket Heartbeats**: 30-second ping/pong intervals preventing proxy timeouts and ghost socket leaks.
+  - **Zero-Panic Resilience**: Complete elimination of `.unwrap()` in authentication and webhook hashing workflows.
+
+---
 
 ## 💻 Developer CLI (`obaf-cli`)
 
@@ -196,7 +243,8 @@ curl -X POST http://127.0.0.1:8080/api/v1/admin/setup/preset \
     "slug": "spice-bistro",
     "preset": "restaurant_pos",
     "admin_email": "admin@spicebistro.com",
-    "admin_name": "Alex Chef"
+    "admin_name": "Alex Chef",
+    "admin_password": "SecurePassword123!"
   }'
 ```
 

@@ -19,18 +19,22 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     run_migrations(&db).await.expect("migrations");
 
     let tenant_id = Uuid::new_v4();
+    let admin_id = Uuid::new_v4();
     let cashier_id = Uuid::new_v4();
     let jwt_secret = "secret_jwt_pos_shifts_123456";
-    let token = generate_token(cashier_id, TenantId(tenant_id), "cashier", jwt_secret, 24).unwrap();
+    let admin_token =
+        generate_token(admin_id, TenantId(tenant_id), "admin", jwt_secret, 24).unwrap();
+    let cashier_token =
+        generate_token(cashier_id, TenantId(tenant_id), "cashier", jwt_secret, 24).unwrap();
 
     let state = Arc::new(AppState::new(db.clone(), jwt_secret));
     let app = create_router(state);
 
-    // 1. Create a stock location
+    // 1. Create a stock location (requires admin/manager)
     let loc_req = Request::builder()
         .method("POST")
         .uri("/api/v1/inventory/locations")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
             serde_json::json!({
@@ -54,7 +58,7 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let list_loc_req = Request::builder()
         .method("GET")
         .uri("/api/v1/inventory/locations")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", cashier_token))
         .body(Body::empty())
         .unwrap();
 
@@ -65,7 +69,7 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let open_shift_req = Request::builder()
         .method("POST")
         .uri("/api/v1/pos/shifts/open")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", cashier_token))
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
             serde_json::json!({
@@ -89,7 +93,7 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let cur_req = Request::builder()
         .method("GET")
         .uri("/api/v1/pos/shifts/current")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", cashier_token))
         .body(Body::empty())
         .unwrap();
 
@@ -105,7 +109,7 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let close_req = Request::builder()
         .method("POST")
         .uri(format!("/api/v1/pos/shifts/{}/close", shift_id))
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", cashier_token))
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
             serde_json::json!({
@@ -128,11 +132,11 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let variance: Decimal = variance_str.parse().unwrap();
     assert_eq!(variance, Decimal::from(5));
 
-    // 5. Issue an immutable Credit Note
+    // 5. Issue an immutable Credit Note (requires admin/manager)
     let cn_req = Request::builder()
         .method("POST")
         .uri("/api/v1/billing/credit-notes")
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", admin_token))
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
             serde_json::json!({
@@ -157,7 +161,7 @@ async fn test_pos_shifts_credit_notes_and_locations() {
     let get_cn_req = Request::builder()
         .method("GET")
         .uri(format!("/api/v1/billing/credit-notes/{}", cn_id))
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
+        .header(header::AUTHORIZATION, format!("Bearer {}", cashier_token))
         .body(Body::empty())
         .unwrap();
 

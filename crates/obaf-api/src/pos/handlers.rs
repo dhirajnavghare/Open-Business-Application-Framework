@@ -6,7 +6,9 @@ use axum::{
 use chrono::Utc;
 use obaf_database::entities::pos_shift;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -85,6 +87,8 @@ pub async fn open_shift(
     auth: AuthUser,
     Json(payload): Json<OpenShiftRequest>,
 ) -> Result<(StatusCode, Json<PosShiftResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     // Check if cashier already has an active open shift on this register
@@ -134,7 +138,8 @@ pub async fn open_shift(
         .await
         .map_err(|e| internal_err(format!("Failed to open shift: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "pos.shift_opened",
         serde_json::json!({
             "shift_id": shift_id,
@@ -199,6 +204,8 @@ pub async fn close_shift(
     Path(id): Path<Uuid>,
     Json(payload): Json<CloseShiftRequest>,
 ) -> Result<Json<PosShiftResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager", "staff", "cashier"])?;
+
     let tenant_uuid = auth.tenant_id.as_uuid();
 
     let shift = pos_shift::Entity::find()
@@ -215,6 +222,16 @@ pub async fn close_shift(
                 }),
             )
         })?;
+
+    if shift.cashier_id != auth.user_id && auth.role != "admin" && auth.role != "manager" {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(AuthErrorResponse {
+                error: "Cannot close another user's shift without administrative privileges"
+                    .to_string(),
+            }),
+        ));
+    }
 
     if shift.status == "CLOSED" {
         return Err((
@@ -242,7 +259,8 @@ pub async fn close_shift(
         .await
         .map_err(|e| internal_err(format!("Failed to close shift: {}", e)))?;
 
-    state.broadcast_event(
+    state.broadcast_tenant_event(
+        auth.tenant_id.as_uuid(),
         "pos.shift_closed",
         serde_json::json!({
             "shift_id": id,
@@ -271,6 +289,7 @@ pub async fn list_shifts(
     let shifts = pos_shift::Entity::find()
         .filter(pos_shift::Column::TenantId.eq(auth.tenant_id.as_uuid()))
         .order_by_desc(pos_shift::Column::OpenedAt)
+        .limit(100)
         .all(&state.db)
         .await
         .map_err(|e| internal_err(format!("DB error: {}", e)))?;

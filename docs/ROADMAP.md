@@ -20,6 +20,7 @@ This document details the milestone ordering, acceptance criteria, and delivered
 | **9** | **Advanced Platform Capabilities** | Offline edge batch sync (`/api/v1/sync`), dynamic rules engine, tenant quota metering, `TenantPoolRouter`, `obaf-worker` daemon | ✅ Completed |
 | **10** | **Enterprise Commerce & Supply Chain** | Procurement (PO lifecycle), Persistent Coupons, Multi-Currency Exchange, POS Cash Drawer Shifts, Multi-Location Warehouses, Credit Notes, Polyglot SDKs | ✅ Completed |
 | **11** | **Developer Experience & AI Integrations** | `/llms.txt` standard & endpoint, 60s guided tour (`make tour`), 1-click cloud DevContainer, live CLI diagnostics (`obaf status`), Token Bucket rate limiting middleware | ✅ Completed |
+| **12** | **Super Admin & Bank-Grade Security** | Super Admin UI (`/admin`), Dual-Engine Auth (Password + Google SSO with audience lock), RFC 6238 TOTP 2FA, Automated Let's Encrypt SSL, SHA-256 Token Revocation, CWE-1188 Defenses, Zero-Trust RBAC & BOLA Defenses, Memory Bounds & Panic Shield | ✅ Completed |
 
 ---
 
@@ -103,3 +104,18 @@ This document details the milestone ordering, acceptance criteria, and delivered
 - [x] **Live System Diagnostics**: `obaf-cli status` and `make status` inspecting running server health, latency, OpenAPI specs, `/llms.txt` context, Prometheus metrics, and local database tenant counts.
 - [x] **Token Bucket Rate Limiting Middleware**: Active Axum traffic-shaping layer with dynamic client key resolution, emitting `X-RateLimit-Remaining` and returning `HTTP 429 Too Many Requests` with `Retry-After`.
 - [x] **Viral Launch Playbook**: Comprehensive launch templates and technical distribution strategy for Hacker News, Reddit, Twitter/X, and Product Hunt (`docs/LAUNCH_PLAYBOOK.md`).
+
+### Phase 12: Super Admin Control Plane & Bank-Grade Security Hardening
+- [x] **Embedded Super Admin Web Console**: Zero-dependency SPA at `/admin` and `/superadmin` for organization management, API module toggles, telemetry, database diagnostics, and backup downloads.
+- [x] **Dual-Engine Authentication**: Root administrator login via email/password or Google Identity Services (GIS) SSO with cryptographic JWKS caching, strict audience (`aud`) verification, and debug-only mock token isolation.
+- [x] **RFC 6238 TOTP Multi-Factor Authentication**: Two-factor authentication with 30s time steps, 6-digit codes, Argon2id-hashed emergency backup codes, and intermediate `superadmin_mfa_pending` privilege isolation.
+- [x] **Automated Let's Encrypt SSL & ACME Engine**: Domain DNS verification, ACME challenge token sanitization, and automated background SSL certificate renewal (`obaf-worker`).
+- [x] **Real-Time Token Revocation Blacklisting**: SHA-256 fingerprint token revocation (`token_blacklist`) backed by a bounded in-memory `TtlCache` for instantaneous logout enforcement.
+- [x] **Elimination of Insecure Default Passwords (CWE-1188)**: Mandatory `admin_password` ($\ge 8$ chars) across all onboarding endpoints (`/organizations`, `/setup/preset`, `/tenants`).
+- [x] **Zero-Trust Role-Based Access Control (RBAC)**: Strict permission boundaries preventing read-only `viewer` accounts from mutating state, and restricting credit notes, reports, and currency rates to administrators.
+- [x] **BOLA / IDOR Cashier Shift Isolation**: Bounded cashier shift closures to the shift owner with administrative override support.
+- [x] **Comprehensive Denial-of-Service Defense**: Bounded memory limits on `TokenBucketRateLimiter` and `TtlCache` (50,000 max), 2MB request body ceiling, pagination limit clamping (200 max), and `CatchPanicLayer` resilience.
+- [x] **Sensitive Headers Redaction (OWASP API3 / CWE-312)**: `SetSensitiveRequestHeadersLayer` masks `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` with `[REDACTED]` in tracing logs.
+- [x] **Sanitized Database Backup Exports (CWE-312)**: Automated redaction of user `password_hash` to `[REDACTED]` and exclusion of MFA secrets and recovery codes in `/api/v1/superadmin/database/backup`.
+- [x] **RFC 6455 WebSocket Heartbeat Keep-Alive**: Periodic 30-second ping/pong frames preventing reverse proxy connection drops and mitigating ghost socket leaks.
+- [x] **Panic-Free Authentication & Resilience**: Eliminated unchecked `.unwrap()` in login flows and HMAC initialization.

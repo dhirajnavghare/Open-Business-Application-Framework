@@ -102,7 +102,8 @@ When an order is created via `POST /api/v1/orders`, OBAF validates the JSON meta
        "slug": "smile-care",
        "preset": "dental_clinic",
        "admin_email": "dr.smith@smilecare.test",
-       "admin_name": "Dr. Smith"
+       "admin_name": "Dr. Smith",
+       "admin_password": "SecurePassword123!"
      }'
    ```
 

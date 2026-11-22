@@ -6,7 +6,9 @@ use axum::{
 use chrono::{DateTime, Utc};
 use obaf_database::entities::coupon;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -187,6 +189,8 @@ pub async fn create_coupon(
     auth_user: AuthUser,
     Json(payload): Json<CreateCouponRequest>,
 ) -> Result<(StatusCode, Json<CouponResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager"])?;
+
     let tenant_id = auth_user.tenant_id.0;
     let code = payload.code.trim().to_uppercase();
 
@@ -275,7 +279,7 @@ pub async fn list_coupons(
         query = query.filter(coupon::Column::IsActive.eq(true));
     }
 
-    let coupons = query.all(&state.db).await.map_err(|e| {
+    let coupons = query.limit(100).all(&state.db).await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthErrorResponse {
@@ -371,6 +375,8 @@ pub async fn redeem_coupon(
     Path(code): Path<String>,
     Json(payload): Json<RedeemCouponRequest>,
 ) -> Result<Json<RedeemCouponResponse>, (StatusCode, Json<AuthErrorResponse>)> {
+    auth_user.require_role(&["admin", "manager", "staff", "cashier", "waiter"])?;
+
     let tenant_id = auth_user.tenant_id.0;
     let code_upper = code.trim().to_uppercase();
     let now = Utc::now();

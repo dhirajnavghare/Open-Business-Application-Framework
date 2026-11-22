@@ -95,6 +95,8 @@ pub async fn create_supplier(
     State(state): State<SharedState>,
     Json(payload): Json<CreateSupplierRequest>,
 ) -> Result<(StatusCode, Json<SupplierResponse>), (StatusCode, Json<AuthErrorResponse>)> {
+    auth.require_role(&["admin", "manager"])?;
+
     let supplier_id = Uuid::new_v4();
     let now = Utc::now();
     let meta_str = payload

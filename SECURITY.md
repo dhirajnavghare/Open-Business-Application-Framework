@@ -10,6 +10,7 @@ Only the latest active minor release is officially supported with security patch
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.2.x   | :white_check_mark: |
 | 0.1.x   | :white_check_mark: |
 | < 0.1   | :x:                |
 
@@ -29,9 +30,10 @@ OBAF enforces defense-in-depth across the following boundaries:
 - We use **Argon2id** (`argon2 = 0.5`) with per-user cryptographic salts (`OsRng`) and memory-hard parameter limits to safeguard against GPU/ASIC cracking.
 
 ### 3. API Authentication & Token Lifecycle
-- Stateless authentication uses JSON Web Tokens (JWT) signed with HMAC-SHA256.
+- Stateless authentication uses JSON Web Tokens (JWT) signed with HMAC-SHA256 locked to `Algorithm::HS256`.
 - Token expiration (`exp`) is enforced.
-- Revocation strategies can be configured via short TTLs or organization-level secret invalidation.
+- **Real-Time Token Revocation:** Immediate session invalidation via `POST /api/v1/auth/logout` and `POST /api/v1/superadmin/logout`, adding token SHA-256 fingerprints to an in-memory `TtlCache` blacklist.
+- **MFA Privilege Isolation:** Multi-factor authentication requires intermediate `superadmin_mfa_pending` token verification before full platform privileges are granted.
 
 ### 4. Webhook Delivery Authentication
 - All outgoing webhooks dispatched to external subscribers include cryptographic signatures:
@@ -43,6 +45,18 @@ OBAF enforces defense-in-depth across the following boundaries:
 ### 5. Financial Arithmetic Security
 - OBAF strictly avoids IEEE 754 floating-point numbers (`f32`/`f64`) in all billing, tax, and ledger logic.
 - We exclusively use `rust_decimal::Decimal` (128-bit fixed-point arithmetic) to prevent rounding exploits and fractional drift attacks.
+
+### 6. Zero-Trust RBAC & Default Credential Defenses (CWE-1188)
+- **Mandatory Administrator Passwords:** All tenant creation routes require an explicit password of $\ge 8$ characters. Static default credentials (`admin123`, `AdminSecure123!`) are eliminated.
+- **Zero-Trust Role Gating:** Read-only `viewer` accounts are blocked from mutating state across orders, catalog, bookings, subscriptions, and promotions.
+- **BOLA Shift Isolation:** Cashier shift closures are strictly locked to the shift owner or authorized administrators.
+
+### 7. Sensitive Headers Redaction & Backup Sanitization (OWASP API3 / CWE-312)
+- **Trace Redaction:** `SetSensitiveRequestHeadersLayer` automatically redacts `Authorization`, `Cookie`, `X-API-Key`, and `X-OBAF-Signature` headers with `[REDACTED]` in tracing logs and error output.
+- **Backup Sanitization:** Database backups downloaded from `/api/v1/superadmin/database/backup` automatically sanitize user `password_hash` to `[REDACTED]` and filter out MFA secrets (`superadmin_totp_secret`, recovery codes).
+
+### 8. RFC 6455 WebSocket Heartbeats & DoS Defense
+- **Heartbeat Pings:** Real-time event streams at `/api/v1/ws` emit periodic 30-second heartbeats (`Message::Ping`) and handle `Message::Pong`, preventing proxy timeouts, detecting dead clients, and mitigating ghost connection leaks.
 
 ---
 
