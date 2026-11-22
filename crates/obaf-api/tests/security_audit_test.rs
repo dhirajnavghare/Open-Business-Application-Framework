@@ -738,11 +738,14 @@ async fn test_token_logout_revocation_blacklist() {
     };
     org.insert(&state.db).await.unwrap();
 
+    let test_password = std::env::var("OBAF_TEST_PASSWORD")
+        .unwrap_or_else(|_| Uuid::new_v4().to_string());
+
     let user = obaf_database::entities::user::ActiveModel {
         id: Set(user_id),
         organization_id: Set(org_id),
         email: Set("revokeme@security.org".to_string()),
-        password_hash: Set(obaf_core::security::hash_password("password123").unwrap()),
+        password_hash: Set(obaf_core::security::hash_password(&test_password).unwrap()),
         full_name: Set("Revoke User".to_string()),
         role: Set("admin".to_string()),
         is_active: Set(true),
